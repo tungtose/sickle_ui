@@ -1,76 +1,86 @@
 use bevy::prelude::*;
 use sickle_math::lerp::Lerp;
 
-use crate::FluxInteraction;
+use crate::{
+    animated_interaction::{add_animated_interaction_state, update_animated_interaction_state},
+    FluxInteraction,
+};
 
 use super::animated_interaction::{
     AnimatedInteractionState, AnimatedInteractionUpdate, AnimationProgress,
 };
 
-pub struct HighlightBackgroundPlugin;
+pub struct InteractiveBorderPlugin;
 
-impl Plugin for HighlightBackgroundPlugin {
+impl Plugin for InteractiveBorderPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(PreUpdate, add_highlight_background_state)
-            .add_systems(
-                Update,
-                (update_base_color, update_background_color)
-                    .chain()
-                    .after(AnimatedInteractionUpdate),
-            );
+        app.add_systems(
+            PreUpdate,
+            (
+                add_animated_interaction_state::<InteractiveBorder>,
+                add_interactive_border_state,
+            ),
+        )
+        .add_systems(
+            Update,
+            update_animated_interaction_state::<InteractiveBorder>
+                .in_set(AnimatedInteractionUpdate),
+        )
+        .add_systems(
+            Update,
+            (update_base_color, update_border_color)
+                .chain()
+                .after(AnimatedInteractionUpdate),
+        );
     }
 }
 
 #[derive(Component)]
-struct HighlightBackgroundState {
+struct InteractiveBorderState {
     original_color: Color,
     base_color: Color,
 }
 
-fn add_highlight_background_state(
+fn add_interactive_border_state(
     mut commands: Commands,
     q_highlighted: Query<
-        (Entity, &BackgroundColor),
+        (Entity, &BorderColor),
         (
-            With<HighlightBackground>,
+            With<InteractiveBorder>,
             With<FluxInteraction>,
-            Without<HighlightBackgroundState>,
+            Without<InteractiveBorderState>,
         ),
     >,
 ) {
-    for (entity, bg_color) in &q_highlighted {
-        commands.entity(entity).insert(HighlightBackgroundState {
-            original_color: bg_color.0,
-            base_color: bg_color.0,
+    for (entity, border_color) in &q_highlighted {
+        commands.entity(entity).insert(InteractiveBorderState {
+            original_color: border_color.0,
+            base_color: border_color.0,
         });
     }
 }
 
 fn update_base_color(
     mut q_interaction: Query<
-        (
-            &BackgroundColor,
-            &mut HighlightBackgroundState,
-            &FluxInteraction,
-        ),
+        (&BorderColor, &mut InteractiveBorderState, &FluxInteraction),
         Changed<FluxInteraction>,
     >,
 ) {
-    for (bg_color, mut highlight, interaction) in &mut q_interaction {
+    for (border_color, mut highlight, interaction) in &mut q_interaction {
         if *interaction == FluxInteraction::Pressed {
-            highlight.base_color = bg_color.0;
+            highlight.base_color = border_color.0;
         }
     }
 }
 
 #[derive(Component)]
-pub struct HighlightBackground {
+pub struct InteractiveBorder {
     pub highlight_color: Option<Color>,
     pub pressed_color: Option<Color>,
     pub cancel_color: Option<Color>,
 }
 
-impl HighlightBackground {
+impl InteractiveBorder {
     pub fn new(
         highlight_color: Option<Color>,
         pressed_color: Option<Color>,
@@ -84,7 +94,7 @@ impl HighlightBackground {
     }
 }
 
-impl Default for HighlightBackground {
+impl Default for InteractiveBorder {
     fn default() -> Self {
         Self {
             highlight_color: Default::default(),
@@ -94,16 +104,16 @@ impl Default for HighlightBackground {
     }
 }
 
-fn update_background_color(
+fn update_border_color(
     mut q_interaction: Query<(
-        &HighlightBackground,
-        &HighlightBackgroundState,
+        &InteractiveBorder,
+        &InteractiveBorderState,
         &FluxInteraction,
-        Option<&AnimatedInteractionState>,
-        &mut BackgroundColor,
+        Option<&AnimatedInteractionState<InteractiveBorder>>,
+        &mut BorderColor,
     )>,
 ) {
-    for (highlight, highlight_state, interaction, animation_state, mut bg_color) in
+    for (highlight, highlight_state, interaction, animation_state, mut border_color) in
         &mut q_interaction
     {
         let original_color = highlight_state.original_color;
@@ -151,6 +161,6 @@ fn update_background_color(
             end_color
         };
 
-        bg_color.0 = new_color;
+        border_color.0 = new_color;
     }
 }

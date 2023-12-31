@@ -2,12 +2,14 @@ use bevy::prelude::*;
 
 pub mod animated_interaction;
 pub mod flux_interaction;
-pub mod highlight_background;
+pub mod interactive_background;
+pub mod interactive_border;
 pub use flux_interaction::*;
+use interactive_border::InteractiveBorderPlugin;
 
 use self::{
     animated_interaction::AnimatedInteractionPlugin,
-    highlight_background::HighlightBackgroundPlugin,
+    interactive_background::InteractiveBackgroundPlugin,
 };
 
 pub struct SickleUiPlugin;
@@ -17,7 +19,8 @@ impl Plugin for SickleUiPlugin {
         app.add_plugins((
             FluxInteractionPlugin,
             AnimatedInteractionPlugin,
-            HighlightBackgroundPlugin,
+            InteractiveBackgroundPlugin,
+            InteractiveBorderPlugin,
         ));
     }
 }

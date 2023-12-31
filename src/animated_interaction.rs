@@ -12,11 +12,6 @@ impl Plugin for AnimatedInteractionPlugin {
         app.configure_sets(
             Update,
             AnimatedInteractionUpdate.after(FluxInteractionUpdate),
-        )
-        .add_systems(PreUpdate, add_animated_interaction_state)
-        .add_systems(
-            Update,
-            update_animated_interaction_state.in_set(AnimatedInteractionUpdate),
         );
     }
 }
@@ -50,20 +45,23 @@ impl Default for AnimationConfig {
 }
 
 #[derive(Component)]
-pub struct AnimatedInteractionState {
+pub struct AnimatedInteractionState<T: Component> {
+    pub context: T,
     pub progress: AnimationProgress,
 }
 
-impl Default for AnimatedInteractionState {
+impl<T: Component + Default> Default for AnimatedInteractionState<T> {
     fn default() -> Self {
         Self {
+            context: Default::default(),
             progress: AnimationProgress::Start,
         }
     }
 }
 
 #[derive(Component)]
-pub struct AnimatedInteraction {
+pub struct AnimatedInteraction<T: Component> {
+    pub context: T,
     pub tween: AnimationConfig,
     pub hover: Option<AnimationConfig>,
     pub press: Option<AnimationConfig>,
@@ -71,9 +69,10 @@ pub struct AnimatedInteraction {
     pub reset_delay: Option<f32>,
 }
 
-impl Default for AnimatedInteraction {
+impl<T: Component + Default> Default for AnimatedInteraction<T> {
     fn default() -> Self {
         Self {
+            context: Default::default(),
             tween: AnimationConfig {
                 duration: 0.1,
                 ..default()
@@ -95,30 +94,30 @@ impl Default for AnimatedInteraction {
     }
 }
 
-fn add_animated_interaction_state(
+pub fn add_animated_interaction_state<T: Component + Default>(
     mut commands: Commands,
     q_animated: Query<
         Entity,
         (
             With<FluxInteraction>,
-            With<AnimatedInteraction>,
-            Without<AnimatedInteractionState>,
+            With<AnimatedInteraction<T>>,
+            Without<AnimatedInteractionState<T>>,
         ),
     >,
 ) {
     for entity in &q_animated {
         commands
             .entity(entity)
-            .insert(AnimatedInteractionState::default());
+            .insert(AnimatedInteractionState::<T>::default());
     }
 }
 
-fn update_animated_interaction_state(
+pub fn update_animated_interaction_state<T: Component>(
     mut q_interaction: Query<(
-        &AnimatedInteraction,
+        &AnimatedInteraction<T>,
         &FluxInteraction,
         &FluxInteractionStopwatch,
-        &mut AnimatedInteractionState,
+        &mut AnimatedInteractionState<T>,
     )>,
 ) {
     for (animation, interaction, stopwatch, mut animation_state) in &mut q_interaction {
