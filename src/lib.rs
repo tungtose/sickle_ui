@@ -10,9 +10,9 @@ use self::{
     highlight_background::HighlightBackgroundPlugin,
 };
 
-pub struct UiInteractionsPlugin;
+pub struct SickleUiPlugin;
 
-impl Plugin for UiInteractionsPlugin {
+impl Plugin for SickleUiPlugin {
     fn build(&self, app: &mut App) {
         app.add_plugins((
             FluxInteractionPlugin,
