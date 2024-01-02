@@ -28,7 +28,7 @@ impl Plugin for InteractiveBackgroundPlugin {
         )
         .add_systems(
             Update,
-            (update_base_color, update_background_color)
+            (update_transition_base_color, update_background_color)
                 .chain()
                 .after(AnimatedInteractionUpdate),
         );
@@ -37,13 +37,13 @@ impl Plugin for InteractiveBackgroundPlugin {
 
 #[derive(Component)]
 struct InteractiveBackgroundState {
-    original_color: Color,
-    base_color: Color,
+    original: Color,
+    transition_base: Color,
 }
 
 fn add_interactive_background_state(
     mut commands: Commands,
-    q_highlighted: Query<
+    q_interaction: Query<
         (Entity, &BackgroundColor),
         (
             With<InteractiveBackground>,
@@ -52,15 +52,15 @@ fn add_interactive_background_state(
         ),
     >,
 ) {
-    for (entity, bg_color) in &q_highlighted {
+    for (entity, bg_color) in &q_interaction {
         commands.entity(entity).insert(InteractiveBackgroundState {
-            original_color: bg_color.0,
-            base_color: bg_color.0,
+            original: bg_color.0,
+            transition_base: bg_color.0,
         });
     }
 }
 
-fn update_base_color(
+fn update_transition_base_color(
     mut q_interaction: Query<
         (
             &BackgroundColor,
@@ -70,40 +70,26 @@ fn update_base_color(
         Changed<FluxInteraction>,
     >,
 ) {
-    for (bg_color, mut highlight, interaction) in &mut q_interaction {
+    for (bg_color, mut state, interaction) in &mut q_interaction {
         if *interaction == FluxInteraction::Pressed {
-            highlight.base_color = bg_color.0;
+            state.transition_base = bg_color.0;
         }
     }
 }
 
 #[derive(Component)]
 pub struct InteractiveBackground {
-    pub highlight_color: Option<Color>,
-    pub pressed_color: Option<Color>,
-    pub cancel_color: Option<Color>,
-}
-
-impl InteractiveBackground {
-    pub fn new(
-        highlight_color: Option<Color>,
-        pressed_color: Option<Color>,
-        cancel_color: Option<Color>,
-    ) -> Self {
-        Self {
-            highlight_color,
-            pressed_color,
-            cancel_color,
-        }
-    }
+    pub highlight: Option<Color>,
+    pub pressed: Option<Color>,
+    pub cancel: Option<Color>,
 }
 
 impl Default for InteractiveBackground {
     fn default() -> Self {
         Self {
-            highlight_color: Default::default(),
-            pressed_color: Default::default(),
-            cancel_color: Default::default(),
+            highlight: Default::default(),
+            pressed: Default::default(),
+            cancel: Default::default(),
         }
     }
 }
@@ -120,31 +106,31 @@ fn update_background_color(
     for (highlight, highlight_state, interaction, animation_state, mut bg_color) in
         &mut q_interaction
     {
-        let original_color = highlight_state.original_color;
+        let original_color = highlight_state.original;
 
         let (start_color, end_color) = match *interaction {
             FluxInteraction::Pressed => {
-                let Some(pressed_color) = highlight.pressed_color else {
+                let Some(pressed_color) = highlight.pressed else {
                     continue;
                 };
 
-                (Some(highlight_state.base_color), pressed_color)
+                (Some(highlight_state.transition_base), pressed_color)
             }
             FluxInteraction::Released => {
-                let end_color = highlight.highlight_color.unwrap_or(original_color);
+                let end_color = highlight.highlight.unwrap_or(original_color);
 
-                (highlight.pressed_color, end_color)
+                (highlight.pressed, end_color)
             }
-            FluxInteraction::PressCanceled => (highlight.cancel_color, original_color),
+            FluxInteraction::PressCanceled => (highlight.cancel, original_color),
             FluxInteraction::PointerEnter => {
-                let Some(highlight_color) = highlight.highlight_color else {
+                let Some(highlight_color) = highlight.highlight else {
                     continue;
                 };
 
                 (Some(original_color), highlight_color)
             }
             FluxInteraction::PointerLeave => {
-                let Some(highlight_color) = highlight.highlight_color else {
+                let Some(highlight_color) = highlight.highlight else {
                     continue;
                 };
 

@@ -4,6 +4,7 @@ pub mod animated_interaction;
 pub mod flux_interaction;
 pub mod interactive_background;
 pub mod interactive_border;
+pub mod interaction_utils;
 pub use flux_interaction::*;
 use interactive_border::InteractiveBorderPlugin;
 

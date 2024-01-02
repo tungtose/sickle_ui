@@ -19,13 +19,14 @@ impl Plugin for AnimatedInteractionPlugin {
 #[derive(SystemSet, Clone, Hash, Debug, Eq, PartialEq)]
 pub struct AnimatedInteractionUpdate;
 
+#[derive(Debug, Copy, Clone, Reflect)]
 pub enum AnimationProgress {
     Start,
     Inbetween(f32),
     End,
 }
 
-#[derive(Clone)]
+#[derive(Debug, Copy, Clone, Reflect)]
 pub struct AnimationConfig {
     pub duration: f32,
     pub easing: Ease,
@@ -44,24 +45,26 @@ impl Default for AnimationConfig {
     }
 }
 
-#[derive(Component)]
+#[derive(Component, Debug, Copy, Clone, Reflect)]
+#[reflect(Component)]
 pub struct AnimatedInteractionState<T: Component> {
-    pub context: T,
+    pub context: Option<T>,
     pub progress: AnimationProgress,
 }
 
-impl<T: Component + Default> Default for AnimatedInteractionState<T> {
+impl<T: Component> Default for AnimatedInteractionState<T> {
     fn default() -> Self {
         Self {
-            context: Default::default(),
+            context: None,
             progress: AnimationProgress::Start,
         }
     }
 }
 
-#[derive(Component)]
+#[derive(Component, Debug, Copy, Clone, Reflect)]
+#[reflect(Component)]
 pub struct AnimatedInteraction<T: Component> {
-    pub context: T,
+    pub context: Option<T>,
     pub tween: AnimationConfig,
     pub hover: Option<AnimationConfig>,
     pub press: Option<AnimationConfig>,
@@ -69,10 +72,10 @@ pub struct AnimatedInteraction<T: Component> {
     pub reset_delay: Option<f32>,
 }
 
-impl<T: Component + Default> Default for AnimatedInteraction<T> {
+impl<T: Component> Default for AnimatedInteraction<T> {
     fn default() -> Self {
         Self {
-            context: Default::default(),
+            context: None,
             tween: AnimationConfig {
                 duration: 0.1,
                 ..default()
@@ -121,19 +124,20 @@ pub fn update_animated_interaction_state<T: Component>(
     )>,
 ) {
     for (animation, interaction, stopwatch, mut animation_state) in &mut q_interaction {
-        let (default, hover, press, cancel) = (
-            animation.tween.clone(),
-            animation.hover.clone(),
-            animation.press.clone(),
-            animation.cancel.clone(),
+        let (base_tween, hover, press, cancel) = (
+            animation.tween,
+            animation.hover,
+            animation.press,
+            animation.cancel,
         );
 
         let elapsed = stopwatch.0.elapsed_secs();
 
         let progress = match *interaction {
             FluxInteraction::Pressed => {
-                let tween = press.unwrap_or(default);
+                let tween = press.unwrap_or(base_tween);
                 let tween_time = tween.duration.max(0.);
+
                 if tween_time == 0. {
                     AnimationProgress::End
                 } else {
@@ -142,55 +146,73 @@ pub fn update_animated_interaction_state<T: Component>(
                 }
             }
             FluxInteraction::Released => {
-                let tween = press.unwrap_or(default);
+                let tween = press.unwrap_or(base_tween);
                 let tween_time = tween.out_duration.unwrap_or(tween.duration).max(0.);
+
                 if tween_time == 0. {
                     AnimationProgress::End
                 } else {
                     let easing = tween.out_easing.unwrap_or(tween.easing);
                     let tween_ratio = (elapsed / tween_time).clamp(0., 1.).ease(easing);
-                    AnimationProgress::Inbetween(tween_ratio)
+
+                    if tween_ratio == 1. {
+                        AnimationProgress::End
+                    } else {
+                        AnimationProgress::Inbetween(tween_ratio)
+                    }
                 }
             }
             FluxInteraction::PressCanceled => {
-                let tween = cancel.unwrap_or(default);
+                let tween = cancel.unwrap_or(base_tween);
                 let tween_time = tween.duration.max(0.);
-                let reset_delay = animation.reset_delay.unwrap_or(tween_time);
-                let reset_length = tween.out_duration.unwrap_or(tween_time);
+
+                let reset_delay = animation.reset_delay.unwrap_or(tween_time).max(0.);
+                let reset_length = tween.out_duration.unwrap_or(tween_time).max(0.);
 
                 if elapsed < reset_delay {
                     AnimationProgress::Start
                 } else {
-                    if tween_time == 0. {
+                    let easing = tween.out_easing.unwrap_or(tween.easing);
+                    let tween_ratio = ((elapsed - reset_delay) / reset_length)
+                        .clamp(0., 1.)
+                        .ease(easing);
+
+                    if tween_time == 0. || tween_ratio == 1. {
                         AnimationProgress::End
                     } else {
-                        let easing = tween.out_easing.unwrap_or(tween.easing);
-                        let tween_ratio = ((elapsed - reset_delay) / reset_length)
-                            .clamp(0., 1.)
-                            .ease(easing);
                         AnimationProgress::Inbetween(tween_ratio)
                     }
                 }
             }
             FluxInteraction::PointerEnter => {
-                let tween = hover.unwrap_or(default);
+                let tween = hover.unwrap_or(base_tween);
                 let tween_time = tween.duration.max(0.);
+
                 if tween_time == 0. {
                     AnimationProgress::End
                 } else {
                     let tween_ratio = (elapsed / tween_time).clamp(0., 1.).ease(tween.easing);
-                    AnimationProgress::Inbetween(tween_ratio)
+                    if tween_ratio == 1. {
+                        AnimationProgress::End
+                    } else {
+                        AnimationProgress::Inbetween(tween_ratio)
+                    }
                 }
             }
             FluxInteraction::PointerLeave => {
-                let tween = hover.unwrap_or(default);
+                let tween = hover.unwrap_or(base_tween);
                 let tween_time = tween.out_duration.unwrap_or(tween.duration).max(0.);
+
                 if tween_time == 0. {
                     AnimationProgress::End
                 } else {
                     let easing = tween.out_easing.unwrap_or(tween.easing);
                     let tween_ratio = (elapsed / tween_time).clamp(0., 1.).ease(easing);
-                    AnimationProgress::Inbetween(tween_ratio)
+                    if tween_ratio == 1. {
+                        AnimationProgress::End
+                    } else {
+                        AnimationProgress::Inbetween(tween_ratio)
+                    }
                 }
             }
             _ => AnimationProgress::End,
