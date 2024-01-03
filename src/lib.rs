@@ -10,7 +10,7 @@ use interactive_border::InteractiveBorderPlugin;
 
 use self::{
     animated_interaction::AnimatedInteractionPlugin,
-    interactive_background::InteractiveBackgroundPlugin,
+    interactive_background::InteractiveBackground,
 };
 
 pub struct SickleUiPlugin;
@@ -20,7 +20,7 @@ impl Plugin for SickleUiPlugin {
         app.add_plugins((
             FluxInteractionPlugin,
             AnimatedInteractionPlugin,
-            InteractiveBackgroundPlugin,
+            InteractiveBackground::default(),
             InteractiveBorderPlugin,
         ));
     }
