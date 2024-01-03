@@ -1,13 +1,46 @@
 use bevy::prelude::*;
+use sickle_macros::simple_interaction_for;
 use sickle_math::lerp::Lerp;
 
-use crate::{
-    animated_interaction::{AnimatedInteractionState, AnimationProgress},
-    FluxInteraction,
-};
+use crate::{animated_interaction::*, FluxInteraction};
+
+pub struct InteractionsPlugin;
+
+impl Plugin for InteractionsPlugin {
+    fn build(&self, app: &mut App) {
+        app.add_plugins((
+            InteractiveBackground::default(),
+            InteractiveBorderSize::default(),
+            InteractiveBorderColor::default(),
+            InteractiveMargin::default(),
+            InteractiveHeight::default(),
+        ));
+    }
+}
+
+#[simple_interaction_for((BackgroundColor, Color))]
+pub struct InteractiveBackground;
+
+#[simple_interaction_for((Style, UiRect, "border"))]
+pub struct InteractiveBorderSize;
+
+#[simple_interaction_for((BorderColor, Color))]
+pub struct InteractiveBorderColor;
+
+#[simple_interaction_for((Style, UiRect, "margin"))]
+pub struct InteractiveMargin;
+
+#[simple_interaction_for((Style, Val, "height"))]
+pub struct InteractiveHeight;
+
 
 pub trait InteractionConfig {
     type TargetType;
+    fn new(
+        highlight: Option<Self::TargetType>,
+        pressed: Option<Self::TargetType>,
+        cancel: Option<Self::TargetType>,
+    ) -> Self;
     fn highlight(&self) -> Option<Self::TargetType>;
     fn pressed(&self) -> Option<Self::TargetType>;
     fn cancel(&self) -> Option<Self::TargetType>;

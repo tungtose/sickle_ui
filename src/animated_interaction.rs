@@ -1,9 +1,7 @@
 use bevy::prelude::*;
 use sickle_math::ease::{Ease, ValueEasing};
 
-use crate::{FluxInteraction, FluxInteractionStopwatch};
-
-use super::FluxInteractionUpdate;
+use crate::{FluxInteraction, FluxInteractionStopwatch, FluxInteractionUpdate};
 
 pub struct AnimatedInteractionPlugin;
 
