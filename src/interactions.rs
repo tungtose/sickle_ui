@@ -33,7 +33,6 @@ pub struct InteractiveMargin;
 #[simple_interaction_for((Style, Val, "height"))]
 pub struct InteractiveHeight;
 
-
 pub trait InteractionConfig {
     type TargetType;
     fn new(

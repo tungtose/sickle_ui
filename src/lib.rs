@@ -3,9 +3,11 @@ use bevy::prelude::*;
 pub mod animated_interaction;
 pub mod flux_interaction;
 pub mod interactions;
+pub mod widgets;
 
 pub use flux_interaction::*;
 use interactions::InteractionsPlugin;
+use widgets::WidgetsPlugin;
 
 use self::animated_interaction::AnimatedInteractionPlugin;
 
@@ -17,6 +19,7 @@ impl Plugin for SickleUiPlugin {
             FluxInteractionPlugin,
             AnimatedInteractionPlugin,
             InteractionsPlugin,
+            WidgetsPlugin,
         ));
     }
 }
