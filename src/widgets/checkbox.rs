@@ -1,4 +1,4 @@
-use bevy::{prelude::*, ui::FocusPolicy};
+use bevy::{ecs::system::EntityCommands, prelude::*, ui::FocusPolicy};
 use sickle_math::ease::Ease;
 
 use crate::{
@@ -13,32 +13,39 @@ pub struct CheckboxPlugin;
 
 impl Plugin for CheckboxPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Update, toggle_checkbox);
+        app.add_systems(Update, (toggle_checkbox, update_checkbox).chain());
     }
 }
 
 fn toggle_checkbox(
     mut q_checkboxes: Query<(&mut InputCheckbox, &FluxInteraction), Changed<FluxInteraction>>,
-    mut style: Query<&mut Style>,
 ) {
     for (mut checkbox, interaction) in &mut q_checkboxes {
         if *interaction == FluxInteraction::Released {
             checkbox.checked = !checkbox.checked;
-
-            if let Ok(mut target) = style.get_mut(checkbox.check_node) {
-                target.display = if checkbox.checked {
-                    Display::Flex
-                } else {
-                    Display::None
-                };
-            }
         }
     }
 }
 
-#[derive(Component, Debug)]
+fn update_checkbox(
+    q_checkboxes: Query<&InputCheckbox, Changed<InputCheckbox>>,
+    mut style: Query<&mut Style>,
+) {
+    for checkbox in &q_checkboxes {
+        if let Ok(mut target) = style.get_mut(checkbox.check_node) {
+            target.display = if checkbox.checked {
+                Display::Flex
+            } else {
+                Display::None
+            };
+        }
+    }
+}
+
+#[derive(Component, Debug, Reflect)]
+#[reflect(Component)]
 pub struct InputCheckbox {
-    checked: bool,
+    pub checked: bool,
     check_node: Entity,
 }
 
@@ -51,8 +58,11 @@ impl Default for InputCheckbox {
     }
 }
 
-impl InputWidget for InputCheckbox {
-    fn spawn(builder: &mut ChildBuilder, label: Option<String>) {
+impl<'w, 's, 'a> InputWidget<'w, 's, 'a> for InputCheckbox {
+    fn spawn(
+        builder: &'a mut ChildBuilder<'w, 's, '_>,
+        label: Option<String>,
+    ) -> EntityCommands<'w, 's, 'a> {
         let tween = AnimationConfig {
             duration: 0.1,
             easing: Ease::OutExpo,
@@ -136,5 +146,7 @@ impl InputWidget for InputCheckbox {
             check_node,
             checked: false,
         });
+
+        input
     }
 }

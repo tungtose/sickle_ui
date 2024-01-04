@@ -1,6 +1,6 @@
 pub mod checkbox;
 
-use bevy::prelude::*;
+use bevy::{ecs::system::EntityCommands, prelude::*};
 
 use self::checkbox::CheckboxPlugin;
 
@@ -12,6 +12,6 @@ impl Plugin for WidgetsPlugin {
     }
 }
 
-pub trait InputWidget {
-    fn spawn(builder: &mut ChildBuilder, label: Option<String>);
+pub trait InputWidget<'w, 's, 'a> {
+    fn spawn(builder: &'a mut ChildBuilder<'w, 's, '_>, label: Option<String>) -> EntityCommands<'w, 's, 'a>;
 }
