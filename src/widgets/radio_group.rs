@@ -7,26 +7,80 @@ use crate::{
     FluxInteraction, TrackedInteraction,
 };
 
-pub struct CheckboxPlugin;
+pub struct RadioGroupPlugin;
 
-impl Plugin for CheckboxPlugin {
+impl Plugin for RadioGroupPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Update, (toggle_checkbox, update_checkbox).chain());
+        app.add_systems(
+            Update,
+            (
+                toggle_radio_button,
+                update_radio_group_buttons,
+                update_radio_button,
+            )
+                .chain(),
+        );
     }
 }
 
-fn toggle_checkbox(
-    mut q_checkboxes: Query<(&mut InputCheckbox, &FluxInteraction), Changed<FluxInteraction>>,
+fn toggle_radio_button(
+    mut q_radio_buttons: Query<(&mut InputRadioButton, &FluxInteraction), Changed<FluxInteraction>>,
+    keys: Res<Input<KeyCode>>,
+    mut q_group: Query<&mut InputRadioGroup>,
 ) {
-    for (mut checkbox, interaction) in &mut q_checkboxes {
+    for (mut radio_button, interaction) in &mut q_radio_buttons {
         if *interaction == FluxInteraction::Released {
-            checkbox.checked = !checkbox.checked;
+            let mut changed = false;
+
+            if radio_button.checked
+                && radio_button.unselectable
+                && keys.any_pressed([KeyCode::ControlLeft, KeyCode::ControlRight])
+            {
+                radio_button.checked = false;
+                changed = true;
+            } else if !radio_button.checked {
+                radio_button.checked = true;
+                changed = true;
+            }
+
+            if !changed {
+                continue;
+            }
+
+            if let Some(group) = radio_button.group {
+                let Ok(mut radio_group) = q_group.get_mut(group) else {
+                    continue;
+                };
+
+                radio_group.selected = if radio_button.checked {
+                    radio_button.index.into()
+                } else {
+                    None
+                };
+            }
         }
     }
 }
 
-fn update_checkbox(
-    q_checkboxes: Query<&InputCheckbox, Changed<InputCheckbox>>,
+fn update_radio_group_buttons(
+    mut q_radio_buttons: Query<(&InputRadioGroup, &Children), Changed<InputRadioGroup>>,
+    mut q_radio_button: Query<&mut InputRadioButton>,
+) {
+    for (radio_group, children) in &mut q_radio_buttons {
+        for child in children {
+            if let Ok(mut button) = q_radio_button.get_mut(*child) {
+                // This is to avoid double triggering the change
+                let checked = radio_group.selected == button.index.into();
+                if button.checked != checked {
+                    button.checked = checked;
+                }
+            }
+        }
+    }
+}
+
+fn update_radio_button(
+    q_checkboxes: Query<&InputRadioButton, Changed<InputRadioButton>>,
     mut style: Query<&mut Style>,
 ) {
     for checkbox in &q_checkboxes {
@@ -42,24 +96,70 @@ fn update_checkbox(
 
 #[derive(Component, Debug, Reflect)]
 #[reflect(Component)]
-pub struct InputCheckbox {
-    pub checked: bool,
-    check_node: Entity,
+pub struct InputRadioGroup {
+    pub selected: Option<usize>,
 }
 
-impl Default for InputCheckbox {
+impl Default for InputRadioGroup {
+    fn default() -> Self {
+        Self { selected: None }
+    }
+}
+
+impl<'w, 's, 'a> InputRadioGroup {
+    pub fn spawn(
+        parent: &'a mut ChildBuilder<'w, 's, '_>,
+        options: Vec<Option<String>>,
+        unselectable: bool,
+    ) -> EntityCommands<'w, 's, 'a> {
+        let mut group = parent.spawn((NodeBundle::default(), InputRadioGroup::default()));
+        let id = Some(group.id());
+
+        group.with_children(|builder| {
+            for (index, label) in options.iter().enumerate() {
+                InputRadioButton::spawn(
+                    builder,
+                    index.try_into().unwrap(),
+                    label.clone(),
+                    id,
+                    unselectable,
+                );
+            }
+        });
+
+        group
+    }
+}
+
+#[derive(Component, Debug, Reflect)]
+#[reflect(Component)]
+pub struct InputRadioButton {
+    pub index: usize,
+    pub checked: bool,
+    unselectable: bool,
+    check_node: Entity,
+    group: Option<Entity>,
+}
+
+impl Default for InputRadioButton {
     fn default() -> Self {
         Self {
+            index: 0,
             checked: false,
+            unselectable: false,
             check_node: Entity::PLACEHOLDER,
+            group: None,
         }
     }
 }
 
-impl<'w, 's, 'a> InputCheckbox {
+impl<'w, 's, 'a> InputRadioButton {
     pub fn spawn(
         parent: &'a mut ChildBuilder<'w, 's, '_>,
+        index: usize,
         label: Option<String>,
+        group: Option<Entity>,
+        unselectable: bool,
     ) -> EntityCommands<'w, 's, 'a> {
         let tween = AnimationConfig {
             duration: 0.1,
@@ -140,9 +240,12 @@ impl<'w, 's, 'a> InputCheckbox {
             }
         });
 
-        input.insert(InputCheckbox {
-            check_node,
+        input.insert(InputRadioButton {
+            index,
             checked: false,
+            unselectable,
+            check_node,
+            group,
         });
 
         input

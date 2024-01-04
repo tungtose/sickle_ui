@@ -1,17 +1,14 @@
 pub mod checkbox;
+pub mod radio_group;
 
-use bevy::{ecs::system::EntityCommands, prelude::*};
+use bevy::prelude::*;
 
-use self::checkbox::CheckboxPlugin;
+use self::{checkbox::CheckboxPlugin, radio_group::RadioGroupPlugin};
 
 pub struct WidgetsPlugin;
 
 impl Plugin for WidgetsPlugin {
     fn build(&self, app: &mut App) {
-        app.add_plugins(CheckboxPlugin);
+        app.add_plugins((CheckboxPlugin, RadioGroupPlugin));
     }
-}
-
-pub trait InputWidget<'w, 's, 'a> {
-    fn spawn(builder: &'a mut ChildBuilder<'w, 's, '_>, label: Option<String>) -> EntityCommands<'w, 's, 'a>;
 }
