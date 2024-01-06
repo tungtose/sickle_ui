@@ -89,8 +89,8 @@ impl<'w, 's, 'a> InputCheckbox {
         ));
 
         let mut check_node: Entity = Entity::PLACEHOLDER;
-        input.with_children(|builder| {
-            builder
+        input.with_children(|parent| {
+            parent
                 .spawn(ButtonBundle {
                     style: Style {
                         width: Val::Px(16.),
@@ -121,7 +121,7 @@ impl<'w, 's, 'a> InputCheckbox {
                 });
 
             if let Some(label) = label {
-                builder.spawn(TextBundle {
+                parent.spawn(TextBundle {
                     style: Style {
                         align_self: AlignSelf::Center,
                         margin: UiRect::right(Val::Px(10.)),

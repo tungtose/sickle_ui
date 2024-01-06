@@ -20,29 +20,20 @@ impl Plugin for FluxInteractionPlugin {
     }
 }
 
-#[derive(SystemSet, Clone, Hash, Debug, Eq, PartialEq)]
+#[derive(SystemSet, Clone, Eq, Debug, Hash, PartialEq)]
 pub struct FluxInteractionUpdate;
 
-#[derive(Bundle, Clone, Debug)]
+#[derive(Bundle, Clone, Debug, Default)]
 pub struct TrackedInteraction {
     pub interaction: FluxInteraction,
     pub stopwatch: FluxInteractionStopwatch,
     pub prev_interaction: PrevInteraction,
 }
 
-impl Default for TrackedInteraction {
-    fn default() -> Self {
-        Self {
-            interaction: FluxInteraction::default(),
-            stopwatch: FluxInteractionStopwatch::default(),
-            prev_interaction: PrevInteraction::default(),
-        }
-    }
-}
-
-#[derive(Component, Copy, Clone, Eq, PartialEq, Debug, Reflect)]
+#[derive(Component, Clone, Copy, Debug, Default, Eq, PartialEq, Reflect)]
 #[reflect(Component, PartialEq)]
 pub enum FluxInteraction {
+    #[default]
     None,
     PointerEnter,
     PointerLeave,
@@ -51,41 +42,16 @@ pub enum FluxInteraction {
     PressCanceled,
 }
 
-impl FluxInteraction {
-    const DEFAULT: Self = Self::None;
-}
-
-impl Default for FluxInteraction {
-    fn default() -> Self {
-        Self::DEFAULT
-    }
-}
-
-#[derive(Component, Clone, Debug)]
+#[derive(Component, Clone, Debug, Default)]
 pub struct FluxInteractionStopwatch(pub Stopwatch);
 
-impl Default for FluxInteractionStopwatch {
-    fn default() -> Self {
-        Self(Stopwatch::new())
-    }
-}
-
-#[derive(Component, Copy, Clone, Eq, PartialEq, Debug, Reflect)]
+#[derive(Component, Clone, Copy, Debug, Default, Eq, PartialEq, Reflect)]
 #[reflect(Component, PartialEq)]
 pub enum PrevInteraction {
+    #[default]
+    None,
     Pressed,
     Hovered,
-    None,
-}
-
-impl PrevInteraction {
-    const DEFAULT: Self = Self::None;
-}
-
-impl Default for PrevInteraction {
-    fn default() -> Self {
-        Self::DEFAULT
-    }
 }
 
 fn tick_flux_interaction_stopwatch(

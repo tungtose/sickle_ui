@@ -14,17 +14,18 @@ impl Plugin for AnimatedInteractionPlugin {
     }
 }
 
-#[derive(SystemSet, Clone, Hash, Debug, Eq, PartialEq)]
+#[derive(SystemSet, Clone, Debug, Eq, Hash, PartialEq)]
 pub struct AnimatedInteractionUpdate;
 
-#[derive(Debug, Copy, Clone, Reflect)]
+#[derive(Clone, Copy, Debug, Default, Reflect)]
 pub enum AnimationProgress {
+    #[default]
     Start,
     Inbetween(f32),
     End,
 }
 
-#[derive(Debug, Copy, Clone, Reflect)]
+#[derive(Clone, Copy, Debug, Default, Reflect)]
 pub struct AnimationConfig {
     pub duration: f32,
     pub easing: Ease,
@@ -32,34 +33,14 @@ pub struct AnimationConfig {
     pub out_easing: Option<Ease>,
 }
 
-impl Default for AnimationConfig {
-    fn default() -> Self {
-        Self {
-            duration: Default::default(),
-            easing: Default::default(),
-            out_duration: Default::default(),
-            out_easing: Default::default(),
-        }
-    }
-}
-
-#[derive(Component, Debug, Copy, Clone, Reflect)]
+#[derive(Component, Clone, Copy, Debug, Default, Reflect)]
 #[reflect(Component)]
-pub struct AnimatedInteractionState<T: Component> {
+pub struct AnimatedInteractionState<T: Component + Default + Reflect> {
     pub context: Option<T>,
     pub progress: AnimationProgress,
 }
 
-impl<T: Component> Default for AnimatedInteractionState<T> {
-    fn default() -> Self {
-        Self {
-            context: None,
-            progress: AnimationProgress::Start,
-        }
-    }
-}
-
-#[derive(Component, Debug, Copy, Clone, Reflect)]
+#[derive(Component, Clone, Copy, Debug, Reflect)]
 #[reflect(Component)]
 pub struct AnimatedInteraction<T: Component> {
     pub context: Option<T>,
@@ -95,7 +76,7 @@ impl<T: Component> Default for AnimatedInteraction<T> {
     }
 }
 
-pub fn add_animated_interaction_state<T: Component + Default>(
+pub fn add_animated_interaction_state<T: Component + Default + Reflect>(
     mut commands: Commands,
     q_animated: Query<
         Entity,
@@ -113,7 +94,7 @@ pub fn add_animated_interaction_state<T: Component + Default>(
     }
 }
 
-pub fn update_animated_interaction_state<T: Component>(
+pub fn update_animated_interaction_state<T: Component + Default + Reflect>(
     mut q_interaction: Query<(
         &AnimatedInteraction<T>,
         &FluxInteraction,

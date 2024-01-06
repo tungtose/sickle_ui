@@ -116,6 +116,8 @@ pub fn update_controlled_component<Interaction, State, ControlledComponent, Tran
     )>,
 ) where
     Interaction: Component
+        + Default
+        + Reflect
         + InteractionConfig<TargetType = TransitionType>
         + ComponentController<
             InteractionState = State,
@@ -126,52 +128,61 @@ pub fn update_controlled_component<Interaction, State, ControlledComponent, Tran
     ControlledComponent: Component,
     TransitionType: Lerp,
 {
-    for (highlight, highlight_state, interaction, state, controlled_component) in &mut q_interaction
+    for (
+        interaction_config,
+        transient_state,
+        flux_interaction,
+        animation_state,
+        controlled_component,
+    ) in &mut q_interaction
     {
-        if let Some(new_value) =
-            calculate_interaction_result(highlight, highlight_state, interaction, state)
-        {
+        if let Some(new_value) = calculate_interaction_result(
+            interaction_config,
+            transient_state,
+            flux_interaction,
+            animation_state,
+        ) {
             Interaction::update_controlled_component(controlled_component, new_value);
         }
     }
 }
 
 pub fn calculate_interaction_result<T, S, R>(
-    config: &T,
+    interaction_config: &T,
     transient_state: &S,
-    interaction: &FluxInteraction,
+    flux_interaction: &FluxInteraction,
     animation_state: Option<&AnimatedInteractionState<T>>,
 ) -> Option<R>
 where
-    T: Component + InteractionConfig<TargetType = R>,
+    T: Component + Default + Reflect + InteractionConfig<TargetType = R>,
     S: InteractionState<TargetType = R>,
     R: Lerp,
 {
     let original_value = transient_state.original();
 
-    let (start_value, end_value) = match *interaction {
+    let (start_value, end_value) = match *flux_interaction {
         FluxInteraction::Pressed => {
-            let Some(pressed_value) = config.pressed() else {
+            let Some(pressed_value) = interaction_config.pressed() else {
                 return None;
             };
 
             (Some(transient_state.transition_base()), pressed_value)
         }
         FluxInteraction::Released => {
-            let end_value = config.highlight().unwrap_or(original_value);
+            let end_value = interaction_config.highlight().unwrap_or(original_value);
 
-            (config.pressed(), end_value)
+            (interaction_config.pressed(), end_value)
         }
-        FluxInteraction::PressCanceled => (config.cancel(), original_value),
+        FluxInteraction::PressCanceled => (interaction_config.cancel(), original_value),
         FluxInteraction::PointerEnter => {
-            let Some(highlight_value) = config.highlight() else {
+            let Some(highlight_value) = interaction_config.highlight() else {
                 return None;
             };
 
             (Some(original_value), highlight_value)
         }
         FluxInteraction::PointerLeave => {
-            let Some(highlight_color) = config.highlight() else {
+            let Some(highlight_color) = interaction_config.highlight() else {
                 return None;
             };
 
