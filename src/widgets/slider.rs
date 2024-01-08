@@ -17,6 +17,7 @@ impl Plugin for InputSliderPlugin {
             (
                 update_slider_on_drag,
                 update_slider_handle,
+                update_slider_readout,
                 // debug_slider,
                 // debug_slider_handle,
             )
@@ -37,26 +38,9 @@ impl Plugin for InputSliderPlugin {
 //     }
 // }
 
-fn update_slider_handle(
-    q_slider: Query<&InputSlider, Changed<InputSlider>>,
-    q_transform: Query<&Node>,
-    mut q_hadle_style: Query<(&Node, &mut Style), With<InputSliderDragHandle>>,
-) {
-    for slider in &q_slider {
-        let Ok(slider_bar) = q_transform.get(slider.slider_bar) else {
-            continue;
-        };
-        let Ok((node, mut style)) = q_hadle_style.get_mut(slider.drag_handle) else {
-            continue;
-        };
-
-        let width = slider_bar.size().x - node.size().x;
-        let handle_position = width * slider.ratio;
-        if style.left != Val::Px(handle_position) {
-            style.left = Val::Px(handle_position);
-        }
-    }
-}
+// TODO: Add mouse wheel scroll (ScrollInteraction Vertical/Horizontal)
+// TODO: Remove hardcoded theming
+// TODO: Add input for value (w/ read/write flags)
 
 fn update_slider_on_drag(
     q_draggable: Query<(&Draggable, &InputSliderDragHandle, &Node), Changed<Draggable>>,
@@ -92,24 +76,133 @@ fn update_slider_on_drag(
     }
 }
 
+fn update_slider_handle(
+    q_slider: Query<&InputSlider, Or<(Changed<InputSlider>, Changed<Node>)>>,
+    q_transform: Query<&Node>,
+    mut q_hadle_style: Query<(&Node, &mut Style), With<InputSliderDragHandle>>,
+) {
+    for slider in &q_slider {
+        let Ok(slider_bar) = q_transform.get(slider.slider_bar) else {
+            continue;
+        };
+        let Ok((node, mut style)) = q_hadle_style.get_mut(slider.drag_handle) else {
+            continue;
+        };
+
+        let width = slider_bar.size().x - node.size().x;
+        let handle_position = width * slider.ratio;
+        if style.left != Val::Px(handle_position) {
+            style.left = Val::Px(handle_position);
+        }
+    }
+}
+
+fn update_slider_readout(
+    q_slider: Query<&InputSlider, Changed<InputSlider>>,
+    mut q_style: Query<&mut Style>,
+    mut q_text: Query<&mut Text>,
+) {
+    for slider in &q_slider {
+        let Ok(mut text) = q_text.get_mut(slider.current_value_node) else {
+            continue;
+        };
+
+        let Ok(mut style) = q_style.get_mut(slider.current_value_node) else {
+            continue;
+        };
+
+        if slider.config.show_current {
+            if style.display == Display::None {
+                style.display = Display::Flex;
+            }
+
+            let content = format!("{:.1}", slider.value());
+            let section = TextSection {
+                value: content,
+                style: TextStyle {
+                    color: Color::BLACK,
+                    font_size: 14.,
+                    ..default()
+                },
+            };
+
+            text.sections = vec![section];
+        } else if !slider.config.show_current && style.display == Display::Flex {
+            style.display = Display::None;
+        }
+    }
+}
+
+#[derive(Component, Debug, Reflect)]
+pub struct SliderConfig {
+    min: f32,
+    max: f32,
+    initial_value: f32,
+    show_current: bool,
+}
+
+impl SliderConfig {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn from(min: f32, max: f32, initial_value: f32, show_current: bool) -> Self {
+        if max <= min || initial_value < min || initial_value > max {
+            panic!(
+                "Invalid slider config values! Min: {}, Max: {}, Initial: {}",
+                min, max, initial_value
+            );
+        }
+
+        SliderConfig {
+            min,
+            max,
+            initial_value,
+            show_current,
+        }
+    }
+
+    pub fn with_value(self, value: f32) -> Self {
+        if value >= self.min && value <= self.max {
+            return Self {
+                initial_value: value,
+                ..self
+            };
+        }
+
+        panic!("Value must be between min and max!");
+    }
+}
+
+impl Default for SliderConfig {
+    fn default() -> Self {
+        Self {
+            min: 0.,
+            max: 1.,
+            initial_value: 0.5,
+            show_current: Default::default(),
+        }
+    }
+}
+
 #[derive(Component, Debug, Reflect)]
 #[reflect(Component)]
 pub struct InputSlider {
     pub ratio: f32,
-    pub min: f32,
-    pub max: f32,
+    pub config: SliderConfig,
     pub slider_bar: Entity,
     pub drag_handle: Entity,
+    pub current_value_node: Entity,
 }
 
 impl Default for InputSlider {
     fn default() -> Self {
         Self {
             ratio: Default::default(),
-            min: Default::default(),
-            max: Default::default(),
+            config: Default::default(),
             slider_bar: Entity::PLACEHOLDER,
             drag_handle: Entity::PLACEHOLDER,
+            current_value_node: Entity::PLACEHOLDER,
         }
     }
 }
@@ -137,12 +230,13 @@ pub enum SliderDirection {
 
 impl<'w, 's, 'a> InputSlider {
     pub fn value(&self) -> f32 {
-        self.min.lerp(self.max, self.ratio)
+        self.config.min.lerp(self.config.max, self.ratio)
     }
 
     pub fn spawn(
         parent: &'a mut ChildBuilder<'w, 's, '_>,
         label: Option<String>,
+        config: Option<SliderConfig>,
     ) -> EntityCommands<'w, 's, 'a> {
         let tween = AnimationConfig {
             duration: 0.1,
@@ -150,21 +244,30 @@ impl<'w, 's, 'a> InputSlider {
             ..default()
         };
 
-        let mut input = parent.spawn((NodeBundle {
-            style: Style {
-                height: Val::Px(20.),
-                justify_content: JustifyContent::SpaceBetween,
-                justify_self: JustifySelf::Stretch,
-                align_content: AlignContent::Center,
-                margin: UiRect::all(Val::Px(5.)),
+        let mut input = parent.spawn((
+            NodeBundle {
+                style: Style {
+                    height: Val::Px(20.),
+                    justify_content: JustifyContent::SpaceBetween,
+                    justify_self: JustifySelf::Stretch,
+                    align_content: AlignContent::Center,
+                    margin: UiRect::all(Val::Px(5.)),
+                    ..default()
+                },
                 ..default()
             },
-            ..default()
-        },));
+            TrackedInteraction::default(),
+            InteractiveBackground {
+                highlight: Some(Color::rgba(0., 1., 1., 0.8)),
+                ..default()
+            },
+            AnimatedInteraction::<InteractiveBackground> { tween, ..default() },
+        ));
 
         let input_id = input.id();
-        let mut drag_handle_id: Entity = Entity::PLACEHOLDER;
+        let mut drag_handle: Entity = Entity::PLACEHOLDER;
         let mut slider_bar: Entity = Entity::PLACEHOLDER;
+        let mut current_value_node: Entity = Entity::PLACEHOLDER;
         input.with_children(|parent| {
             if let Some(label) = label {
                 parent.spawn(TextBundle {
@@ -211,11 +314,10 @@ impl<'w, 's, 'a> InputSlider {
                             ..default()
                         })
                         .with_children(|parent| {
-                            drag_handle_id = parent
+                            drag_handle = parent
                                 .spawn((
                                     ButtonBundle {
                                         style: Style {
-                                            left: Val::Percent(50.),
                                             width: Val::Px(20.),
                                             height: Val::Px(20.),
                                             align_self: AlignSelf::Stretch,
@@ -242,15 +344,31 @@ impl<'w, 's, 'a> InputSlider {
                                 .id();
                         })
                         .id();
+
+                    current_value_node = parent
+                        .spawn(TextBundle {
+                            style: Style {
+                                min_width: Val::Px(50.),
+                                overflow: Overflow::clip(),
+                                align_self: AlignSelf::Center,
+                                margin: UiRect::left(Val::Px(5.)),
+                                ..default()
+                            },
+                            ..default()
+                        })
+                        .id();
                 });
         });
 
+        let config = config.unwrap_or_default();
+        let initial_ratio = config.initial_value / (config.max - config.min);
+
         input.insert(InputSlider {
-            ratio: 0.,
-            min: 0.,
-            max: 1.,
-            slider_bar: slider_bar,
-            drag_handle: drag_handle_id,
+            ratio: initial_ratio,
+            config,
+            slider_bar,
+            drag_handle,
+            current_value_node,
         });
 
         input
