@@ -5,7 +5,8 @@ pub struct FluxInteractionPlugin;
 
 impl Plugin for FluxInteractionPlugin {
     fn build(&self, app: &mut App) {
-        app.configure_sets(Update, FluxInteractionUpdate)
+        app.init_resource::<FluxInteractionConfig>()
+            .configure_sets(Update, FluxInteractionUpdate)
             .add_systems(
                 Update,
                 (
@@ -20,13 +21,25 @@ impl Plugin for FluxInteractionPlugin {
     }
 }
 
+#[derive(Resource, Clone, Debug, Reflect)]
+pub struct FluxInteractionConfig {
+    pub max_interaction_duration: f32,
+}
+
+impl Default for FluxInteractionConfig {
+    fn default() -> Self {
+        Self {
+            max_interaction_duration: 1.,
+        }
+    }
+}
+
 #[derive(SystemSet, Clone, Eq, Debug, Hash, PartialEq)]
 pub struct FluxInteractionUpdate;
 
 #[derive(Bundle, Clone, Debug, Default)]
 pub struct TrackedInteraction {
     pub interaction: FluxInteraction,
-    pub stopwatch: FluxInteractionStopwatch,
     pub prev_interaction: PrevInteraction,
 }
 
@@ -43,6 +56,7 @@ pub enum FluxInteraction {
 }
 
 #[derive(Component, Clone, Debug, Default)]
+#[component(storage = "SparseSet")]
 pub struct FluxInteractionStopwatch(pub Stopwatch);
 
 #[derive(Component, Clone, Copy, Debug, Default, Eq, PartialEq, Reflect)]
@@ -55,11 +69,17 @@ pub enum PrevInteraction {
 }
 
 fn tick_flux_interaction_stopwatch(
+    config: Res<FluxInteractionConfig>,
     time: Res<Time<Real>>,
-    mut q_stopwatch: Query<&mut FluxInteractionStopwatch>,
+    mut q_stopwatch: Query<(Entity, &mut FluxInteractionStopwatch)>,
+    mut commands: Commands,
 ) {
-    for mut stopwatch in &mut q_stopwatch {
-        stopwatch.0.tick(time.delta());
+    for (entity, mut stopwatch) in &mut q_stopwatch {
+        if stopwatch.0.elapsed().as_secs_f32() > config.max_interaction_duration {
+            commands.entity(entity).remove::<FluxInteractionStopwatch>();
+        } else {
+            stopwatch.0.tick(time.delta());
+        }
     }
 }
 
@@ -87,10 +107,20 @@ fn update_flux_interaction(
 }
 
 fn reset_stopwatch_on_change(
-    mut q_stopwatch: Query<&mut FluxInteractionStopwatch, Changed<FluxInteraction>>,
+    mut q_stopwatch: Query<
+        (Entity, Option<&mut FluxInteractionStopwatch>),
+        Changed<FluxInteraction>,
+    >,
+    mut commands: Commands,
 ) {
-    for mut stopwatch in &mut q_stopwatch {
-        stopwatch.0.reset();
+    for (entity, stopwatch) in &mut q_stopwatch {
+        if let Some(mut stopwatch) = stopwatch {
+            stopwatch.0.reset();
+        } else {
+            commands
+                .entity(entity)
+                .insert(FluxInteractionStopwatch::default());
+        }
     }
 }
 

@@ -1,7 +1,7 @@
 use bevy::{prelude::*, window::PrimaryWindow};
 use bevy_reflect::Reflect;
 
-use crate::FluxInteraction;
+use crate::{FluxInteraction, FluxInteractionUpdate};
 
 pub struct DragInteractionPlugin;
 
@@ -9,7 +9,9 @@ impl Plugin for DragInteractionPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(
             Update,
-            (update_drag_progress, update_drag_state).chain(),
+            (update_drag_progress, update_drag_state)
+                .chain()
+                .after(FluxInteractionUpdate),
         );
     }
 }
