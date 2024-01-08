@@ -1,4 +1,9 @@
-use bevy::{ecs::system::EntityCommands, prelude::*, ui::FocusPolicy};
+use bevy::{
+    ecs::system::EntityCommands,
+    input::mouse::{MouseScrollUnit, MouseWheel},
+    prelude::*,
+    ui::FocusPolicy,
+};
 use sickle_math::{ease::Ease, lerp::Lerp};
 
 use crate::{
@@ -15,6 +20,7 @@ impl Plugin for InputSliderPlugin {
         app.add_systems(
             Update,
             (
+                update_slider_on_scroll,
                 update_slider_on_drag,
                 update_slider_handle,
                 update_slider_readout,
@@ -41,6 +47,40 @@ impl Plugin for InputSliderPlugin {
 // TODO: Add mouse wheel scroll (ScrollInteraction Vertical/Horizontal)
 // TODO: Remove hardcoded theming
 // TODO: Add input for value (w/ read/write flags)
+
+fn update_slider_on_scroll(
+    mut mouse_wheel_events: EventReader<MouseWheel>,
+    q_slider_bar: Query<(
+        AnyOf<(&InputSliderBar, &InputSliderDragHandle)>,
+        &Interaction,
+    )>,
+    mut q_slider: Query<&mut InputSlider>,
+) {
+    for mouse_wheel_event in mouse_wheel_events.read() {
+        for ((slider_bar, handle), interaction) in &q_slider_bar {
+            if *interaction != Interaction::Hovered {
+                continue;
+            }
+
+            let fraction = match mouse_wheel_event.unit {
+                MouseScrollUnit::Line => mouse_wheel_event.y * 5.,
+                MouseScrollUnit::Pixel => mouse_wheel_event.y,
+            } / 100.;
+
+            if let Some(slider_bar) = slider_bar {
+                let Ok(mut slider) = q_slider.get_mut(slider_bar.slider) else {
+                    continue;
+                };
+                slider.ratio = (slider.ratio + fraction).clamp(0., 1.);
+            } else if let Some(handle) = handle {
+                let Ok(mut slider) = q_slider.get_mut(handle.slider) else {
+                    continue;
+                };
+                slider.ratio = (slider.ratio + fraction).clamp(0., 1.);
+            }
+        }
+    }
+}
 
 fn update_slider_on_drag(
     q_draggable: Query<(&Draggable, &InputSliderDragHandle, &Node), Changed<Draggable>>,
@@ -70,9 +110,7 @@ fn update_slider_on_drag(
         }
 
         let fraction = diff.x / width;
-        let ratio = (slider.ratio + fraction).clamp(0., 1.);
-
-        slider.ratio = ratio;
+        slider.ratio = (slider.ratio + fraction).clamp(0., 1.);
     }
 }
 
@@ -221,12 +259,26 @@ impl Default for InputSliderDragHandle {
     }
 }
 
-#[derive(Default, Debug, Reflect)]
-pub enum SliderDirection {
-    #[default]
-    Horizontal,
-    Vertical,
+#[derive(Component, Debug, Reflect)]
+#[reflect(Component)]
+pub struct InputSliderBar {
+    pub slider: Entity,
 }
+
+impl Default for InputSliderBar {
+    fn default() -> Self {
+        Self {
+            slider: Entity::PLACEHOLDER,
+        }
+    }
+}
+
+// #[derive(Default, Debug, Reflect)]
+// pub enum SliderDirection {
+//     #[default]
+//     Horizontal,
+//     Vertical,
+// }
 
 impl<'w, 's, 'a> InputSlider {
     pub fn value(&self) -> f32 {
@@ -288,19 +340,23 @@ impl<'w, 's, 'a> InputSlider {
                 });
             }
 
-            parent
-                .spawn(NodeBundle {
-                    style: Style {
-                        width: Val::Percent(100.),
-                        justify_content: JustifyContent::SpaceBetween,
-                        align_self: AlignSelf::Stretch,
+            slider_bar = parent
+                .spawn((
+                    NodeBundle {
+                        style: Style {
+                            width: Val::Percent(100.),
+                            justify_content: JustifyContent::SpaceBetween,
+                            align_self: AlignSelf::Stretch,
+                            ..default()
+                        },
                         ..default()
                     },
-                    ..default()
-                })
+                    InputSliderBar { slider: input_id },
+                    Interaction::default(),
+                ))
                 .with_children(|parent| {
-                    slider_bar = parent
-                        .spawn(NodeBundle {
+                    parent
+                        .spawn((NodeBundle {
                             style: Style {
                                 width: Val::Percent(100.),
                                 height: Val::Px(4.),
@@ -312,7 +368,7 @@ impl<'w, 's, 'a> InputSlider {
                             background_color: Color::DARK_GRAY.into(),
                             border_color: Color::GRAY.into(),
                             ..default()
-                        })
+                        },))
                         .with_children(|parent| {
                             drag_handle = parent
                                 .spawn((
@@ -342,22 +398,22 @@ impl<'w, 's, 'a> InputSlider {
                                     InputSliderDragHandle { slider: input_id },
                                 ))
                                 .id();
-                        })
-                        .id();
+                        });
+                })
+                .id();
 
-                    current_value_node = parent
-                        .spawn(TextBundle {
-                            style: Style {
-                                min_width: Val::Px(50.),
-                                overflow: Overflow::clip(),
-                                align_self: AlignSelf::Center,
-                                margin: UiRect::left(Val::Px(5.)),
-                                ..default()
-                            },
-                            ..default()
-                        })
-                        .id();
-                });
+            current_value_node = parent
+                .spawn(TextBundle {
+                    style: Style {
+                        min_width: Val::Px(50.),
+                        overflow: Overflow::clip(),
+                        align_self: AlignSelf::Center,
+                        margin: UiRect::left(Val::Px(5.)),
+                        ..default()
+                    },
+                    ..default()
+                })
+                .id();
         });
 
         let config = config.unwrap_or_default();
