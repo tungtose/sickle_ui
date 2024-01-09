@@ -46,12 +46,6 @@ pub enum DragSource {
     Touch(u64),
 }
 
-// fn debug_drag_state(q_draggable: Query<&Draggable, Changed<Draggable>>) {
-//     for draggable in &q_draggable {
-//         println!("{:?}", draggable);
-//     }
-// }
-
 fn update_drag_progress(
     mut q_draggable: Query<(&mut Draggable, &FluxInteraction)>,
     q_window: Query<&Window, With<PrimaryWindow>>,
