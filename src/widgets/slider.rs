@@ -35,11 +35,8 @@ impl Plugin for InputSliderPlugin {
 
 fn update_slider_on_scroll(
     mut mouse_wheel_events: EventReader<MouseWheel>,
-    q_slider_bar: Query<(
-        AnyOf<(&InputSliderBar, &InputSliderDragHandle)>,
-        &Interaction,
-    )>,
-    mut q_slider: Query<&mut InputSlider>,
+    q_slider_bar: Query<(AnyOf<(&SliderBar, &SliderDragHandle)>, &Interaction)>,
+    mut q_slider: Query<&mut Slider>,
 ) {
     for mouse_wheel_event in mouse_wheel_events.read() {
         for ((slider_bar, handle), interaction) in &q_slider_bar {
@@ -68,9 +65,9 @@ fn update_slider_on_scroll(
 }
 
 fn update_slider_on_drag(
-    q_draggable: Query<(&Draggable, &InputSliderDragHandle, &Node), Changed<Draggable>>,
+    q_draggable: Query<(&Draggable, &SliderDragHandle, &Node), Changed<Draggable>>,
     q_transform: Query<&Node>,
-    mut q_slider: Query<&mut InputSlider>,
+    mut q_slider: Query<&mut Slider>,
 ) {
     for (draggable, handle, node) in &q_draggable {
         if draggable.state == DragState::Inactive
@@ -112,9 +109,9 @@ fn update_slider_on_drag(
 }
 
 fn update_slider_handle(
-    q_slider: Query<&InputSlider, Or<(Changed<InputSlider>, Changed<Node>)>>,
+    q_slider: Query<&Slider, Or<(Changed<Slider>, Changed<Node>)>>,
     q_transform: Query<&Node>,
-    mut q_hadle_style: Query<(&Node, &mut Style), With<InputSliderDragHandle>>,
+    mut q_hadle_style: Query<(&Node, &mut Style), With<SliderDragHandle>>,
 ) {
     for slider in &q_slider {
         let Ok(slider_bar) = q_transform.get(slider.slider_bar) else {
@@ -145,7 +142,7 @@ fn update_slider_handle(
 }
 
 fn update_slider_readout(
-    q_slider: Query<&InputSlider, Changed<InputSlider>>,
+    q_slider: Query<&Slider, Changed<Slider>>,
     mut q_style: Query<&mut Style>,
     mut q_text: Query<&mut Text>,
 ) {
@@ -264,7 +261,7 @@ impl Default for SliderConfig {
 
 #[derive(Component, Debug, Reflect)]
 #[reflect(Component)]
-pub struct InputSlider {
+pub struct Slider {
     pub ratio: f32,
     pub config: SliderConfig,
     slider_bar: Entity,
@@ -272,7 +269,7 @@ pub struct InputSlider {
     readout_target: Entity,
 }
 
-impl Default for InputSlider {
+impl Default for Slider {
     fn default() -> Self {
         Self {
             ratio: Default::default(),
@@ -286,11 +283,11 @@ impl Default for InputSlider {
 
 #[derive(Component, Debug, Reflect)]
 #[reflect(Component)]
-pub struct InputSliderDragHandle {
+pub struct SliderDragHandle {
     pub slider: Entity,
 }
 
-impl Default for InputSliderDragHandle {
+impl Default for SliderDragHandle {
     fn default() -> Self {
         Self {
             slider: Entity::PLACEHOLDER,
@@ -300,11 +297,11 @@ impl Default for InputSliderDragHandle {
 
 #[derive(Component, Debug, Reflect)]
 #[reflect(Component)]
-pub struct InputSliderBar {
+pub struct SliderBar {
     pub slider: Entity,
 }
 
-impl Default for InputSliderBar {
+impl Default for SliderBar {
     fn default() -> Self {
         Self {
             slider: Entity::PLACEHOLDER,
@@ -312,7 +309,7 @@ impl Default for InputSliderBar {
     }
 }
 
-impl<'w, 's, 'a> InputSlider {
+impl<'w, 's, 'a> Slider {
     pub fn value(&self) -> f32 {
         self.config.min.lerp(self.config.max, self.ratio)
     }
@@ -394,7 +391,7 @@ impl<'w, 's, 'a> InputSlider {
                         },
                         ..default()
                     },
-                    InputSliderBar { slider: input_id },
+                    SliderBar { slider: input_id },
                     Interaction::default(),
                 ))
                 .with_children(|parent| {
@@ -436,7 +433,7 @@ impl<'w, 's, 'a> InputSlider {
                                         ..default()
                                     },
                                     Draggable::default(),
-                                    InputSliderDragHandle { slider: input_id },
+                                    SliderDragHandle { slider: input_id },
                                 ))
                                 .id();
                         });
@@ -457,7 +454,7 @@ impl<'w, 's, 'a> InputSlider {
 
         let initial_ratio = config.initial_value / (config.max - config.min);
 
-        input.insert(InputSlider {
+        input.insert(Slider {
             ratio: initial_ratio,
             config,
             slider_bar,
@@ -507,7 +504,7 @@ impl<'w, 's, 'a> InputSlider {
             current_value_node = parent
                 .spawn(TextBundle {
                     style: Style {
-                        margin: UiRect::px(5.,5.,5.,0.),
+                        margin: UiRect::px(5., 5., 5., 0.),
                         ..default()
                     },
                     focus_policy: FocusPolicy::Pass,
@@ -525,7 +522,7 @@ impl<'w, 's, 'a> InputSlider {
                         },
                         ..default()
                     },
-                    InputSliderBar { slider: input_id },
+                    SliderBar { slider: input_id },
                     Interaction::default(),
                 ))
                 .with_children(|parent| {
@@ -568,7 +565,7 @@ impl<'w, 's, 'a> InputSlider {
                                         ..default()
                                     },
                                     Draggable::default(),
-                                    InputSliderDragHandle { slider: input_id },
+                                    SliderDragHandle { slider: input_id },
                                 ))
                                 .id();
                         });
@@ -578,7 +575,7 @@ impl<'w, 's, 'a> InputSlider {
             if let Some(label) = label {
                 parent.spawn(TextBundle {
                     style: Style {
-                        margin: UiRect::px(5.,5.,0.,5.),
+                        margin: UiRect::px(5., 5., 0., 5.),
                         ..default()
                     },
                     text: Text::from_section(
@@ -597,7 +594,7 @@ impl<'w, 's, 'a> InputSlider {
 
         let initial_ratio = config.initial_value / (config.max - config.min);
 
-        input.insert(InputSlider {
+        input.insert(Slider {
             ratio: initial_ratio,
             config,
             slider_bar,

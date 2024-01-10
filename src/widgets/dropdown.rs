@@ -7,9 +7,9 @@ use bevy::prelude::*;
 //     FluxInteraction, TrackedInteraction,
 // };
 
-pub struct InputDropdownPlugin;
+pub struct DropdownPlugin;
 
-impl Plugin for InputDropdownPlugin {
+impl Plugin for DropdownPlugin {
     fn build(&self, _app: &mut App) {
         // app.add_systems(
         //     Update,
@@ -25,4 +25,4 @@ impl Plugin for InputDropdownPlugin {
 
 #[derive(Component, Default, Debug, Reflect)]
 #[reflect(Component)]
-pub struct InputDropdown {}
+pub struct Dropdown {}

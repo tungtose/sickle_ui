@@ -41,6 +41,7 @@ pub struct FluxInteractionUpdate;
 pub struct TrackedInteraction {
     pub interaction: FluxInteraction,
     pub prev_interaction: PrevInteraction,
+    pub stopwatch: FluxInteractionStopwatch,
 }
 
 #[derive(Component, Clone, Copy, Debug, Default, Eq, PartialEq, Reflect)]
@@ -74,6 +75,7 @@ fn tick_flux_interaction_stopwatch(
     mut q_stopwatch: Query<(Entity, &mut FluxInteractionStopwatch)>,
     mut commands: Commands,
 ) {
+    //println!("Count: {}", q_stopwatch.iter().count());
     for (entity, mut stopwatch) in &mut q_stopwatch {
         if stopwatch.0.elapsed().as_secs_f32() > config.max_interaction_duration {
             commands.entity(entity).remove::<FluxInteractionStopwatch>();

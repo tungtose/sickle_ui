@@ -16,7 +16,7 @@ impl Plugin for CheckboxPlugin {
 }
 
 fn toggle_checkbox(
-    mut q_checkboxes: Query<(&mut InputCheckbox, &FluxInteraction), Changed<FluxInteraction>>,
+    mut q_checkboxes: Query<(&mut Checkbox, &FluxInteraction), Changed<FluxInteraction>>,
 ) {
     for (mut checkbox, interaction) in &mut q_checkboxes {
         if *interaction == FluxInteraction::Released {
@@ -26,7 +26,7 @@ fn toggle_checkbox(
 }
 
 fn update_checkbox(
-    q_checkboxes: Query<&InputCheckbox, Changed<InputCheckbox>>,
+    q_checkboxes: Query<&Checkbox, Changed<Checkbox>>,
     mut style: Query<&mut Style>,
 ) {
     for checkbox in &q_checkboxes {
@@ -42,12 +42,12 @@ fn update_checkbox(
 
 #[derive(Component, Debug, Reflect)]
 #[reflect(Component)]
-pub struct InputCheckbox {
+pub struct Checkbox {
     pub checked: bool,
     check_node: Entity,
 }
 
-impl Default for InputCheckbox {
+impl Default for Checkbox {
     fn default() -> Self {
         Self {
             checked: false,
@@ -56,7 +56,7 @@ impl Default for InputCheckbox {
     }
 }
 
-impl<'w, 's, 'a> InputCheckbox {
+impl<'w, 's, 'a> Checkbox {
     pub fn spawn(
         parent: &'a mut ChildBuilder<'w, 's, '_>,
         label: Option<String>,
@@ -140,7 +140,7 @@ impl<'w, 's, 'a> InputCheckbox {
             }
         });
 
-        input.insert(InputCheckbox {
+        input.insert(Checkbox {
             check_node,
             checked: false,
         });

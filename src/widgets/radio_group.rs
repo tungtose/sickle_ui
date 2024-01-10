@@ -24,9 +24,9 @@ impl Plugin for RadioGroupPlugin {
 }
 
 fn toggle_radio_button(
-    mut q_radio_buttons: Query<(&mut InputRadioButton, &FluxInteraction), Changed<FluxInteraction>>,
+    mut q_radio_buttons: Query<(&mut RadioButton, &FluxInteraction), Changed<FluxInteraction>>,
     keys: Res<Input<KeyCode>>,
-    mut q_group: Query<&mut InputRadioGroup>,
+    mut q_group: Query<&mut RadioGroup>,
 ) {
     for (mut radio_button, interaction) in &mut q_radio_buttons {
         if *interaction == FluxInteraction::Released {
@@ -63,8 +63,8 @@ fn toggle_radio_button(
 }
 
 fn update_radio_group_buttons(
-    mut q_radio_buttons: Query<(&InputRadioGroup, &Children), Changed<InputRadioGroup>>,
-    mut q_radio_button: Query<&mut InputRadioButton>,
+    mut q_radio_buttons: Query<(&RadioGroup, &Children), Changed<RadioGroup>>,
+    mut q_radio_button: Query<&mut RadioButton>,
 ) {
     for (radio_group, children) in &mut q_radio_buttons {
         for child in children {
@@ -80,7 +80,7 @@ fn update_radio_group_buttons(
 }
 
 fn update_radio_button(
-    q_checkboxes: Query<&InputRadioButton, Changed<InputRadioButton>>,
+    q_checkboxes: Query<&RadioButton, Changed<RadioButton>>,
     mut style: Query<&mut Style>,
 ) {
     for checkbox in &q_checkboxes {
@@ -96,29 +96,29 @@ fn update_radio_button(
 
 #[derive(Component, Debug, Reflect)]
 #[reflect(Component)]
-pub struct InputRadioGroup {
+pub struct RadioGroup {
     pub selected: Option<usize>,
 }
 
-impl Default for InputRadioGroup {
+impl Default for RadioGroup {
     fn default() -> Self {
         Self { selected: None }
     }
 }
 
-impl<'w, 's, 'a> InputRadioGroup {
+impl<'w, 's, 'a> RadioGroup {
     pub fn spawn(
         parent: &'a mut ChildBuilder<'w, 's, '_>,
         options: Vec<Option<String>>,
         unselectable: bool,
     ) -> EntityCommands<'w, 's, 'a> {
-        let mut group = parent.spawn((NodeBundle::default(), InputRadioGroup::default()));
+        let mut group = parent.spawn((NodeBundle::default(), RadioGroup::default()));
         let id = Some(group.id());
 
-        group.with_children(|builder| {
+        group.with_children(|parent| {
             for (index, label) in options.iter().enumerate() {
-                InputRadioButton::spawn(
-                    builder,
+                RadioButton::spawn(
+                    parent,
                     index.try_into().unwrap(),
                     label.clone(),
                     id,
@@ -133,7 +133,7 @@ impl<'w, 's, 'a> InputRadioGroup {
 
 #[derive(Component, Debug, Reflect)]
 #[reflect(Component)]
-pub struct InputRadioButton {
+pub struct RadioButton {
     pub index: usize,
     pub checked: bool,
     unselectable: bool,
@@ -141,7 +141,7 @@ pub struct InputRadioButton {
     group: Option<Entity>,
 }
 
-impl Default for InputRadioButton {
+impl Default for RadioButton {
     fn default() -> Self {
         Self {
             index: 0,
@@ -153,7 +153,7 @@ impl Default for InputRadioButton {
     }
 }
 
-impl<'w, 's, 'a> InputRadioButton {
+impl<'w, 's, 'a> RadioButton {
     pub fn spawn(
         parent: &'a mut ChildBuilder<'w, 's, '_>,
         index: usize,
@@ -189,8 +189,8 @@ impl<'w, 's, 'a> InputRadioButton {
         ));
 
         let mut check_node: Entity = Entity::PLACEHOLDER;
-        input.with_children(|builder| {
-            builder
+        input.with_children(|parent| {
+            parent
                 .spawn(ButtonBundle {
                     style: Style {
                         width: Val::Px(16.),
@@ -221,7 +221,7 @@ impl<'w, 's, 'a> InputRadioButton {
                 });
 
             if let Some(label) = label {
-                builder.spawn(TextBundle {
+                parent.spawn(TextBundle {
                     style: Style {
                         align_self: AlignSelf::Center,
                         margin: UiRect::right(Val::Px(10.)),
@@ -240,7 +240,7 @@ impl<'w, 's, 'a> InputRadioButton {
             }
         });
 
-        input.insert(InputRadioButton {
+        input.insert(RadioButton {
             index,
             checked: false,
             unselectable,
