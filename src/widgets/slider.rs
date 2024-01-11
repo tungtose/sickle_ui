@@ -66,7 +66,7 @@ fn update_slider_on_scroll(
 
 fn update_slider_on_drag(
     q_draggable: Query<(&Draggable, &SliderDragHandle, &Node), Changed<Draggable>>,
-    q_transform: Query<&Node>,
+    q_node: Query<&Node>,
     mut q_slider: Query<&mut Slider>,
 ) {
     for (draggable, handle, node) in &q_draggable {
@@ -77,11 +77,12 @@ fn update_slider_on_drag(
             continue;
         }
 
-        let mut slider = q_slider.get_mut(handle.slider).unwrap();
-        let Ok(slider_bar) = q_transform.get(slider.slider_bar) else {
+        let Ok(mut slider) = q_slider.get_mut(handle.slider) else {
             continue;
         };
-
+        let Ok(slider_bar) = q_node.get(slider.slider_bar) else {
+            continue;
+        };
         let Some(diff) = draggable.diff else {
             continue;
         };
@@ -110,11 +111,11 @@ fn update_slider_on_drag(
 
 fn update_slider_handle(
     q_slider: Query<&Slider, Or<(Changed<Slider>, Changed<Node>)>>,
-    q_transform: Query<&Node>,
+    q_node: Query<&Node>,
     mut q_hadle_style: Query<(&Node, &mut Style), With<SliderDragHandle>>,
 ) {
     for slider in &q_slider {
-        let Ok(slider_bar) = q_transform.get(slider.slider_bar) else {
+        let Ok(slider_bar) = q_node.get(slider.slider_bar) else {
             continue;
         };
         let Ok((node, mut style)) = q_hadle_style.get_mut(slider.drag_handle) else {
