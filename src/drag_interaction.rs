@@ -1,4 +1,7 @@
-use bevy::{prelude::*, window::PrimaryWindow};
+use bevy::{
+    prelude::*,
+    window::{CursorGrabMode, PrimaryWindow},
+};
 use bevy_reflect::Reflect;
 
 use crate::{FluxInteraction, FluxInteractionUpdate};
@@ -48,15 +51,19 @@ pub enum DragSource {
 
 fn update_drag_progress(
     mut q_draggable: Query<(&mut Draggable, &FluxInteraction)>,
-    q_window: Query<&Window, With<PrimaryWindow>>,
+    mut q_window: Query<&mut Window, With<PrimaryWindow>>,
     r_touches: Res<Touches>,
 ) {
+    let mut confine_cursor = false;
+    let mut update_cursor = false;
+
     for (mut draggable, flux_interaction) in &mut q_draggable {
         if draggable.state == DragState::DragEnd {
             draggable.state = DragState::Inactive;
             draggable.origin = None;
             draggable.position = None;
             draggable.diff = Some(Vec2::default());
+            update_cursor = true;
         } else if *flux_interaction == FluxInteraction::Pressed
             && (draggable.state == DragState::MaybeDragged
                 || draggable.state == DragState::DragStart
@@ -89,9 +96,20 @@ fn update_drag_progress(
 
                     draggable.position = new_position.into();
                     draggable.diff = Some(new_position - current_position);
+
+                    update_cursor = true;
+                    confine_cursor = true;
                 }
             }
         }
+    }
+
+    if update_cursor {
+        q_window.single_mut().cursor.grab_mode = if confine_cursor {
+            CursorGrabMode::Confined
+        } else {
+            CursorGrabMode::None
+        };
     }
 }
 

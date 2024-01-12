@@ -4,11 +4,13 @@ pub mod animated_interaction;
 pub mod drag_interaction;
 pub mod flux_interaction;
 pub mod interactions;
+pub mod scroll_interaction;
 pub mod widgets;
 
 use drag_interaction::DragInteractionPlugin;
 pub use flux_interaction::*;
 use interactions::InteractionsPlugin;
+use scroll_interaction::ScrollInteractionPlugin;
 use widgets::WidgetsPlugin;
 
 use self::animated_interaction::AnimatedInteractionPlugin;
@@ -22,6 +24,7 @@ impl Plugin for SickleUiPlugin {
             DragInteractionPlugin,
             FluxInteractionPlugin,
             InteractionsPlugin,
+            ScrollInteractionPlugin,
             WidgetsPlugin,
         ));
     }

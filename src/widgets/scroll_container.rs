@@ -1,16 +1,15 @@
-use bevy::{
-    ecs::system::EntityCommands,
-    input::mouse::{MouseScrollUnit, MouseWheel},
-    prelude::*,
-};
+use bevy::{ecs::system::EntityCommands, input::mouse::MouseScrollUnit, prelude::*};
 use sickle_math::ease::Ease;
 
 use crate::{
     animated_interaction::{AnimatedInteraction, AnimationConfig},
     drag_interaction::{DragState, Draggable},
     interactions::InteractiveBackground,
+    scroll_interaction::{ScrollAxis, Scrollable},
     TrackedInteraction,
 };
+
+use super::hierarchy::MoveToParent;
 
 pub struct ScrollContainerPlugin;
 
@@ -19,11 +18,11 @@ impl Plugin for ScrollContainerPlugin {
         app.add_systems(
             Update,
             (
-                move_contents_to_viewport,
+                move_scrolled_contents_to_viewport,
                 update_scroll_container_on_content_change,
-                process_scroll_event,
-                update_scroll_on_drag,
-                update_scroll_offset,
+                update_scroll_container_on_scroll,
+                update_scroll_container_on_drag,
+                update_scroll_container_offset,
                 update_scroll_container_layout,
             )
                 .chain(),
@@ -31,7 +30,7 @@ impl Plugin for ScrollContainerPlugin {
     }
 }
 
-fn move_contents_to_viewport(
+fn move_scrolled_contents_to_viewport(
     q_to_move: Query<(Entity, &MoveToViewport), Added<MoveToViewport>>,
     mut q_scroll: Query<&mut ScrollContainer>,
     mut commands: Commands,
@@ -60,69 +59,46 @@ fn update_scroll_container_on_content_change(
     }
 }
 
-fn process_scroll_event(
-    mut mouse_wheel_events: EventReader<MouseWheel>,
-    keys: Res<Input<KeyCode>>,
-    q_scrollables: Query<(
-        AnyOf<(&ScrollContainerViewport, &ScrollBar, &ScrollBarHandle)>,
-        &Interaction,
-    )>,
+fn update_scroll_container_on_scroll(
+    q_scrollables: Query<
+        (
+            AnyOf<(&ScrollContainerViewport, &ScrollBarHandle)>,
+            &Scrollable,
+        ),
+        Changed<Scrollable>,
+    >,
     mut q_scroll_container: Query<&mut ScrollContainer>,
 ) {
-    for mouse_wheel_event in mouse_wheel_events.read() {
-        for ((viewport, scroll_bar, bar_handle), interaction) in &q_scrollables {
-            if *interaction != Interaction::Hovered {
-                continue;
-            }
+    for ((viewport, handle), scrollable) in &q_scrollables {
+        let Some((axis, diff, unit)) = scrollable.last_change() else {
+            continue;
+        };
 
-            let mut axis = ScrollAxis::Vertical;
-            let mut offset = if mouse_wheel_event.x != 0. {
-                -mouse_wheel_event.x
-            } else {
-                -mouse_wheel_event.y
-            };
+        let scroll_container_id = if let Some(viewport) = viewport {
+            viewport.container
+        } else if let Some(handle) = handle {
+            handle.container
+        } else {
+            continue;
+        };
 
-            if mouse_wheel_event.x > 0.
-                || keys.any_pressed([KeyCode::ShiftLeft, KeyCode::ShiftRight])
-            {
-                axis = ScrollAxis::Horizontal;
-            }
+        let Ok(mut scroll_container) = q_scroll_container.get_mut(scroll_container_id) else {
+            continue;
+        };
 
-            offset = match mouse_wheel_event.unit {
-                MouseScrollUnit::Line => offset * 20.,
-                MouseScrollUnit::Pixel => offset,
-            };
-
-            let scroll_container_id: Entity;
-            if let Some(bar_handle) = bar_handle {
-                scroll_container_id = bar_handle.container;
-            } else if let Some(scroll_bar) = scroll_bar {
-                scroll_container_id = scroll_bar.container;
-            } else if let Some(viewport) = viewport {
-                scroll_container_id = viewport.container;
-            } else {
-                continue;
-            }
-
-            let Ok(mut scroll_container) = q_scroll_container.get_mut(scroll_container_id) else {
-                continue;
-            };
-
-            match axis {
-                ScrollAxis::Horizontal => {
-                    scroll_container.scroll_offset =
-                        scroll_container.scroll_offset + Vec2 { x: offset, y: 0. };
-                }
-                ScrollAxis::Vertical => {
-                    scroll_container.scroll_offset =
-                        scroll_container.scroll_offset + Vec2 { x: 0., y: offset };
-                }
-            }
-        }
+        let offset = match axis {
+            ScrollAxis::Horizontal => Vec2 { x: diff, y: 0. },
+            ScrollAxis::Vertical => Vec2 { x: 0., y: diff },
+        };
+        let diff = match unit {
+            MouseScrollUnit::Line => offset * 20.,
+            MouseScrollUnit::Pixel => offset,
+        };
+        scroll_container.scroll_offset = scroll_container.scroll_offset + diff;
     }
 }
 
-fn update_scroll_on_drag(
+fn update_scroll_container_on_drag(
     q_draggable: Query<(Entity, &Draggable, &ScrollBarHandle), Changed<Draggable>>,
     q_node: Query<&Node>,
     mut q_scroll_container: Query<&mut ScrollContainer>,
@@ -185,7 +161,7 @@ fn update_scroll_on_drag(
     }
 }
 
-fn update_scroll_offset(
+fn update_scroll_container_offset(
     mut q_container: Query<(Entity, &mut ScrollContainer), Changed<ScrollContainer>>,
     q_node: Query<&Node>,
 ) {
@@ -274,7 +250,7 @@ fn update_scroll_container_layout(
         let Ok(mut vertical_bar_style) = q_style.get_mut(container.vertical_scroll_bar) else {
             continue;
         };
-        if container_height >= content_height {
+        if container_height >= content_height || container_height <= 5. {
             vertical_bar_style.display = Display::None;
         } else {
             vertical_bar_style.display = Display::Flex;
@@ -296,7 +272,7 @@ fn update_scroll_container_layout(
         let Ok(mut horizontal_bar_style) = q_style.get_mut(container.horizontal_scroll_bar) else {
             continue;
         };
-        if container_width >= content_width {
+        if container_width >= content_width || container_width <= 5. {
             horizontal_bar_style.display = Display::None;
         } else {
             horizontal_bar_style.display = Display::Flex;
@@ -315,13 +291,6 @@ fn update_scroll_container_layout(
             handle_style.left = Val::Px(bar_offset);
         }
     }
-}
-
-#[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Reflect)]
-pub enum ScrollAxis {
-    #[default]
-    Horizontal,
-    Vertical,
 }
 
 #[derive(Component, Debug, Reflect)]
@@ -431,20 +400,31 @@ impl Default for ScrollContainer {
 
 impl<'w, 's, 'a> ScrollContainer {
     pub fn spawn(parent: &'a mut ChildBuilder<'w, 's, '_>) -> EntityCommands<'w, 's, 'a> {
+        ScrollContainer::spawn_docked(parent, None)
+    }
+
+    pub fn spawn_docked(
+        parent: &'a mut ChildBuilder<'w, 's, '_>,
+        dock_id: Option<Entity>,
+    ) -> EntityCommands<'w, 's, 'a> {
         let mut viewport_id = Entity::PLACEHOLDER;
         let mut horizontal_scroll_id = Entity::PLACEHOLDER;
         let mut horizontal_scroll_handle_id = Entity::PLACEHOLDER;
         let mut vertical_scroll_id = Entity::PLACEHOLDER;
         let mut vertical_scroll_handle_id = Entity::PLACEHOLDER;
 
-        let mut container = parent.spawn((NodeBundle {
+        let mut container = parent.spawn(NodeBundle {
             style: Style {
                 width: Val::Percent(100.),
                 height: Val::Percent(100.),
                 ..default()
             },
             ..default()
-        },));
+        });
+
+        if dock_id.is_some() {
+            container.insert(MoveToParent { parent: dock_id });
+        }
 
         let scroll_container_id = container.id();
 
@@ -466,6 +446,7 @@ impl<'w, 's, 'a> ScrollContainer {
                         container: scroll_container_id,
                     },
                     Interaction::default(),
+                    Scrollable::default(),
                 ))
                 .id();
 
@@ -591,6 +572,7 @@ impl<'w, 's, 'a> ScrollContainer {
                     },
                     AnimatedInteraction::<InteractiveBackground> { tween, ..default() },
                     Draggable::default(),
+                    Scrollable::default(),
                 ))
                 .id();
         });

@@ -1,6 +1,7 @@
 use bevy::{
     ecs::system::EntityCommands,
-    input::mouse::{MouseScrollUnit, MouseWheel},
+    input::mouse::MouseScrollUnit,
+    // input::mouse::{MouseScrollUnit, MouseWheel},
     prelude::*,
     ui::FocusPolicy,
 };
@@ -10,6 +11,7 @@ use crate::{
     animated_interaction::{AnimatedInteraction, AnimationConfig},
     drag_interaction::{DragState, Draggable},
     interactions::InteractiveBackground,
+    scroll_interaction::{ScrollAxis, Scrollable},
     TrackedInteraction,
 };
 
@@ -34,33 +36,40 @@ impl Plugin for InputSliderPlugin {
 // TODO: Add input for value (w/ read/write flags)
 
 fn update_slider_on_scroll(
-    mut mouse_wheel_events: EventReader<MouseWheel>,
-    q_slider_bar: Query<(AnyOf<(&SliderBar, &SliderDragHandle)>, &Interaction)>,
+    q_scrollables: Query<
+        (AnyOf<(&SliderBar, &SliderDragHandle)>, &Scrollable),
+        Changed<Scrollable>,
+    >,
     mut q_slider: Query<&mut Slider>,
 ) {
-    for mouse_wheel_event in mouse_wheel_events.read() {
-        for ((slider_bar, handle), interaction) in &q_slider_bar {
-            if *interaction != Interaction::Hovered {
-                continue;
-            }
+    for ((slider_bar, handle), scrollable) in &q_scrollables {
+        let Some((axis, diff, unit)) = scrollable.last_change() else {
+            continue;
+        };
 
-            let fraction = match mouse_wheel_event.unit {
-                MouseScrollUnit::Line => mouse_wheel_event.y * 5.,
-                MouseScrollUnit::Pixel => mouse_wheel_event.y,
-            } / 100.;
-
-            if let Some(slider_bar) = slider_bar {
-                let Ok(mut slider) = q_slider.get_mut(slider_bar.slider) else {
-                    continue;
-                };
-                slider.ratio = (slider.ratio + fraction).clamp(0., 1.);
-            } else if let Some(handle) = handle {
-                let Ok(mut slider) = q_slider.get_mut(handle.slider) else {
-                    continue;
-                };
-                slider.ratio = (slider.ratio + fraction).clamp(0., 1.);
-            }
+        if axis == ScrollAxis::Horizontal {
+            continue;
         }
+
+        let slider_id = if let Some(slider_bar) = slider_bar {
+            slider_bar.slider
+        } else if let Some(handle) = handle {
+            handle.slider
+        } else {
+            continue;
+        };
+
+        let Ok(mut slider) = q_slider.get_mut(slider_id) else {
+            continue;
+        };
+
+        let offset = match unit {
+            MouseScrollUnit::Line => -diff * 5.,
+            MouseScrollUnit::Pixel => -diff,
+        };
+
+        let fraction = offset / 100.;
+        slider.ratio = (slider.ratio + fraction).clamp(0., 1.);
     }
 }
 
@@ -394,6 +403,7 @@ impl<'w, 's, 'a> Slider {
                     },
                     SliderBar { slider: input_id },
                     Interaction::default(),
+                    Scrollable::default(),
                 ))
                 .with_children(|parent| {
                     parent
@@ -433,8 +443,9 @@ impl<'w, 's, 'a> Slider {
                                         tween,
                                         ..default()
                                     },
-                                    Draggable::default(),
                                     SliderDragHandle { slider: input_id },
+                                    Draggable::default(),
+                                    Scrollable::default(),
                                 ))
                                 .id();
                         });
@@ -525,6 +536,7 @@ impl<'w, 's, 'a> Slider {
                     },
                     SliderBar { slider: input_id },
                     Interaction::default(),
+                    Scrollable::default(),
                 ))
                 .with_children(|parent| {
                     parent
@@ -565,8 +577,9 @@ impl<'w, 's, 'a> Slider {
                                         tween,
                                         ..default()
                                     },
-                                    Draggable::default(),
                                     SliderDragHandle { slider: input_id },
+                                    Draggable::default(),
+                                    Scrollable::default(),
                                 ))
                                 .id();
                         });
