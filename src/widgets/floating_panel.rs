@@ -9,7 +9,7 @@ use crate::{
     TrackedInteraction,
 };
 
-use super::{hierarchy::MoveToParent, scroll_container::ScrollContainer};
+use super::{hierarchy::MoveToParent, scroll_view::ScrollView};
 
 pub struct FloatingPanelPlugin;
 
@@ -228,6 +228,6 @@ impl<'w, 's, 'a> FloatingPanel {
                 .id();
         });
 
-        ScrollContainer::spawn_docked(parent, container_id.into())
+        ScrollView::spawn_docked(parent, container_id.into())
     }
 }

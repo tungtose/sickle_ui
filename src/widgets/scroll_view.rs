@@ -11,19 +11,19 @@ use crate::{
 
 use super::hierarchy::MoveToParent;
 
-pub struct ScrollContainerPlugin;
+pub struct ScrollViewPlugin;
 
-impl Plugin for ScrollContainerPlugin {
+impl Plugin for ScrollViewPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(
             Update,
             (
                 move_scrolled_contents_to_viewport,
-                update_scroll_container_on_content_change,
-                update_scroll_container_on_scroll,
-                update_scroll_container_on_drag,
-                update_scroll_container_offset,
-                update_scroll_container_layout,
+                update_scroll_view_on_content_change,
+                update_scroll_view_on_scroll,
+                update_scroll_view_on_drag,
+                update_scroll_view_offset,
+                update_scroll_view_layout,
             )
                 .chain(),
         );
@@ -32,11 +32,11 @@ impl Plugin for ScrollContainerPlugin {
 
 fn move_scrolled_contents_to_viewport(
     q_to_move: Query<(Entity, &MoveToViewport), Added<MoveToViewport>>,
-    mut q_scroll: Query<&mut ScrollContainer>,
+    mut q_scroll_view: Query<&mut ScrollView>,
     mut commands: Commands,
 ) {
     for (entity, to_move) in &q_to_move {
-        let mut container = q_scroll.get_mut(to_move.scroll_container).unwrap();
+        let mut container = q_scroll_view.get_mut(to_move.scroll_view).unwrap();
         container.content_container = entity;
         commands
             .entity(entity)
@@ -45,12 +45,12 @@ fn move_scrolled_contents_to_viewport(
     }
 }
 
-fn update_scroll_container_on_content_change(
-    q_content: Query<&ScrollContainerContent, Changed<Node>>,
-    mut q_scroll_container: Query<&mut ScrollContainer>,
+fn update_scroll_view_on_content_change(
+    q_content: Query<&ScrollViewContent, Changed<Node>>,
+    mut q_scroll_view: Query<&mut ScrollView>,
 ) {
     for content in &q_content {
-        let Ok(mut container) = q_scroll_container.get_mut(content.container) else {
+        let Ok(mut container) = q_scroll_view.get_mut(content.scroll_view) else {
             continue;
         };
 
@@ -59,15 +59,12 @@ fn update_scroll_container_on_content_change(
     }
 }
 
-fn update_scroll_container_on_scroll(
+fn update_scroll_view_on_scroll(
     q_scrollables: Query<
-        (
-            AnyOf<(&ScrollContainerViewport, &ScrollBarHandle)>,
-            &Scrollable,
-        ),
+        (AnyOf<(&ScrollViewViewport, &ScrollBarHandle)>, &Scrollable),
         Changed<Scrollable>,
     >,
-    mut q_scroll_container: Query<&mut ScrollContainer>,
+    mut q_scroll_view: Query<&mut ScrollView>,
 ) {
     for ((viewport, handle), scrollable) in &q_scrollables {
         let Some((axis, diff, unit)) = scrollable.last_change() else {
@@ -75,14 +72,14 @@ fn update_scroll_container_on_scroll(
         };
 
         let scroll_container_id = if let Some(viewport) = viewport {
-            viewport.container
+            viewport.scroll_view
         } else if let Some(handle) = handle {
-            handle.container
+            handle.scroll_view
         } else {
             continue;
         };
 
-        let Ok(mut scroll_container) = q_scroll_container.get_mut(scroll_container_id) else {
+        let Ok(mut scroll_view) = q_scroll_view.get_mut(scroll_container_id) else {
             continue;
         };
 
@@ -94,14 +91,14 @@ fn update_scroll_container_on_scroll(
             MouseScrollUnit::Line => offset * 20.,
             MouseScrollUnit::Pixel => offset,
         };
-        scroll_container.scroll_offset = scroll_container.scroll_offset + diff;
+        scroll_view.scroll_offset = scroll_view.scroll_offset + diff;
     }
 }
 
-fn update_scroll_container_on_drag(
+fn update_scroll_view_on_drag(
     q_draggable: Query<(Entity, &Draggable, &ScrollBarHandle), Changed<Draggable>>,
     q_node: Query<&Node>,
-    mut q_scroll_container: Query<&mut ScrollContainer>,
+    mut q_scroll_view: Query<&mut ScrollView>,
 ) {
     for (entity, draggable, bar_handle) in &q_draggable {
         if draggable.state == DragState::Inactive
@@ -111,7 +108,7 @@ fn update_scroll_container_on_drag(
             continue;
         }
 
-        let Ok(mut scroll_container) = q_scroll_container.get_mut(bar_handle.container) else {
+        let Ok(mut scroll_view) = q_scroll_view.get_mut(bar_handle.scroll_view) else {
             continue;
         };
         let Some(diff) = draggable.diff else {
@@ -126,7 +123,7 @@ fn update_scroll_container_on_drag(
             ScrollAxis::Vertical => bar_node.size().y,
         };
 
-        let Ok(content_node) = q_node.get(scroll_container.content_container) else {
+        let Ok(content_node) = q_node.get(scroll_view.content_container) else {
             continue;
         };
         let content_size = match bar_handle.axis {
@@ -134,7 +131,7 @@ fn update_scroll_container_on_drag(
             ScrollAxis::Vertical => content_node.size().y,
         };
 
-        let Ok(container_node) = q_node.get(bar_handle.container) else {
+        let Ok(container_node) = q_node.get(bar_handle.scroll_view) else {
             continue;
         };
         let container_size = match bar_handle.axis {
@@ -154,18 +151,18 @@ fn update_scroll_container_on_drag(
             ScrollAxis::Vertical => diff.y,
         } * ratio;
 
-        scroll_container.scroll_offset += match bar_handle.axis {
+        scroll_view.scroll_offset += match bar_handle.axis {
             ScrollAxis::Horizontal => Vec2 { x: diff, y: 0. },
             ScrollAxis::Vertical => Vec2 { x: 0., y: diff },
         };
     }
 }
 
-fn update_scroll_container_offset(
-    mut q_container: Query<(Entity, &mut ScrollContainer), Changed<ScrollContainer>>,
+fn update_scroll_view_offset(
+    mut q_scroll_view: Query<(Entity, &mut ScrollView), Changed<ScrollView>>,
     q_node: Query<&Node>,
 ) {
-    for (entity, mut container) in &mut q_container {
+    for (entity, mut scroll_view) in &mut q_scroll_view {
         let Ok(container_node) = q_node.get(entity) else {
             continue;
         };
@@ -176,7 +173,7 @@ fn update_scroll_container_offset(
             continue;
         }
 
-        let Ok(content_node) = q_node.get(container.content_container) else {
+        let Ok(content_node) = q_node.get(scroll_view.content_container) else {
             continue;
         };
 
@@ -185,30 +182,30 @@ fn update_scroll_container_offset(
 
         let overflow_x = content_width - container_width;
         let scroll_offset_x = if overflow_x > 0. {
-            container.scroll_offset.x.clamp(0., overflow_x)
+            scroll_view.scroll_offset.x.clamp(0., overflow_x)
         } else {
-            container.scroll_offset.x
+            scroll_view.scroll_offset.x
         };
         let overflow_y = content_height - container_height;
         let scroll_offset_y = if overflow_y > 0. {
-            container.scroll_offset.y.clamp(0., overflow_y)
+            scroll_view.scroll_offset.y.clamp(0., overflow_y)
         } else {
-            container.scroll_offset.y
+            scroll_view.scroll_offset.y
         };
 
-        container.scroll_offset = Vec2 {
+        scroll_view.scroll_offset = Vec2 {
             x: scroll_offset_x,
             y: scroll_offset_y,
         };
     }
 }
 
-fn update_scroll_container_layout(
-    q_container: Query<(Entity, &ScrollContainer), Or<(Changed<ScrollContainer>, Changed<Node>)>>,
+fn update_scroll_view_layout(
+    q_scroll_view: Query<(Entity, &ScrollView), Or<(Changed<ScrollView>, Changed<Node>)>>,
     mut q_node: Query<&Node>,
     mut q_style: Query<&mut Style>,
 ) {
-    for (entity, container) in &q_container {
+    for (entity, scroll_view) in &q_scroll_view {
         let Ok(container_node) = q_node.get(entity) else {
             continue;
         };
@@ -219,10 +216,10 @@ fn update_scroll_container_layout(
             continue;
         }
 
-        let Ok(content_node) = q_node.get_mut(container.content_container) else {
+        let Ok(content_node) = q_node.get_mut(scroll_view.content_container) else {
             continue;
         };
-        let Ok(mut content_style) = q_style.get_mut(container.content_container) else {
+        let Ok(mut content_style) = q_style.get_mut(scroll_view.content_container) else {
             continue;
         };
 
@@ -234,20 +231,20 @@ fn update_scroll_container_layout(
 
         // Update content scroll
         if content_height > container_height {
-            let scroll_offset_y = container.scroll_offset.y.clamp(0., overflow_y);
+            let scroll_offset_y = scroll_view.scroll_offset.y.clamp(0., overflow_y);
             content_style.top = Val::Px(-scroll_offset_y);
         } else {
             content_style.top = Val::Px(0.);
         }
         if content_width > container_width {
-            let scroll_offset_x = container.scroll_offset.x.clamp(0., overflow_x);
+            let scroll_offset_x = scroll_view.scroll_offset.x.clamp(0., overflow_x);
             content_style.left = Val::Px(-scroll_offset_x);
         } else {
             content_style.left = Val::Px(0.);
         }
 
         // Update vertical scroll bar
-        let Ok(mut vertical_bar_style) = q_style.get_mut(container.vertical_scroll_bar) else {
+        let Ok(mut vertical_bar_style) = q_style.get_mut(scroll_view.vertical_scroll_bar) else {
             continue;
         };
         if container_height >= content_height || container_height <= 5. {
@@ -255,10 +252,11 @@ fn update_scroll_container_layout(
         } else {
             vertical_bar_style.display = Display::Flex;
 
-            let Ok(mut handle_style) = q_style.get_mut(container.vertical_scroll_bar_handle) else {
+            let Ok(mut handle_style) = q_style.get_mut(scroll_view.vertical_scroll_bar_handle)
+            else {
                 continue;
             };
-            let scroll_offset_y = container.scroll_offset.y.clamp(0., overflow_y);
+            let scroll_offset_y = scroll_view.scroll_offset.y.clamp(0., overflow_y);
             let visible_ratio = (container_height / content_height).clamp(0., 1.);
             let bar_height = (visible_ratio * container_height).clamp(5., container_height);
             let remaining_space = container_height - bar_height;
@@ -269,7 +267,8 @@ fn update_scroll_container_layout(
         }
 
         // Update horizontal scroll bar
-        let Ok(mut horizontal_bar_style) = q_style.get_mut(container.horizontal_scroll_bar) else {
+        let Ok(mut horizontal_bar_style) = q_style.get_mut(scroll_view.horizontal_scroll_bar)
+        else {
             continue;
         };
         if container_width >= content_width || container_width <= 5. {
@@ -277,11 +276,11 @@ fn update_scroll_container_layout(
         } else {
             horizontal_bar_style.display = Display::Flex;
 
-            let Ok(mut handle_style) = q_style.get_mut(container.horizontal_scroll_bar_handle)
+            let Ok(mut handle_style) = q_style.get_mut(scroll_view.horizontal_scroll_bar_handle)
             else {
                 continue;
             };
-            let scroll_offset_x = container.scroll_offset.x.clamp(0., overflow_x);
+            let scroll_offset_x = scroll_view.scroll_offset.x.clamp(0., overflow_x);
             let visible_ratio = (container_width / content_width).clamp(0., 1.);
             let bar_width = (visible_ratio * container_width).clamp(5., container_width);
             let remaining_space = container_width - bar_width;
@@ -297,14 +296,14 @@ fn update_scroll_container_layout(
 #[reflect(Component)]
 pub struct ScrollBarHandle {
     axis: ScrollAxis,
-    container: Entity,
+    scroll_view: Entity,
 }
 
 impl Default for ScrollBarHandle {
     fn default() -> Self {
         Self {
             axis: Default::default(),
-            container: Entity::PLACEHOLDER,
+            scroll_view: Entity::PLACEHOLDER,
         }
     }
 }
@@ -313,7 +312,7 @@ impl Default for ScrollBarHandle {
 #[reflect(Component)]
 pub struct ScrollBar {
     axis: ScrollAxis,
-    container: Entity,
+    scroll_view: Entity,
     handle: Entity,
 }
 
@@ -321,7 +320,7 @@ impl Default for ScrollBar {
     fn default() -> Self {
         Self {
             axis: Default::default(),
-            container: Entity::PLACEHOLDER,
+            scroll_view: Entity::PLACEHOLDER,
             handle: Entity::PLACEHOLDER,
         }
     }
@@ -329,28 +328,28 @@ impl Default for ScrollBar {
 
 #[derive(Component, Debug, Reflect)]
 #[reflect(Component)]
-pub struct ScrollContainerContent {
-    container: Entity,
+pub struct ScrollViewContent {
+    scroll_view: Entity,
 }
 
-impl Default for ScrollContainerContent {
+impl Default for ScrollViewContent {
     fn default() -> Self {
         Self {
-            container: Entity::PLACEHOLDER,
+            scroll_view: Entity::PLACEHOLDER,
         }
     }
 }
 
 #[derive(Component, Debug, Reflect)]
 #[reflect(Component)]
-pub struct ScrollContainerViewport {
-    container: Entity,
+pub struct ScrollViewViewport {
+    scroll_view: Entity,
 }
 
-impl Default for ScrollContainerViewport {
+impl Default for ScrollViewViewport {
     fn default() -> Self {
         Self {
-            container: Entity::PLACEHOLDER,
+            scroll_view: Entity::PLACEHOLDER,
         }
     }
 }
@@ -359,14 +358,14 @@ impl Default for ScrollContainerViewport {
 #[component(storage = "SparseSet")]
 #[reflect(Component)]
 struct MoveToViewport {
-    scroll_container: Entity,
+    scroll_view: Entity,
     viewport: Entity,
 }
 
 impl Default for MoveToViewport {
     fn default() -> Self {
         Self {
-            scroll_container: Entity::PLACEHOLDER,
+            scroll_view: Entity::PLACEHOLDER,
             viewport: Entity::PLACEHOLDER,
         }
     }
@@ -374,7 +373,7 @@ impl Default for MoveToViewport {
 
 #[derive(Component, Debug, Reflect)]
 #[reflect(Component)]
-pub struct ScrollContainer {
+pub struct ScrollView {
     viewport: Entity,
     content_container: Entity,
     horizontal_scroll_bar: Entity,
@@ -384,7 +383,7 @@ pub struct ScrollContainer {
     scroll_offset: Vec2,
 }
 
-impl Default for ScrollContainer {
+impl Default for ScrollView {
     fn default() -> Self {
         Self {
             viewport: Entity::PLACEHOLDER,
@@ -398,9 +397,9 @@ impl Default for ScrollContainer {
     }
 }
 
-impl<'w, 's, 'a> ScrollContainer {
+impl<'w, 's, 'a> ScrollView {
     pub fn spawn(parent: &'a mut ChildBuilder<'w, 's, '_>) -> EntityCommands<'w, 's, 'a> {
-        ScrollContainer::spawn_docked(parent, None)
+        ScrollView::spawn_docked(parent, None)
     }
 
     pub fn spawn_docked(
@@ -413,7 +412,7 @@ impl<'w, 's, 'a> ScrollContainer {
         let mut vertical_scroll_id = Entity::PLACEHOLDER;
         let mut vertical_scroll_handle_id = Entity::PLACEHOLDER;
 
-        let mut container = parent.spawn(NodeBundle {
+        let mut scroll_view = parent.spawn(NodeBundle {
             style: Style {
                 width: Val::Percent(100.),
                 height: Val::Percent(100.),
@@ -423,12 +422,12 @@ impl<'w, 's, 'a> ScrollContainer {
         });
 
         if dock_id.is_some() {
-            container.insert(MoveToParent { parent: dock_id });
+            scroll_view.insert(MoveToParent { parent: dock_id });
         }
 
-        let scroll_container_id = container.id();
+        let scroll_view_id = scroll_view.id();
 
-        container.with_children(|parent| {
+        scroll_view.with_children(|parent| {
             viewport_id = parent
                 .spawn((
                     NodeBundle {
@@ -442,8 +441,8 @@ impl<'w, 's, 'a> ScrollContainer {
                         background_color: Color::DARK_GRAY.into(),
                         ..default()
                     },
-                    ScrollContainerViewport {
-                        container: scroll_container_id,
+                    ScrollViewViewport {
+                        scroll_view: scroll_view_id,
                     },
                     Interaction::default(),
                     Scrollable::default(),
@@ -465,21 +464,17 @@ impl<'w, 's, 'a> ScrollContainer {
                 })
                 .with_children(|parent| {
                     (horizontal_scroll_id, horizontal_scroll_handle_id) =
-                        ScrollContainer::spawn_scroll_bar(
+                        ScrollView::spawn_scroll_bar(
                             parent,
                             ScrollAxis::Horizontal,
-                            scroll_container_id,
+                            scroll_view_id,
                         );
                     (vertical_scroll_id, vertical_scroll_handle_id) =
-                        ScrollContainer::spawn_scroll_bar(
-                            parent,
-                            ScrollAxis::Vertical,
-                            scroll_container_id,
-                        );
+                        ScrollView::spawn_scroll_bar(parent, ScrollAxis::Vertical, scroll_view_id);
                 });
         });
 
-        container.insert((ScrollContainer {
+        scroll_view.insert((ScrollView {
             viewport: viewport_id,
             horizontal_scroll_bar: horizontal_scroll_id,
             horizontal_scroll_bar_handle: horizontal_scroll_handle_id,
@@ -488,7 +483,7 @@ impl<'w, 's, 'a> ScrollContainer {
             ..default()
         },));
 
-        let inner_container = parent.spawn((
+        let content_container = parent.spawn((
             NodeBundle {
                 style: Style {
                     justify_self: JustifySelf::Start,
@@ -500,21 +495,21 @@ impl<'w, 's, 'a> ScrollContainer {
                 ..default()
             },
             MoveToViewport {
-                scroll_container: scroll_container_id,
+                scroll_view: scroll_view_id,
                 viewport: viewport_id,
             },
-            ScrollContainerContent {
-                container: scroll_container_id,
+            ScrollViewContent {
+                scroll_view: scroll_view_id,
             },
         ));
 
-        inner_container
+        content_container
     }
 
     fn spawn_scroll_bar(
         parent: &'a mut ChildBuilder<'w, 's, '_>,
         axis: ScrollAxis,
-        container: Entity,
+        scroll_view: Entity,
     ) -> (Entity, Entity) {
         let tween = AnimationConfig {
             duration: 0.1,
@@ -564,7 +559,7 @@ impl<'w, 's, 'a> ScrollContainer {
                         background_color: Color::rgba(0., 1., 1., 0.4).into(),
                         ..default()
                     },
-                    ScrollBarHandle { axis, container },
+                    ScrollBarHandle { axis, scroll_view },
                     TrackedInteraction::default(),
                     InteractiveBackground {
                         highlight: Some(Color::rgba(0., 1., 1., 0.8)),
@@ -579,7 +574,7 @@ impl<'w, 's, 'a> ScrollContainer {
 
         scroll_bar.insert(ScrollBar {
             axis,
-            container,
+            scroll_view,
             handle: handle_id,
         });
 
