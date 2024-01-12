@@ -1,8 +1,4 @@
-use bevy::{
-    ecs::system::EntityCommands,
-    prelude::*,
-    window::{PrimaryWindow, WindowResized},
-};
+use bevy::{ecs::system::EntityCommands, prelude::*, window::WindowResized};
 
 use crate::{
     drag_interaction::{DragState, Draggable},
@@ -19,9 +15,8 @@ impl Plugin for FloatingPanelPlugin {
             Update,
             (
                 index_floating_panel.run_if(panel_added),
-                handle_widnow_resize,
+                handle_window_resize,
                 update_panel_on_title_drag,
-                constrain_panel_position,
                 update_panel_layout,
             )
                 .chain(),
@@ -34,8 +29,6 @@ fn panel_added(q_panels: Query<Entity, Added<FloatingPanel>>) -> bool {
 }
 
 fn index_floating_panel(mut q_panels: Query<&mut FloatingPanel>) {
-    println!("Indexing panels");
-
     for (i, mut panel) in &mut q_panels.iter_mut().enumerate() {
         panel.z_index = i + 1;
     }
@@ -64,7 +57,7 @@ fn update_panel_on_title_drag(
     }
 }
 
-fn handle_widnow_resize(
+fn handle_window_resize(
     mut events: EventReader<WindowResized>,
     mut q_panels: Query<&mut FloatingPanel>,
 ) {
@@ -73,53 +66,6 @@ fn handle_widnow_resize(
             panel.position = panel.position;
         }
     }
-}
-
-fn constrain_panel_position(
-    mut q_panels: Query<(&mut FloatingPanel, &Node), Changed<FloatingPanel>>,
-    q_window: Query<&Window, With<PrimaryWindow>>,
-) {
-    let Ok(window) = q_window.get_single() else {
-        return;
-    };
-
-    for (mut panel, node) in &mut q_panels {
-        let (changed, new_position) = clamp_position(
-            panel.position,
-            node.size(),
-            Vec2 {
-                x: window.resolution.width(),
-                y: window.resolution.height(),
-            },
-        );
-
-        if changed {
-            panel.position = new_position;
-        }
-    }
-}
-
-fn clamp_position(mut position: Vec2, size: Vec2, container_size: Vec2) -> (bool, Vec2) {
-    let mut changed = false;
-
-    if position.x + size.x > container_size.x {
-        position.x = container_size.x - size.x;
-        changed = true;
-    }
-    if position.y + size.y > container_size.y {
-        position.y = container_size.y - size.y;
-        changed = true;
-    }
-    if position.x < 0. {
-        position.x = 0.;
-        changed = true;
-    }
-    if position.y < 0. {
-        position.y = 0.;
-        changed = true;
-    }
-
-    (changed, position)
 }
 
 fn update_panel_layout(
