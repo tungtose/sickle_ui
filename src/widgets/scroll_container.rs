@@ -63,11 +63,14 @@ fn update_scroll_container_on_content_change(
 fn process_scroll_event(
     mut mouse_wheel_events: EventReader<MouseWheel>,
     keys: Res<Input<KeyCode>>,
-    q_scrollables: Query<(AnyOf<(&ScrollContainerViewport, &ScrollBar)>, &Interaction)>,
+    q_scrollables: Query<(
+        AnyOf<(&ScrollContainerViewport, &ScrollBar, &ScrollBarHandle)>,
+        &Interaction,
+    )>,
     mut q_scroll_container: Query<&mut ScrollContainer>,
 ) {
     for mouse_wheel_event in mouse_wheel_events.read() {
-        for ((viewport, scroll_bar), interaction) in &q_scrollables {
+        for ((viewport, scroll_bar, bar_handle), interaction) in &q_scrollables {
             if *interaction != Interaction::Hovered {
                 continue;
             }
@@ -91,7 +94,9 @@ fn process_scroll_event(
             };
 
             let scroll_container_id: Entity;
-            if let Some(scroll_bar) = scroll_bar {
+            if let Some(bar_handle) = bar_handle {
+                scroll_container_id = bar_handle.container;
+            } else if let Some(scroll_bar) = scroll_bar {
                 scroll_container_id = scroll_bar.container;
             } else if let Some(viewport) = viewport {
                 scroll_container_id = viewport.container;
@@ -118,11 +123,11 @@ fn process_scroll_event(
 }
 
 fn update_scroll_on_drag(
-    q_draggable: Query<(Entity, &Draggable, &ScrollBar), Changed<Draggable>>,
+    q_draggable: Query<(Entity, &Draggable, &ScrollBarHandle), Changed<Draggable>>,
     q_node: Query<&Node>,
     mut q_scroll_container: Query<&mut ScrollContainer>,
 ) {
-    for (entity, draggable, scroll_bar) in &q_draggable {
+    for (entity, draggable, bar_handle) in &q_draggable {
         if draggable.state == DragState::Inactive
             || draggable.state == DragState::MaybeDragged
             || draggable.state == DragState::DragCanceled
@@ -130,7 +135,7 @@ fn update_scroll_on_drag(
             continue;
         }
 
-        let Ok(mut scroll_container) = q_scroll_container.get_mut(scroll_bar.container) else {
+        let Ok(mut scroll_container) = q_scroll_container.get_mut(bar_handle.container) else {
             continue;
         };
         let Some(diff) = draggable.diff else {
@@ -140,7 +145,7 @@ fn update_scroll_on_drag(
         let Ok(bar_node) = q_node.get(entity) else {
             continue;
         };
-        let bar_size = match scroll_bar.axis {
+        let bar_size = match bar_handle.axis {
             ScrollAxis::Horizontal => bar_node.size().x,
             ScrollAxis::Vertical => bar_node.size().y,
         };
@@ -148,15 +153,15 @@ fn update_scroll_on_drag(
         let Ok(content_node) = q_node.get(scroll_container.content_container) else {
             continue;
         };
-        let content_size = match scroll_bar.axis {
+        let content_size = match bar_handle.axis {
             ScrollAxis::Horizontal => content_node.size().x,
             ScrollAxis::Vertical => content_node.size().y,
         };
 
-        let Ok(container_node) = q_node.get(scroll_bar.container) else {
+        let Ok(container_node) = q_node.get(bar_handle.container) else {
             continue;
         };
-        let container_size = match scroll_bar.axis {
+        let container_size = match bar_handle.axis {
             ScrollAxis::Horizontal => container_node.size().x,
             ScrollAxis::Vertical => container_node.size().y,
         };
@@ -168,12 +173,12 @@ fn update_scroll_on_drag(
 
         let remaining_space = container_size - bar_size;
         let ratio = overflow / remaining_space;
-        let diff = match scroll_bar.axis {
+        let diff = match bar_handle.axis {
             ScrollAxis::Horizontal => diff.x,
             ScrollAxis::Vertical => diff.y,
         } * ratio;
 
-        scroll_container.scroll_offset += match scroll_bar.axis {
+        scroll_container.scroll_offset += match bar_handle.axis {
             ScrollAxis::Horizontal => Vec2 { x: diff, y: 0. },
             ScrollAxis::Vertical => Vec2 { x: 0., y: diff },
         };
@@ -266,44 +271,53 @@ fn update_scroll_container_layout(
         }
 
         // Update vertical scroll bar
-        let Ok(mut vertical_style) = q_style.get_mut(container.vertical_scroll) else {
+        let Ok(mut vertical_bar_style) = q_style.get_mut(container.vertical_scroll_bar) else {
             continue;
         };
         if container_height >= content_height {
-            vertical_style.display = Display::None;
+            vertical_bar_style.display = Display::None;
         } else {
+            vertical_bar_style.display = Display::Flex;
+
+            let Ok(mut handle_style) = q_style.get_mut(container.vertical_scroll_bar_handle) else {
+                continue;
+            };
             let scroll_offset_y = container.scroll_offset.y.clamp(0., overflow_y);
             let visible_ratio = (container_height / content_height).clamp(0., 1.);
             let bar_height = (visible_ratio * container_height).clamp(5., container_height);
             let remaining_space = container_height - bar_height;
             let bar_offset = (scroll_offset_y / overflow_y) * remaining_space;
 
-            vertical_style.display = Display::Flex;
-            vertical_style.height = Val::Px(bar_height);
-            vertical_style.top = Val::Px(bar_offset);
+            handle_style.height = Val::Px(bar_height);
+            handle_style.top = Val::Px(bar_offset);
         }
 
         // Update horizontal scroll bar
-        let Ok(mut horizontal_style) = q_style.get_mut(container.horizontal_scroll) else {
+        let Ok(mut horizontal_bar_style) = q_style.get_mut(container.horizontal_scroll_bar) else {
             continue;
         };
         if container_width >= content_width {
-            horizontal_style.display = Display::None;
+            horizontal_bar_style.display = Display::None;
         } else {
+            horizontal_bar_style.display = Display::Flex;
+
+            let Ok(mut handle_style) = q_style.get_mut(container.horizontal_scroll_bar_handle)
+            else {
+                continue;
+            };
             let scroll_offset_x = container.scroll_offset.x.clamp(0., overflow_x);
             let visible_ratio = (container_width / content_width).clamp(0., 1.);
             let bar_width = (visible_ratio * container_width).clamp(5., container_width);
             let remaining_space = container_width - bar_width;
-            let bar_offset = (1. - (scroll_offset_x / overflow_x)) * remaining_space;
+            let bar_offset = (scroll_offset_x / overflow_x) * remaining_space;
 
-            horizontal_style.display = Display::Flex;
-            horizontal_style.width = Val::Px(bar_width);
-            horizontal_style.right = Val::Px(bar_offset);
+            handle_style.width = Val::Px(bar_width);
+            handle_style.left = Val::Px(bar_offset);
         }
     }
 }
 
-#[derive(Debug, Default, Eq, PartialEq, Reflect)]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Reflect)]
 pub enum ScrollAxis {
     #[default]
     Horizontal,
@@ -312,9 +326,26 @@ pub enum ScrollAxis {
 
 #[derive(Component, Debug, Reflect)]
 #[reflect(Component)]
+pub struct ScrollBarHandle {
+    axis: ScrollAxis,
+    container: Entity,
+}
+
+impl Default for ScrollBarHandle {
+    fn default() -> Self {
+        Self {
+            axis: Default::default(),
+            container: Entity::PLACEHOLDER,
+        }
+    }
+}
+
+#[derive(Component, Debug, Reflect)]
+#[reflect(Component)]
 pub struct ScrollBar {
     axis: ScrollAxis,
     container: Entity,
+    handle: Entity,
 }
 
 impl Default for ScrollBar {
@@ -322,6 +353,7 @@ impl Default for ScrollBar {
         Self {
             axis: Default::default(),
             container: Entity::PLACEHOLDER,
+            handle: Entity::PLACEHOLDER,
         }
     }
 }
@@ -376,8 +408,10 @@ impl Default for MoveToViewport {
 pub struct ScrollContainer {
     viewport: Entity,
     content_container: Entity,
-    horizontal_scroll: Entity,
-    vertical_scroll: Entity,
+    horizontal_scroll_bar: Entity,
+    horizontal_scroll_bar_handle: Entity,
+    vertical_scroll_bar: Entity,
+    vertical_scroll_bar_handle: Entity,
     scroll_offset: Vec2,
 }
 
@@ -386,8 +420,10 @@ impl Default for ScrollContainer {
         Self {
             viewport: Entity::PLACEHOLDER,
             content_container: Entity::PLACEHOLDER,
-            horizontal_scroll: Entity::PLACEHOLDER,
-            vertical_scroll: Entity::PLACEHOLDER,
+            horizontal_scroll_bar: Entity::PLACEHOLDER,
+            horizontal_scroll_bar_handle: Entity::PLACEHOLDER,
+            vertical_scroll_bar: Entity::PLACEHOLDER,
+            vertical_scroll_bar_handle: Entity::PLACEHOLDER,
             scroll_offset: Vec2::ZERO,
         }
     }
@@ -397,12 +433,9 @@ impl<'w, 's, 'a> ScrollContainer {
     pub fn spawn(parent: &'a mut ChildBuilder<'w, 's, '_>) -> EntityCommands<'w, 's, 'a> {
         let mut viewport_id = Entity::PLACEHOLDER;
         let mut horizontal_scroll_id = Entity::PLACEHOLDER;
+        let mut horizontal_scroll_handle_id = Entity::PLACEHOLDER;
         let mut vertical_scroll_id = Entity::PLACEHOLDER;
-        let tween = AnimationConfig {
-            duration: 0.1,
-            easing: Ease::OutExpo,
-            ..default()
-        };
+        let mut vertical_scroll_handle_id = Entity::PLACEHOLDER;
 
         let mut container = parent.spawn((NodeBundle {
             style: Style {
@@ -450,63 +483,27 @@ impl<'w, 's, 'a> ScrollContainer {
                     ..default()
                 })
                 .with_children(|parent| {
-                    horizontal_scroll_id = parent
-                        .spawn((
-                            ButtonBundle {
-                                style: Style {
-                                    position_type: PositionType::Absolute,
-                                    height: Val::Px(12.),
-                                    align_self: AlignSelf::End,
-                                    ..default()
-                                },
-                                background_color: Color::rgba(0., 1., 1., 0.4).into(),
-                                ..default()
-                            },
-                            ScrollBar {
-                                axis: ScrollAxis::Horizontal,
-                                container: scroll_container_id,
-                            },
-                            TrackedInteraction::default(),
-                            InteractiveBackground {
-                                highlight: Some(Color::rgba(0., 1., 1., 0.8)),
-                                ..default()
-                            },
-                            AnimatedInteraction::<InteractiveBackground> { tween, ..default() },
-                            Draggable::default(),
-                        ))
-                        .id();
-                    vertical_scroll_id = parent
-                        .spawn((
-                            ButtonBundle {
-                                style: Style {
-                                    position_type: PositionType::Absolute,
-                                    width: Val::Px(12.),
-                                    align_self: AlignSelf::Start,
-                                    ..default()
-                                },
-                                background_color: Color::rgba(0., 1., 1., 0.4).into(),
-                                ..default()
-                            },
-                            ScrollBar {
-                                axis: ScrollAxis::Vertical,
-                                container: scroll_container_id,
-                            },
-                            TrackedInteraction::default(),
-                            InteractiveBackground {
-                                highlight: Some(Color::rgba(0., 1., 1., 0.8)),
-                                ..default()
-                            },
-                            AnimatedInteraction::<InteractiveBackground> { tween, ..default() },
-                            Draggable::default(),
-                        ))
-                        .id();
+                    (horizontal_scroll_id, horizontal_scroll_handle_id) =
+                        ScrollContainer::spawn_scroll_bar(
+                            parent,
+                            ScrollAxis::Horizontal,
+                            scroll_container_id,
+                        );
+                    (vertical_scroll_id, vertical_scroll_handle_id) =
+                        ScrollContainer::spawn_scroll_bar(
+                            parent,
+                            ScrollAxis::Vertical,
+                            scroll_container_id,
+                        );
                 });
         });
 
         container.insert((ScrollContainer {
             viewport: viewport_id,
-            horizontal_scroll: horizontal_scroll_id,
-            vertical_scroll: vertical_scroll_id,
+            horizontal_scroll_bar: horizontal_scroll_id,
+            horizontal_scroll_bar_handle: horizontal_scroll_handle_id,
+            vertical_scroll_bar: vertical_scroll_id,
+            vertical_scroll_bar_handle: vertical_scroll_handle_id,
             ..default()
         },));
 
@@ -516,7 +513,7 @@ impl<'w, 's, 'a> ScrollContainer {
                     justify_self: JustifySelf::Start,
                     align_self: AlignSelf::Start,
                     flex_direction: FlexDirection::Column,
-                    padding: UiRect::bottom(Val::Px(20.)),
+                    padding: UiRect::px(0., 12., 0., 12.),
                     ..default()
                 },
                 ..default()
@@ -531,5 +528,79 @@ impl<'w, 's, 'a> ScrollContainer {
         ));
 
         inner_container
+    }
+
+    fn spawn_scroll_bar(
+        parent: &'a mut ChildBuilder<'w, 's, '_>,
+        axis: ScrollAxis,
+        container: Entity,
+    ) -> (Entity, Entity) {
+        let tween = AnimationConfig {
+            duration: 0.1,
+            easing: Ease::OutExpo,
+            ..default()
+        };
+
+        let mut scroll_bar = parent.spawn(NodeBundle {
+            style: Style {
+                position_type: PositionType::Absolute,
+                width: match axis {
+                    ScrollAxis::Horizontal => Val::Percent(100.),
+                    ScrollAxis::Vertical => Val::Px(12.),
+                },
+                height: match axis {
+                    ScrollAxis::Horizontal => Val::Px(12.),
+                    ScrollAxis::Vertical => Val::Percent(100.),
+                },
+                flex_direction: match axis {
+                    ScrollAxis::Horizontal => FlexDirection::Row,
+                    ScrollAxis::Vertical => FlexDirection::Column,
+                },
+                align_self: AlignSelf::End,
+                justify_content: JustifyContent::Start,
+                ..default()
+            },
+            background_color: Color::GRAY.into(),
+            ..default()
+        });
+
+        let mut handle_id = Entity::PLACEHOLDER;
+        scroll_bar.with_children(|parent| {
+            handle_id = parent
+                .spawn((
+                    ButtonBundle {
+                        style: Style {
+                            width: match axis {
+                                ScrollAxis::Horizontal => Val::Auto,
+                                ScrollAxis::Vertical => Val::Percent(100.),
+                            },
+                            height: match axis {
+                                ScrollAxis::Horizontal => Val::Percent(100.),
+                                ScrollAxis::Vertical => Val::Auto,
+                            },
+                            ..default()
+                        },
+                        background_color: Color::rgba(0., 1., 1., 0.4).into(),
+                        ..default()
+                    },
+                    ScrollBarHandle { axis, container },
+                    TrackedInteraction::default(),
+                    InteractiveBackground {
+                        highlight: Some(Color::rgba(0., 1., 1., 0.8)),
+                        ..default()
+                    },
+                    AnimatedInteraction::<InteractiveBackground> { tween, ..default() },
+                    Draggable::default(),
+                ))
+                .id();
+        });
+
+        scroll_bar.insert(ScrollBar {
+            axis,
+            container,
+            handle: handle_id,
+        });
+
+        (scroll_bar.id(), handle_id)
     }
 }
