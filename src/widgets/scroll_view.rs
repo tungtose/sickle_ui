@@ -3,9 +3,9 @@ use sickle_math::ease::Ease;
 
 use crate::{
     animated_interaction::{AnimatedInteraction, AnimationConfig},
-    drag_interaction::{DragState, Draggable},
+    drag_interaction::{DragState, Draggable, DraggableUpdate},
     interactions::InteractiveBackground,
-    scroll_interaction::{ScrollAxis, Scrollable},
+    scroll_interaction::{ScrollAxis, Scrollable, ScrollableUpdate},
     TrackedInteraction,
 };
 
@@ -20,8 +20,8 @@ impl Plugin for ScrollViewPlugin {
             (
                 move_scrolled_contents_to_viewport,
                 update_scroll_view_on_content_change,
-                update_scroll_view_on_scroll,
-                update_scroll_view_on_drag,
+                update_scroll_view_on_scroll.after(ScrollableUpdate),
+                update_scroll_view_on_drag.after(DraggableUpdate),
                 update_scroll_view_offset,
                 update_scroll_view_layout,
             )

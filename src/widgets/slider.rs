@@ -9,9 +9,9 @@ use sickle_math::{ease::Ease, lerp::Lerp};
 
 use crate::{
     animated_interaction::{AnimatedInteraction, AnimationConfig},
-    drag_interaction::{DragState, Draggable},
+    drag_interaction::{DragState, Draggable, DraggableUpdate},
     interactions::InteractiveBackground,
-    scroll_interaction::{ScrollAxis, Scrollable},
+    scroll_interaction::{ScrollAxis, Scrollable, ScrollableUpdate},
     TrackedInteraction,
 };
 
@@ -22,8 +22,8 @@ impl Plugin for InputSliderPlugin {
         app.add_systems(
             Update,
             (
-                update_slider_on_scroll,
-                update_slider_on_drag,
+                update_slider_on_scroll.after(ScrollableUpdate),
+                update_slider_on_drag.after(DraggableUpdate),
                 update_slider_handle,
                 update_slider_readout,
             )
@@ -79,16 +79,25 @@ fn update_slider_on_drag(
     mut q_slider: Query<&mut Slider>,
 ) {
     for (draggable, handle, node) in &q_draggable {
-        if draggable.state == DragState::Inactive
-            || draggable.state == DragState::MaybeDragged
-            || draggable.state == DragState::DragCanceled
-        {
-            continue;
-        }
-
         let Ok(mut slider) = q_slider.get_mut(handle.slider) else {
             continue;
         };
+
+        if draggable.state == DragState::Inactive || draggable.state == DragState::MaybeDragged {
+            continue;
+        }
+
+        if draggable.state == DragState::DragStart {
+            slider.base_ratio = Some(slider.ratio);
+        }
+
+        if draggable.state == DragState::DragCanceled {
+            if let Some(base_ratio) = slider.base_ratio {
+                slider.ratio = base_ratio;
+                continue;
+            }
+        }
+
         let Ok(slider_bar) = q_node.get(slider.slider_bar) else {
             continue;
         };
@@ -277,6 +286,7 @@ pub struct Slider {
     slider_bar: Entity,
     drag_handle: Entity,
     readout_target: Entity,
+    base_ratio: Option<f32>,
 }
 
 impl Default for Slider {
@@ -287,6 +297,7 @@ impl Default for Slider {
             slider_bar: Entity::PLACEHOLDER,
             drag_handle: Entity::PLACEHOLDER,
             readout_target: Entity::PLACEHOLDER,
+            base_ratio: None,
         }
     }
 }
@@ -472,6 +483,7 @@ impl<'w, 's, 'a> Slider {
             slider_bar,
             drag_handle,
             readout_target,
+            base_ratio: None,
         });
 
         input
@@ -614,6 +626,7 @@ impl<'w, 's, 'a> Slider {
             slider_bar,
             drag_handle,
             readout_target: current_value_node,
+            base_ratio: None,
         });
 
         input

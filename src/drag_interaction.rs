@@ -10,14 +10,22 @@ pub struct DragInteractionPlugin;
 
 impl Plugin for DragInteractionPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(
+        app.configure_sets(Update, DraggableUpdate).add_systems(
             Update,
-            (update_drag_progress, update_drag_state)
+            (
+                update_drag_progress,
+                update_drag_state,
+                update_cursor_confinement_from_drag,
+            )
                 .chain()
-                .after(FluxInteractionUpdate),
+                .after(FluxInteractionUpdate)
+                .in_set(DraggableUpdate),
         );
     }
 }
+
+#[derive(SystemSet, Clone, Eq, Debug, Hash, PartialEq)]
+pub struct DraggableUpdate;
 
 #[derive(Component, Default, Debug, Reflect)]
 #[reflect(Component)]
@@ -27,6 +35,14 @@ pub struct Draggable {
     pub position: Option<Vec2>,
     pub diff: Option<Vec2>,
     pub source: DragSource,
+}
+
+impl Draggable {
+    fn clear(&mut self) {
+        self.origin = None;
+        self.position = None;
+        self.diff = Some(Vec2::default());
+    }
 }
 
 #[derive(Default, Debug, PartialEq, Eq, Reflect)]
@@ -49,33 +65,61 @@ pub enum DragSource {
     Touch(u64),
 }
 
+fn update_cursor_confinement_from_drag(
+    q_draggable: Query<&Draggable, Changed<Draggable>>,
+    mut q_window: Query<&mut Window, With<PrimaryWindow>>,
+) {
+    let Ok(mut window) = q_window.get_single_mut() else {
+        return;
+    };
+
+    if let Some(_) = q_draggable
+        .iter()
+        .find(|&draggable| draggable.state == DragState::DragStart)
+    {
+        window.cursor.grab_mode = CursorGrabMode::Confined;
+    } else if let Some(_) = q_draggable.iter().find(|&draggable| {
+        draggable.state == DragState::DragEnd || draggable.state == DragState::DragCanceled
+    }) {
+        window.cursor.grab_mode = CursorGrabMode::None;
+    }
+}
+
 fn update_drag_progress(
     mut q_draggable: Query<(&mut Draggable, &FluxInteraction)>,
-    mut q_window: Query<&mut Window, With<PrimaryWindow>>,
+    q_window: Query<&Window, With<PrimaryWindow>>,
     r_touches: Res<Touches>,
+    r_keys: Res<Input<KeyCode>>,
 ) {
-    let mut confine_cursor = false;
-    let mut update_cursor = false;
+    let Ok(window) = q_window.get_single() else {
+        return;
+    };
 
     for (mut draggable, flux_interaction) in &mut q_draggable {
         if draggable.state == DragState::DragEnd {
             draggable.state = DragState::Inactive;
-            draggable.origin = None;
-            draggable.position = None;
-            draggable.diff = Some(Vec2::default());
-            update_cursor = true;
+        } else if draggable.state == DragState::DragCanceled {
+            draggable.state = DragState::Inactive;
         } else if *flux_interaction == FluxInteraction::Pressed
             && (draggable.state == DragState::MaybeDragged
                 || draggable.state == DragState::DragStart
                 || draggable.state == DragState::Dragging)
         {
+            if (draggable.state == DragState::DragStart || draggable.state == DragState::Dragging)
+                && r_keys.just_pressed(KeyCode::Escape)
+            {
+                draggable.state = DragState::DragCanceled;
+                draggable.clear();
+                continue;
+            }
+
             // Drag start is only a single frame, triggered after initial movement
             if draggable.state == DragState::DragStart {
                 draggable.state = DragState::Dragging;
             }
 
             let position: Option<Vec2> = match draggable.source {
-                DragSource::Mouse => match q_window.single().cursor_position() {
+                DragSource::Mouse => match window.cursor_position() {
                     Some(pos) => Some(pos),
                     None => None,
                 },
@@ -96,20 +140,9 @@ fn update_drag_progress(
 
                     draggable.position = new_position.into();
                     draggable.diff = Some(new_position - current_position);
-
-                    update_cursor = true;
-                    confine_cursor = true;
                 }
             }
         }
-    }
-
-    if update_cursor {
-        q_window.single_mut().cursor.grab_mode = if confine_cursor {
-            CursorGrabMode::Confined
-        } else {
-            CursorGrabMode::None
-        };
     }
 }
 
@@ -139,11 +172,10 @@ fn update_drag_state(
         {
             if draggable.state == DragState::DragStart || draggable.state == DragState::Dragging {
                 draggable.state = DragState::DragEnd;
+                draggable.clear();
             } else if draggable.state == DragState::MaybeDragged {
                 draggable.state = DragState::Inactive;
-                draggable.origin = None;
-                draggable.position = None;
-                draggable.diff = Some(Vec2::default());
+                draggable.clear();
             }
         }
     }

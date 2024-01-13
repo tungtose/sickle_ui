@@ -7,13 +7,17 @@ pub struct ScrollInteractionPlugin;
 
 impl Plugin for ScrollInteractionPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Update, update_scrollables);
+        app.configure_sets(Update, ScrollableUpdate)
+            .add_systems(Update, update_scrollables.in_set(ScrollableUpdate));
     }
 }
 
+#[derive(SystemSet, Clone, Eq, Debug, Hash, PartialEq)]
+pub struct ScrollableUpdate;
+
 fn update_scrollables(
     mut mouse_wheel_events: EventReader<MouseWheel>,
-    keys: Res<Input<KeyCode>>,
+    r_keys: Res<Input<KeyCode>>,
     mut q_scrollables: Query<(&mut Scrollable, &Interaction)>,
 ) {
     let mut axis = ScrollAxis::Vertical;
@@ -31,7 +35,7 @@ fn update_scrollables(
             -mouse_wheel_event.y
         };
 
-        if mouse_wheel_event.x > 0. || keys.any_pressed([KeyCode::ShiftLeft, KeyCode::ShiftRight]) {
+        if mouse_wheel_event.x > 0. || r_keys.any_pressed([KeyCode::ShiftLeft, KeyCode::ShiftRight]) {
             axis = ScrollAxis::Horizontal;
         }
 
@@ -46,7 +50,7 @@ fn update_scrollables(
         if *interaction != Interaction::Hovered {
             continue;
         }
-        
+
         scrollable.axis = Some(axis);
         scrollable.diff = offset.into();
         scrollable.unit = unit;
