@@ -13,7 +13,7 @@ fn move_node_to_parent(
     mut commands: Commands,
 ) {
     for (entity, to_move) in &q_to_move {
-        println!("Moving {:?} to {:?}", entity, to_move.parent);
+        //println!("Moving {:?} to {:?}", entity, to_move.parent);
 
         if let Some(parent) = to_move.parent {
             commands
