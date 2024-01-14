@@ -36,8 +36,8 @@ fn move_scrolled_contents_to_viewport(
     mut commands: Commands,
 ) {
     for (entity, to_move) in &q_to_move {
-        let mut container = q_scroll_view.get_mut(to_move.scroll_view).unwrap();
-        container.content_container = entity;
+        let mut scroll_view = q_scroll_view.get_mut(to_move.scroll_view).unwrap();
+        scroll_view.content_container = entity;
         commands
             .entity(entity)
             .set_parent(to_move.viewport)
@@ -114,36 +114,33 @@ fn update_scroll_view_on_drag(
         let Some(diff) = draggable.diff else {
             continue;
         };
-
         let Ok(bar_node) = q_node.get(entity) else {
             continue;
         };
-        let bar_size = match bar_handle.axis {
-            ScrollAxis::Horizontal => bar_node.size().x,
-            ScrollAxis::Vertical => bar_node.size().y,
-        };
-
         let Ok(content_node) = q_node.get(scroll_view.content_container) else {
             continue;
+        };
+        let Ok(container_node) = q_node.get(bar_handle.scroll_view) else {
+            continue;
+        };
+
+        let container_size = match bar_handle.axis {
+            ScrollAxis::Horizontal => container_node.size().x,
+            ScrollAxis::Vertical => container_node.size().y,
         };
         let content_size = match bar_handle.axis {
             ScrollAxis::Horizontal => content_node.size().x,
             ScrollAxis::Vertical => content_node.size().y,
         };
-
-        let Ok(container_node) = q_node.get(bar_handle.scroll_view) else {
-            continue;
-        };
-        let container_size = match bar_handle.axis {
-            ScrollAxis::Horizontal => container_node.size().x,
-            ScrollAxis::Vertical => container_node.size().y,
-        };
-
         let overflow = content_size - container_size;
         if overflow <= 0. {
             continue;
         }
 
+        let bar_size = match bar_handle.axis {
+            ScrollAxis::Horizontal => bar_node.size().x,
+            ScrollAxis::Vertical => bar_node.size().y,
+        };
         let remaining_space = container_size - bar_size;
         let ratio = overflow / remaining_space;
         let diff = match bar_handle.axis {
@@ -244,50 +241,55 @@ fn update_scroll_view_layout(
         }
 
         // Update vertical scroll bar
-        let Ok(mut vertical_bar_style) = q_style.get_mut(scroll_view.vertical_scroll_bar) else {
-            continue;
-        };
-        if container_height >= content_height || container_height <= 5. {
-            vertical_bar_style.display = Display::None;
-        } else {
-            vertical_bar_style.display = Display::Flex;
+        if let (Some(vertical_scroll_bar), Some(vertical_scroll_bar_handle)) = (
+            scroll_view.vertical_scroll_bar,
+            scroll_view.vertical_scroll_bar_handle,
+        ) {
+            if let Ok(mut vertical_bar_style) = q_style.get_mut(vertical_scroll_bar) {
+                if container_height >= content_height || container_height <= 5. {
+                    vertical_bar_style.display = Display::None;
+                } else {
+                    vertical_bar_style.display = Display::Flex;
 
-            let Ok(mut handle_style) = q_style.get_mut(scroll_view.vertical_scroll_bar_handle)
-            else {
-                continue;
+                    if let Ok(mut handle_style) = q_style.get_mut(vertical_scroll_bar_handle) {
+                        let scroll_offset_y = scroll_view.scroll_offset.y.clamp(0., overflow_y);
+                        let visible_ratio = (container_height / content_height).clamp(0., 1.);
+                        let bar_height =
+                            (visible_ratio * container_height).clamp(5., container_height);
+                        let remaining_space = container_height - bar_height;
+                        let bar_offset = (scroll_offset_y / overflow_y) * remaining_space;
+
+                        handle_style.height = Val::Px(bar_height);
+                        handle_style.top = Val::Px(bar_offset);
+                    };
+                }
             };
-            let scroll_offset_y = scroll_view.scroll_offset.y.clamp(0., overflow_y);
-            let visible_ratio = (container_height / content_height).clamp(0., 1.);
-            let bar_height = (visible_ratio * container_height).clamp(5., container_height);
-            let remaining_space = container_height - bar_height;
-            let bar_offset = (scroll_offset_y / overflow_y) * remaining_space;
-
-            handle_style.height = Val::Px(bar_height);
-            handle_style.top = Val::Px(bar_offset);
         }
 
-        // Update horizontal scroll bar
-        let Ok(mut horizontal_bar_style) = q_style.get_mut(scroll_view.horizontal_scroll_bar)
-        else {
-            continue;
-        };
-        if container_width >= content_width || container_width <= 5. {
-            horizontal_bar_style.display = Display::None;
-        } else {
-            horizontal_bar_style.display = Display::Flex;
+        if let (Some(horizontal_scroll_bar), Some(horizontal_scroll_bar_handle)) = (
+            scroll_view.horizontal_scroll_bar,
+            scroll_view.horizontal_scroll_bar_handle,
+        ) {
+            // Update horizontal scroll bar
+            if let Ok(mut horizontal_bar_style) = q_style.get_mut(horizontal_scroll_bar) {
+                if container_width >= content_width || container_width <= 5. {
+                    horizontal_bar_style.display = Display::None;
+                } else {
+                    horizontal_bar_style.display = Display::Flex;
 
-            let Ok(mut handle_style) = q_style.get_mut(scroll_view.horizontal_scroll_bar_handle)
-            else {
-                continue;
+                    if let Ok(mut handle_style) = q_style.get_mut(horizontal_scroll_bar_handle) {
+                        let scroll_offset_x = scroll_view.scroll_offset.x.clamp(0., overflow_x);
+                        let visible_ratio = (container_width / content_width).clamp(0., 1.);
+                        let bar_width =
+                            (visible_ratio * container_width).clamp(5., container_width);
+                        let remaining_space = container_width - bar_width;
+                        let bar_offset = (scroll_offset_x / overflow_x) * remaining_space;
+
+                        handle_style.width = Val::Px(bar_width);
+                        handle_style.left = Val::Px(bar_offset);
+                    };
+                }
             };
-            let scroll_offset_x = scroll_view.scroll_offset.x.clamp(0., overflow_x);
-            let visible_ratio = (container_width / content_width).clamp(0., 1.);
-            let bar_width = (visible_ratio * container_width).clamp(5., container_width);
-            let remaining_space = container_width - bar_width;
-            let bar_offset = (scroll_offset_x / overflow_x) * remaining_space;
-
-            handle_style.width = Val::Px(bar_width);
-            handle_style.left = Val::Px(bar_offset);
         }
     }
 }
@@ -376,10 +378,10 @@ impl Default for MoveToViewport {
 pub struct ScrollView {
     viewport: Entity,
     content_container: Entity,
-    horizontal_scroll_bar: Entity,
-    horizontal_scroll_bar_handle: Entity,
-    vertical_scroll_bar: Entity,
-    vertical_scroll_bar_handle: Entity,
+    horizontal_scroll_bar: Option<Entity>,
+    horizontal_scroll_bar_handle: Option<Entity>,
+    vertical_scroll_bar: Option<Entity>,
+    vertical_scroll_bar_handle: Option<Entity>,
     scroll_offset: Vec2,
 }
 
@@ -388,10 +390,10 @@ impl Default for ScrollView {
         Self {
             viewport: Entity::PLACEHOLDER,
             content_container: Entity::PLACEHOLDER,
-            horizontal_scroll_bar: Entity::PLACEHOLDER,
-            horizontal_scroll_bar_handle: Entity::PLACEHOLDER,
-            vertical_scroll_bar: Entity::PLACEHOLDER,
-            vertical_scroll_bar_handle: Entity::PLACEHOLDER,
+            horizontal_scroll_bar: None,
+            horizontal_scroll_bar_handle: None,
+            vertical_scroll_bar: None,
+            vertical_scroll_bar_handle: None,
             scroll_offset: Vec2::ZERO,
         }
     }
@@ -399,12 +401,35 @@ impl Default for ScrollView {
 
 impl<'w, 's, 'a> ScrollView {
     pub fn spawn(parent: &'a mut ChildBuilder<'w, 's, '_>) -> EntityCommands<'w, 's, 'a> {
-        ScrollView::spawn_docked(parent, None)
+        ScrollView::spawn_docked(parent, None, None)
+    }
+
+    pub fn horizontal(parent: &'a mut ChildBuilder<'w, 's, '_>) -> EntityCommands<'w, 's, 'a> {
+        ScrollView::spawn_docked(parent, None, Some(ScrollAxis::Horizontal))
+    }
+
+    pub fn vertical(parent: &'a mut ChildBuilder<'w, 's, '_>) -> EntityCommands<'w, 's, 'a> {
+        ScrollView::spawn_docked(parent, None, Some(ScrollAxis::Vertical))
+    }
+
+    pub fn horizontal_docked(
+        parent: &'a mut ChildBuilder<'w, 's, '_>,
+        dock_id: Option<Entity>,
+    ) -> EntityCommands<'w, 's, 'a> {
+        ScrollView::spawn_docked(parent, dock_id, Some(ScrollAxis::Horizontal))
+    }
+
+    pub fn vertical_docked(
+        parent: &'a mut ChildBuilder<'w, 's, '_>,
+        dock_id: Option<Entity>,
+    ) -> EntityCommands<'w, 's, 'a> {
+        ScrollView::spawn_docked(parent, dock_id, Some(ScrollAxis::Vertical))
     }
 
     pub fn spawn_docked(
         parent: &'a mut ChildBuilder<'w, 's, '_>,
         dock_id: Option<Entity>,
+        restrict_to: Option<ScrollAxis>,
     ) -> EntityCommands<'w, 's, 'a> {
         let mut viewport_id = Entity::PLACEHOLDER;
         let mut horizontal_scroll_id = Entity::PLACEHOLDER;
@@ -463,23 +488,48 @@ impl<'w, 's, 'a> ScrollView {
                     ..default()
                 })
                 .with_children(|parent| {
-                    (horizontal_scroll_id, horizontal_scroll_handle_id) =
-                        ScrollView::spawn_scroll_bar(
-                            parent,
-                            ScrollAxis::Horizontal,
-                            scroll_view_id,
-                        );
-                    (vertical_scroll_id, vertical_scroll_handle_id) =
-                        ScrollView::spawn_scroll_bar(parent, ScrollAxis::Vertical, scroll_view_id);
+                    if let Some(restrict_to) = restrict_to {
+                        match restrict_to {
+                            ScrollAxis::Horizontal => {
+                                (horizontal_scroll_id, horizontal_scroll_handle_id) =
+                                    ScrollView::spawn_scroll_bar(
+                                        parent,
+                                        ScrollAxis::Horizontal,
+                                        scroll_view_id,
+                                    )
+                            }
+                            ScrollAxis::Vertical => {
+                                (vertical_scroll_id, vertical_scroll_handle_id) =
+                                    ScrollView::spawn_scroll_bar(
+                                        parent,
+                                        ScrollAxis::Vertical,
+                                        scroll_view_id,
+                                    )
+                            }
+                        }
+                    } else {
+                        (horizontal_scroll_id, horizontal_scroll_handle_id) =
+                            ScrollView::spawn_scroll_bar(
+                                parent,
+                                ScrollAxis::Horizontal,
+                                scroll_view_id,
+                            );
+                        (vertical_scroll_id, vertical_scroll_handle_id) =
+                            ScrollView::spawn_scroll_bar(
+                                parent,
+                                ScrollAxis::Vertical,
+                                scroll_view_id,
+                            );
+                    }
                 });
         });
 
         scroll_view.insert((ScrollView {
             viewport: viewport_id,
-            horizontal_scroll_bar: horizontal_scroll_id,
-            horizontal_scroll_bar_handle: horizontal_scroll_handle_id,
-            vertical_scroll_bar: vertical_scroll_id,
-            vertical_scroll_bar_handle: vertical_scroll_handle_id,
+            horizontal_scroll_bar: horizontal_scroll_id.into(),
+            horizontal_scroll_bar_handle: horizontal_scroll_handle_id.into(),
+            vertical_scroll_bar: vertical_scroll_id.into(),
+            vertical_scroll_bar_handle: vertical_scroll_handle_id.into(),
             ..default()
         },));
 

@@ -46,7 +46,6 @@ fn update_slider_on_scroll(
         let Some((axis, diff, unit)) = scrollable.last_change() else {
             continue;
         };
-
         if axis == ScrollAxis::Horizontal {
             continue;
         }
@@ -87,15 +86,15 @@ fn update_slider_on_drag(
             continue;
         }
 
-        if draggable.state == DragState::DragStart {
-            slider.base_ratio = Some(slider.ratio);
-        }
-
         if draggable.state == DragState::DragCanceled {
             if let Some(base_ratio) = slider.base_ratio {
                 slider.ratio = base_ratio;
                 continue;
             }
+        }
+
+        if draggable.state == DragState::DragStart {
+            slider.base_ratio = Some(slider.ratio);
         }
 
         let Ok(slider_bar) = q_node.get(slider.slider_bar) else {

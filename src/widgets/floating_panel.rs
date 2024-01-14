@@ -9,7 +9,7 @@ use crate::{
     animated_interaction::{AnimatedInteraction, AnimationConfig},
     drag_interaction::{DragState, Draggable, DraggableUpdate},
     interactions::InteractiveBackground,
-    FluxInteraction, FluxInteractionUpdate, TrackedInteraction,
+    FluxInteraction, FluxInteractionUpdate, TrackedInteraction, scroll_interaction::ScrollAxis,
 };
 
 use super::{hierarchy::MoveToParent, scroll_view::ScrollView};
@@ -298,11 +298,14 @@ pub struct FloatingPanel {
 }
 
 impl<'w, 's, 'a> FloatingPanel {
-    pub fn spawn(
+    pub fn build(
         parent: &'a mut ChildBuilder<'w, 's, '_>,
-        title: String,
+        title: Option<String>,
         size: Vec2,
         position: Option<Vec2>,
+        draggable: bool,
+        resizable: bool,
+        restrict_scroll: Option<ScrollAxis>,
     ) -> (Entity, EntityCommands<'w, 's, 'a>) {
         let mut panel = parent.spawn((
             NodeBundle {
@@ -331,33 +334,15 @@ impl<'w, 's, 'a> FloatingPanel {
         let panel_id = panel.id();
         let mut container_id = Entity::PLACEHOLDER;
         panel.with_children(|parent| {
-            FloatingPanel::add_resize_handles(parent, panel_id);
+            if resizable {
+                FloatingPanel::add_resize_handles(parent, panel_id);
+            }
 
-            parent
-                .spawn((
-                    ButtonBundle {
-                        style: Style {
-                            border: UiRect::right(Val::Px(2.)),
-                            ..default()
-                        },
-                        border_color: Color::BLACK.into(),
-                        background_color: Color::DARK_GRAY.into(),
-                        ..default()
-                    },
-                    TrackedInteraction::default(),
-                    FloatingPanelTitle { panel: panel_id },
-                    Draggable::default(),
-                ))
-                .with_children(|parent| {
-                    parent.spawn(TextBundle {
-                        style: Style {
-                            margin: UiRect::px(5., 5., 5., 2.),
-                            ..default()
-                        },
-                        text: Text::from_section(title, TextStyle::default()),
-                        ..default()
-                    });
-                });
+            if let Some(title) = title {
+                FloatingPanel::add_panel_title(parent, panel_id, title, draggable);
+            } else if draggable {
+                FloatingPanel::add_panel_drag_handle(parent, panel_id);
+            }
 
             container_id = parent
                 .spawn(NodeBundle {
@@ -373,8 +358,62 @@ impl<'w, 's, 'a> FloatingPanel {
 
         (
             panel_id,
-            ScrollView::spawn_docked(parent, container_id.into()),
+            ScrollView::spawn_docked(parent, container_id.into(), restrict_scroll),
         )
+    }
+
+    fn add_panel_title(
+        parent: &'a mut ChildBuilder<'w, 's, '_>,
+        panel: Entity,
+        title: String,
+        draggable: bool,
+    ) {
+        let mut title_node = parent.spawn((
+            ButtonBundle {
+                style: Style {
+                    border: UiRect::right(Val::Px(2.)),
+                    ..default()
+                },
+                border_color: Color::BLACK.into(),
+                background_color: Color::DARK_GRAY.into(),
+                ..default()
+            },
+            FloatingPanelTitle { panel },
+        ));
+
+        if draggable {
+            title_node.insert((TrackedInteraction::default(), Draggable::default()));
+        }
+
+        title_node.with_children(|parent| {
+            parent.spawn(TextBundle {
+                style: Style {
+                    margin: UiRect::px(5., 5., 5., 2.),
+                    ..default()
+                },
+                text: Text::from_section(title, TextStyle::default()),
+                ..default()
+            });
+        });
+    }
+
+    fn add_panel_drag_handle(parent: &'a mut ChildBuilder<'w, 's, '_>, panel: Entity) {
+        parent.spawn((
+            ButtonBundle {
+                style: Style {
+                    width: Val::Percent(100.),
+                    height: Val::Px(6.),
+                    border: UiRect::vertical(Val::Px(2.)),
+                    ..default()
+                },
+                border_color: Color::GRAY.into(),
+                background_color: Color::BLACK.into(),
+                ..default()
+            },
+            FloatingPanelTitle { panel },
+            TrackedInteraction::default(),
+            Draggable::default(),
+        ));
     }
 
     fn add_resize_handles(parent: &'a mut ChildBuilder<'w, 's, '_>, panel: Entity) {
