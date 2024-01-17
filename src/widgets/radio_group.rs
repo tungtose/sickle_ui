@@ -191,7 +191,7 @@ impl<'w, 's, 'a> RadioButton {
         let mut check_node: Entity = Entity::PLACEHOLDER;
         input.with_children(|parent| {
             parent
-                .spawn(ButtonBundle {
+                .spawn(NodeBundle {
                     style: Style {
                         width: Val::Px(16.),
                         height: Val::Px(16.),
@@ -205,7 +205,7 @@ impl<'w, 's, 'a> RadioButton {
                 })
                 .with_children(|builder| {
                     check_node = builder
-                        .spawn(ButtonBundle {
+                        .spawn(NodeBundle {
                             style: Style {
                                 display: Display::None,
                                 width: Val::Px(10.),
@@ -221,22 +221,7 @@ impl<'w, 's, 'a> RadioButton {
                 });
 
             if let Some(label) = label {
-                parent.spawn(TextBundle {
-                    style: Style {
-                        align_self: AlignSelf::Center,
-                        margin: UiRect::right(Val::Px(10.)),
-                        ..default()
-                    },
-                    text: Text::from_section(
-                        label,
-                        TextStyle {
-                            color: Color::BLACK,
-                            ..default()
-                        },
-                    ),
-                    focus_policy: FocusPolicy::Pass,
-                    ..default()
-                });
+                RadioButton::add_label(parent, label);
             }
         });
 
@@ -249,5 +234,26 @@ impl<'w, 's, 'a> RadioButton {
         });
 
         input
+    }
+
+    fn add_label(parent: &'a mut ChildBuilder<'w, 's, '_>, label: String) -> Entity {
+        parent
+            .spawn(TextBundle {
+                style: Style {
+                    align_self: AlignSelf::Center,
+                    margin: UiRect::right(Val::Px(10.)),
+                    ..default()
+                },
+                text: Text::from_section(
+                    label,
+                    TextStyle {
+                        color: Color::BLACK,
+                        ..default()
+                    },
+                ),
+                focus_policy: FocusPolicy::Pass,
+                ..default()
+            })
+            .id()
     }
 }

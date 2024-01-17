@@ -85,6 +85,7 @@ fn update_cursor_confinement_from_drag(
     }
 }
 
+// TODO: Consider using MouseMotion and TouchInput events directly
 fn update_drag_progress(
     mut q_draggable: Query<(&mut Draggable, &FluxInteraction)>,
     q_window: Query<&Window, With<PrimaryWindow>>,

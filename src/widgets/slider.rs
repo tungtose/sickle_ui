@@ -1,9 +1,5 @@
 use bevy::{
-    ecs::system::EntityCommands,
-    input::mouse::MouseScrollUnit,
-    // input::mouse::{MouseScrollUnit, MouseWheel},
-    prelude::*,
-    ui::FocusPolicy,
+    ecs::system::EntityCommands, input::mouse::MouseScrollUnit, prelude::*, ui::FocusPolicy,
 };
 use sickle_math::{ease::Ease, lerp::Lerp};
 
@@ -165,11 +161,13 @@ fn update_slider_readout(
     mut q_text: Query<&mut Text>,
 ) {
     for slider in &q_slider {
-        let Ok(mut text) = q_text.get_mut(slider.readout_target) else {
+        let Some(readout_target) = slider.readout_target else {
             continue;
         };
-
-        let Ok(mut style) = q_style.get_mut(slider.readout_target) else {
+        let Ok(mut text) = q_text.get_mut(readout_target) else {
+            continue;
+        };
+        let Ok(mut style) = q_style.get_mut(readout_target) else {
             continue;
         };
 
@@ -195,15 +193,16 @@ fn update_slider_readout(
     }
 }
 
-#[derive(Debug, Default, Eq, PartialEq, Reflect)]
+#[derive(Copy, Clone, Debug, Default, Eq, PartialEq, Reflect)]
 pub enum SliderAxis {
     #[default]
     Horizontal,
     Vertical,
 }
 
-#[derive(Component, Debug, Reflect)]
+#[derive(Component, Clone, Debug, Reflect)]
 pub struct SliderConfig {
+    label: Option<String>,
     min: f32,
     max: f32,
     initial_value: f32,
@@ -212,11 +211,8 @@ pub struct SliderConfig {
 }
 
 impl SliderConfig {
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    pub fn from(
+    pub fn new(
+        label: Option<String>,
         min: f32,
         max: f32,
         initial_value: f32,
@@ -236,11 +232,19 @@ impl SliderConfig {
             initial_value,
             show_current,
             axis,
+            label,
         }
     }
 
-    pub fn horizontal(min: f32, max: f32, initial_value: f32, show_current: bool) -> Self {
-        Self::from(
+    pub fn horizontal(
+        label: Option<String>,
+        min: f32,
+        max: f32,
+        initial_value: f32,
+        show_current: bool,
+    ) -> Self {
+        Self::new(
+            label,
             min,
             max,
             initial_value,
@@ -249,8 +253,21 @@ impl SliderConfig {
         )
     }
 
-    pub fn vertical(min: f32, max: f32, initial_value: f32, show_current: bool) -> Self {
-        Self::from(min, max, initial_value, show_current, SliderAxis::Vertical)
+    pub fn vertical(
+        label: Option<String>,
+        min: f32,
+        max: f32,
+        initial_value: f32,
+        show_current: bool,
+    ) -> Self {
+        Self::new(
+            label,
+            min,
+            max,
+            initial_value,
+            show_current,
+            SliderAxis::Vertical,
+        )
     }
 
     pub fn with_value(self, value: f32) -> Self {
@@ -268,6 +285,7 @@ impl SliderConfig {
 impl Default for SliderConfig {
     fn default() -> Self {
         Self {
+            label: None,
             min: 0.,
             max: 1.,
             initial_value: 0.5,
@@ -284,7 +302,7 @@ pub struct Slider {
     pub config: SliderConfig,
     slider_bar: Entity,
     drag_handle: Entity,
-    readout_target: Entity,
+    readout_target: Option<Entity>,
     base_ratio: Option<f32>,
 }
 
@@ -295,7 +313,7 @@ impl Default for Slider {
             config: Default::default(),
             slider_bar: Entity::PLACEHOLDER,
             drag_handle: Entity::PLACEHOLDER,
-            readout_target: Entity::PLACEHOLDER,
+            readout_target: None,
             base_ratio: None,
         }
     }
@@ -336,28 +354,20 @@ impl<'w, 's, 'a> Slider {
 
     pub fn spawn(
         parent: &'a mut ChildBuilder<'w, 's, '_>,
-        label: Option<String>,
         config: Option<SliderConfig>,
     ) -> EntityCommands<'w, 's, 'a> {
         let config = config.unwrap_or_default();
         if config.axis == SliderAxis::Horizontal {
-            Self::horizontal(parent, label, config)
+            Self::horizontal(parent, config)
         } else {
-            Self::vertical(parent, label, config)
+            Self::vertical(parent, config)
         }
     }
 
     fn horizontal(
         parent: &'a mut ChildBuilder<'w, 's, '_>,
-        label: Option<String>,
         config: SliderConfig,
     ) -> EntityCommands<'w, 's, 'a> {
-        let tween = AnimationConfig {
-            duration: 0.1,
-            easing: Ease::OutExpo,
-            ..default()
-        };
-
         let mut input = parent.spawn((
             NodeBundle {
                 style: Style {
@@ -375,31 +385,19 @@ impl<'w, 's, 'a> Slider {
                 highlight: Some(Color::rgba(0., 1., 1., 0.8)),
                 ..default()
             },
-            AnimatedInteraction::<InteractiveBackground> { tween, ..default() },
+            AnimatedInteraction::<InteractiveBackground> {
+                tween: Slider::base_tween(),
+                ..default()
+            },
         ));
 
         let input_id = input.id();
         let mut drag_handle: Entity = Entity::PLACEHOLDER;
         let mut slider_bar: Entity = Entity::PLACEHOLDER;
-        let mut readout_target: Entity = Entity::PLACEHOLDER;
+        let mut readout_target: Option<Entity> = None;
         input.with_children(|parent| {
-            if let Some(label) = label {
-                parent.spawn(TextBundle {
-                    style: Style {
-                        margin: UiRect::px(5., 10., 0., 0.),
-                        ..default()
-                    },
-                    text: Text::from_section(
-                        label,
-                        TextStyle {
-                            color: Color::BLACK,
-                            font_size: 14.,
-                            ..default()
-                        },
-                    ),
-                    focus_policy: FocusPolicy::Pass,
-                    ..default()
-                });
+            if let Some(label) = config.label.clone() {
+                Slider::add_label(parent, label, SliderAxis::Horizontal);
             }
 
             slider_bar = parent
@@ -431,47 +429,15 @@ impl<'w, 's, 'a> Slider {
                         },))
                         .with_children(|parent| {
                             drag_handle = parent
-                                .spawn((
-                                    ButtonBundle {
-                                        style: Style {
-                                            width: Val::Px(20.),
-                                            height: Val::Px(20.),
-                                            margin: UiRect::top(Val::Px(-8.)),
-                                            border: UiRect::px(1., 1., 1., 2.),
-                                            ..default()
-                                        },
-                                        background_color: Color::AQUAMARINE.into(),
-                                        border_color: Color::GRAY.into(),
-                                        ..default()
-                                    },
-                                    TrackedInteraction::default(),
-                                    InteractiveBackground {
-                                        highlight: Some(Color::rgba(0., 1., 1., 0.8)),
-                                        ..default()
-                                    },
-                                    AnimatedInteraction::<InteractiveBackground> {
-                                        tween,
-                                        ..default()
-                                    },
-                                    SliderDragHandle { slider: input_id },
-                                    Draggable::default(),
-                                    Scrollable::default(),
-                                ))
+                                .spawn(Slider::handle_bundle(input_id, SliderAxis::Horizontal))
                                 .id();
                         });
                 })
                 .id();
 
-            readout_target = parent
-                .spawn(TextBundle {
-                    style: Style {
-                        min_width: Val::Px(50.),
-                        margin: UiRect::left(Val::Px(5.)),
-                        ..default()
-                    },
-                    ..default()
-                })
-                .id();
+            if config.show_current {
+                readout_target = Slider::add_readout_target(parent, SliderAxis::Horizontal).into();
+            }
         });
 
         let initial_ratio = config.initial_value / (config.max - config.min);
@@ -490,15 +456,8 @@ impl<'w, 's, 'a> Slider {
 
     fn vertical(
         parent: &'a mut ChildBuilder<'w, 's, '_>,
-        label: Option<String>,
         config: SliderConfig,
     ) -> EntityCommands<'w, 's, 'a> {
-        let tween = AnimationConfig {
-            duration: 0.1,
-            easing: Ease::OutExpo,
-            ..default()
-        };
-
         let mut input = parent.spawn((
             NodeBundle {
                 style: Style {
@@ -516,24 +475,21 @@ impl<'w, 's, 'a> Slider {
                 highlight: Some(Color::rgba(0., 1., 1., 0.8)),
                 ..default()
             },
-            AnimatedInteraction::<InteractiveBackground> { tween, ..default() },
+            AnimatedInteraction::<InteractiveBackground> {
+                tween: Slider::base_tween(),
+                ..default()
+            },
         ));
 
         let input_id = input.id();
         let mut drag_handle: Entity = Entity::PLACEHOLDER;
         let mut slider_bar: Entity = Entity::PLACEHOLDER;
-        let mut current_value_node: Entity = Entity::PLACEHOLDER;
+        let mut current_value_node: Option<Entity> = None;
         input.with_children(|parent| {
-            current_value_node = parent
-                .spawn(TextBundle {
-                    style: Style {
-                        margin: UiRect::px(5., 5., 5., 0.),
-                        ..default()
-                    },
-                    focus_policy: FocusPolicy::Pass,
-                    ..default()
-                })
-                .id();
+            if config.show_current {
+                current_value_node =
+                    Slider::add_readout_target(parent, SliderAxis::Vertical).into();
+            }
 
             slider_bar = parent
                 .spawn((
@@ -566,54 +522,14 @@ impl<'w, 's, 'a> Slider {
                         },))
                         .with_children(|parent| {
                             drag_handle = parent
-                                .spawn((
-                                    ButtonBundle {
-                                        style: Style {
-                                            width: Val::Px(20.),
-                                            height: Val::Px(20.),
-                                            margin: UiRect::left(Val::Px(-8.)),
-                                            border: UiRect::px(1., 1., 1., 2.),
-                                            ..default()
-                                        },
-                                        background_color: Color::AQUAMARINE.into(),
-                                        border_color: Color::GRAY.into(),
-                                        ..default()
-                                    },
-                                    TrackedInteraction::default(),
-                                    InteractiveBackground {
-                                        highlight: Some(Color::rgba(0., 1., 1., 0.8)),
-                                        ..default()
-                                    },
-                                    AnimatedInteraction::<InteractiveBackground> {
-                                        tween,
-                                        ..default()
-                                    },
-                                    SliderDragHandle { slider: input_id },
-                                    Draggable::default(),
-                                    Scrollable::default(),
-                                ))
+                                .spawn(Slider::handle_bundle(input_id, SliderAxis::Vertical))
                                 .id();
                         });
                 })
                 .id();
 
-            if let Some(label) = label {
-                parent.spawn(TextBundle {
-                    style: Style {
-                        margin: UiRect::px(5., 5., 0., 5.),
-                        ..default()
-                    },
-                    text: Text::from_section(
-                        label,
-                        TextStyle {
-                            color: Color::BLACK,
-                            font_size: 14.,
-                            ..default()
-                        },
-                    ),
-                    focus_policy: FocusPolicy::Pass,
-                    ..default()
-                });
+            if let Some(label) = config.label.clone() {
+                Slider::add_label(parent, label, SliderAxis::Vertical);
             }
         });
 
@@ -629,5 +545,99 @@ impl<'w, 's, 'a> Slider {
         });
 
         input
+    }
+
+    fn base_tween() -> AnimationConfig {
+        AnimationConfig {
+            duration: 0.1,
+            easing: Ease::OutExpo,
+            ..default()
+        }
+    }
+
+    fn handle_bundle(slider: Entity, axis: SliderAxis) -> impl Bundle {
+        let margin = match axis {
+            SliderAxis::Horizontal => UiRect::top(Val::Px(-8.)),
+            SliderAxis::Vertical => UiRect::left(Val::Px(-8.)),
+        };
+
+        (
+            ButtonBundle {
+                style: Style {
+                    width: Val::Px(20.),
+                    height: Val::Px(20.),
+                    border: UiRect::px(1., 1., 1., 2.),
+                    margin,
+                    ..default()
+                },
+                background_color: Color::AQUAMARINE.into(),
+                border_color: Color::GRAY.into(),
+                ..default()
+            },
+            TrackedInteraction::default(),
+            InteractiveBackground {
+                highlight: Some(Color::rgba(0., 1., 1., 0.8)),
+                ..default()
+            },
+            AnimatedInteraction::<InteractiveBackground> {
+                tween: Slider::base_tween(),
+                ..default()
+            },
+            SliderDragHandle { slider },
+            Draggable::default(),
+            Scrollable::default(),
+        )
+    }
+
+    fn add_readout_target(parent: &'a mut ChildBuilder<'w, 's, '_>, axis: SliderAxis) -> Entity {
+        let margin = match axis {
+            SliderAxis::Horizontal => UiRect::left(Val::Px(5.)),
+            SliderAxis::Vertical => UiRect::px(5., 5., 5., 0.),
+        };
+        let min_width = match axis {
+            SliderAxis::Horizontal => Val::Px(50.),
+            SliderAxis::Vertical => Val::Auto,
+        };
+
+        parent
+            .spawn(TextBundle {
+                style: Style {
+                    min_width,
+                    margin,
+                    ..default()
+                },
+                ..default()
+            })
+            .id()
+    }
+
+    fn add_label(
+        parent: &'a mut ChildBuilder<'w, 's, '_>,
+        label: String,
+        axis: SliderAxis,
+    ) -> Entity {
+        let margin = match axis {
+            SliderAxis::Horizontal => UiRect::px(5., 10., 0., 0.),
+            SliderAxis::Vertical => UiRect::px(5., 5., 0., 5.),
+        };
+
+        parent
+            .spawn(TextBundle {
+                style: Style {
+                    margin,
+                    ..default()
+                },
+                text: Text::from_section(
+                    label,
+                    TextStyle {
+                        color: Color::BLACK,
+                        font_size: 14.,
+                        ..default()
+                    },
+                ),
+                focus_policy: FocusPolicy::Pass,
+                ..default()
+            })
+            .id()
     }
 }
