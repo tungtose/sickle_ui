@@ -4,6 +4,7 @@ use sickle_math::ease::Ease;
 use crate::{
     animated_interaction::{AnimatedInteraction, AnimationConfig},
     interactions::InteractiveBackground,
+    ui_builder::UiBuilder,
     FluxInteraction, TrackedInteraction,
 };
 
@@ -61,13 +62,27 @@ impl<'w, 's, 'a> Checkbox {
         parent: &'a mut ChildBuilder<'w, 's, '_>,
         label: Option<String>,
     ) -> EntityCommands<'w, 's, 'a> {
+        let mut input = parent.spawn(Checkbox::checkbox_container_bundle());
+        Checkbox::add_content(&mut input, label);
+
+        input
+    }
+
+    fn parentless(commands: &'a mut Commands<'w, 's>, label: Option<String>) -> Entity {
+        let mut input = commands.spawn(Checkbox::checkbox_container_bundle());
+        Checkbox::add_content(&mut input, label);
+
+        input.id()
+    }
+
+    fn checkbox_container_bundle() -> impl Bundle {
         let tween = AnimationConfig {
             duration: 0.1,
             easing: Ease::OutExpo,
             ..default()
         };
 
-        let mut input = parent.spawn((
+        (
             ButtonBundle {
                 style: Style {
                     height: Val::Px(26.),
@@ -86,8 +101,10 @@ impl<'w, 's, 'a> Checkbox {
                 ..default()
             },
             AnimatedInteraction::<InteractiveBackground> { tween, ..default() },
-        ));
+        )
+    }
 
+    fn add_content(input: &mut EntityCommands<'w, 's, 'a>, label: Option<String>) {
         let mut check_node: Entity = Entity::PLACEHOLDER;
         input.with_children(|parent| {
             parent
@@ -129,8 +146,6 @@ impl<'w, 's, 'a> Checkbox {
             check_node,
             checked: false,
         });
-
-        input
     }
 
     fn add_label(parent: &'a mut ChildBuilder<'w, 's, '_>, label: String) -> Entity {
@@ -152,5 +167,25 @@ impl<'w, 's, 'a> Checkbox {
                 ..default()
             })
             .id()
+    }
+}
+
+pub trait UiCheckboxExt<'w, 's> {
+    fn checkbox<'a>(&'a mut self, label: Option<String>) -> EntityCommands<'w, 's, 'a>;
+}
+
+impl<'w, 's> UiCheckboxExt<'w, 's> for UiBuilder<'w, 's, '_> {
+    fn checkbox<'a>(&'a mut self, label: Option<String>) -> EntityCommands<'w, 's, 'a> {
+        let mut checkbox = Entity::PLACEHOLDER;
+
+        if let Some(entity) = self.entity() {
+            self.commands().entity(entity).with_children(|parent| {
+                checkbox = Checkbox::spawn(parent, label).id();
+            });
+        } else {
+            checkbox = Checkbox::parentless(self.commands(), label);
+        }
+
+        self.commands().entity(checkbox)
     }
 }

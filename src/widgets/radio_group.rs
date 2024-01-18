@@ -4,6 +4,7 @@ use sickle_math::ease::Ease;
 use crate::{
     animated_interaction::{AnimatedInteraction, AnimationConfig},
     interactions::InteractiveBackground,
+    ui_builder::UiBuilder,
     FluxInteraction, TrackedInteraction,
 };
 
@@ -128,6 +129,29 @@ impl<'w, 's, 'a> RadioGroup {
         });
 
         group
+    }
+
+    fn parentless(
+        commands: &'a mut Commands<'w, 's>,
+        options: Vec<Option<String>>,
+        unselectable: bool,
+    ) -> Entity {
+        let mut group = commands.spawn((NodeBundle::default(), RadioGroup::default()));
+        let id = Some(group.id());
+
+        group.with_children(|parent| {
+            for (index, label) in options.iter().enumerate() {
+                RadioButton::spawn(
+                    parent,
+                    index.try_into().unwrap(),
+                    label.clone(),
+                    id,
+                    unselectable,
+                );
+            }
+        });
+
+        group.id()
     }
 }
 
@@ -255,5 +279,33 @@ impl<'w, 's, 'a> RadioButton {
                 ..default()
             })
             .id()
+    }
+}
+
+pub trait UiRadioGroupExt<'w, 's> {
+    fn radio_group<'a>(
+        &'a mut self,
+        options: Vec<Option<String>>,
+        unselectable: bool,
+    ) -> EntityCommands<'w, 's, 'a>;
+}
+
+impl<'w, 's> UiRadioGroupExt<'w, 's> for UiBuilder<'w, 's, '_> {
+    fn radio_group<'a>(
+        &'a mut self,
+        options: Vec<Option<String>>,
+        unselectable: bool,
+    ) -> EntityCommands<'w, 's, 'a> {
+        let mut radio_group = Entity::PLACEHOLDER;
+
+        if let Some(entity) = self.entity() {
+            self.commands().entity(entity).with_children(|parent| {
+                radio_group = RadioGroup::spawn(parent, options, unselectable).id();
+            });
+        } else {
+            radio_group = RadioGroup::parentless(self.commands(), options, unselectable);
+        }
+
+        self.commands().entity(radio_group)
     }
 }

@@ -6,6 +6,7 @@ use crate::{
     drag_interaction::{DragState, Draggable, DraggableUpdate},
     interactions::InteractiveBackground,
     scroll_interaction::{ScrollAxis, Scrollable, ScrollableUpdate},
+    ui_builder::{UiBuilder, UiBuilderExt},
     TrackedInteraction,
 };
 
@@ -61,12 +62,17 @@ fn update_scroll_view_on_content_change(
 
 fn update_scroll_view_on_scroll(
     q_scrollables: Query<
-        (AnyOf<(&ScrollViewViewport, &ScrollBarHandle)>, &Scrollable),
+        (
+            Entity,
+            AnyOf<(&ScrollViewViewport, &ScrollBarHandle, &ScrollThrough)>,
+            &Scrollable,
+        ),
         Changed<Scrollable>,
     >,
+    q_parent: Query<&Parent>,
     mut q_scroll_view: Query<&mut ScrollView>,
 ) {
-    for ((viewport, handle), scrollable) in &q_scrollables {
+    for (entity, (viewport, handle, scroll_through), scrollable) in &q_scrollables {
         let Some((axis, diff, unit)) = scrollable.last_change() else {
             continue;
         };
@@ -75,6 +81,15 @@ fn update_scroll_view_on_scroll(
             viewport.scroll_view
         } else if let Some(handle) = handle {
             handle.scroll_view
+        } else if let Some(_) = scroll_through {
+            let mut found = Entity::PLACEHOLDER;
+            for parent in q_parent.iter_ancestors(entity) {
+                if let Ok(_) = q_scroll_view.get(parent) {
+                    found = parent;
+                }
+            }
+
+            found
         } else {
             continue;
         };
@@ -294,6 +309,9 @@ fn update_scroll_view_layout(
     }
 }
 
+#[derive(Component, Debug)]
+pub struct ScrollThrough;
+
 #[derive(Component, Debug, Reflect)]
 #[reflect(Component)]
 pub struct ScrollBarHandle {
@@ -373,7 +391,7 @@ impl Default for MoveToViewport {
     }
 }
 
-#[derive(Component, Debug, Reflect)]
+#[derive(Component, Clone, Debug, Reflect)]
 #[reflect(Component)]
 pub struct ScrollView {
     viewport: Entity,
@@ -399,60 +417,72 @@ impl Default for ScrollView {
     }
 }
 
-impl<'w, 's, 'a> ScrollView {
-    pub fn spawn(parent: &'a mut ChildBuilder<'w, 's, '_>) -> EntityCommands<'w, 's, 'a> {
+impl<'w, 's> ScrollView {
+    pub fn spawn<'a>(parent: &'a mut ChildBuilder<'w, 's, '_>) -> EntityCommands<'w, 's, 'a> {
         ScrollView::spawn_docked(parent, None, None)
     }
 
-    pub fn horizontal(parent: &'a mut ChildBuilder<'w, 's, '_>) -> EntityCommands<'w, 's, 'a> {
+    pub fn horizontal<'a>(parent: &'a mut ChildBuilder<'w, 's, '_>) -> EntityCommands<'w, 's, 'a> {
         ScrollView::spawn_docked(parent, None, Some(ScrollAxis::Horizontal))
     }
 
-    pub fn vertical(parent: &'a mut ChildBuilder<'w, 's, '_>) -> EntityCommands<'w, 's, 'a> {
+    pub fn vertical<'a>(parent: &'a mut ChildBuilder<'w, 's, '_>) -> EntityCommands<'w, 's, 'a> {
         ScrollView::spawn_docked(parent, None, Some(ScrollAxis::Vertical))
     }
 
-    pub fn horizontal_docked(
+    pub fn horizontal_docked<'a>(
         parent: &'a mut ChildBuilder<'w, 's, '_>,
         dock_id: Option<Entity>,
     ) -> EntityCommands<'w, 's, 'a> {
         ScrollView::spawn_docked(parent, dock_id, Some(ScrollAxis::Horizontal))
     }
 
-    pub fn vertical_docked(
+    pub fn vertical_docked<'a>(
         parent: &'a mut ChildBuilder<'w, 's, '_>,
         dock_id: Option<Entity>,
     ) -> EntityCommands<'w, 's, 'a> {
         ScrollView::spawn_docked(parent, dock_id, Some(ScrollAxis::Vertical))
     }
 
-    pub fn spawn_docked(
+    pub fn spawn_docked<'a>(
         parent: &'a mut ChildBuilder<'w, 's, '_>,
         dock_id: Option<Entity>,
         restrict_to: Option<ScrollAxis>,
     ) -> EntityCommands<'w, 's, 'a> {
-        let mut viewport_id = Entity::PLACEHOLDER;
-        let mut horizontal_scroll_id = Entity::PLACEHOLDER;
-        let mut horizontal_scroll_handle_id = Entity::PLACEHOLDER;
-        let mut vertical_scroll_id = Entity::PLACEHOLDER;
-        let mut vertical_scroll_handle_id = Entity::PLACEHOLDER;
-
-        let mut scroll_view = parent.spawn(NodeBundle {
-            style: Style {
-                width: Val::Percent(100.),
-                height: Val::Percent(100.),
-                ..default()
-            },
-            ..default()
-        });
+        let mut scroll_view = parent.spawn(ScrollView::shell_bundle());
 
         if dock_id.is_some() {
             scroll_view.insert(MoveToParent { parent: dock_id });
         }
 
         let scroll_view_id = scroll_view.id();
+        let component = ScrollView::fill_scroll_view(&mut scroll_view, restrict_to);
 
-        scroll_view.with_children(|parent| {
+        scroll_view.insert(component.clone());
+
+        let content_container = parent.spawn((
+            ScrollView::content_bundle(scroll_view_id),
+            MoveToViewport {
+                scroll_view: scroll_view_id,
+                viewport: component.viewport,
+            },
+        ));
+
+        content_container
+    }
+
+    fn fill_scroll_view<'a>(
+        shell: &'a mut EntityCommands<'w, 's, '_>,
+        restrict_to: Option<ScrollAxis>,
+    ) -> ScrollView {
+        let mut viewport_id = Entity::PLACEHOLDER;
+        let mut horizontal_scroll_id = Entity::PLACEHOLDER;
+        let mut horizontal_scroll_handle_id = Entity::PLACEHOLDER;
+        let mut vertical_scroll_id = Entity::PLACEHOLDER;
+        let mut vertical_scroll_handle_id = Entity::PLACEHOLDER;
+        let scroll_view_id = shell.id();
+
+        shell.with_children(|parent| {
             viewport_id = parent
                 .spawn((
                     NodeBundle {
@@ -524,39 +554,17 @@ impl<'w, 's, 'a> ScrollView {
                 });
         });
 
-        scroll_view.insert((ScrollView {
+        ScrollView {
             viewport: viewport_id,
             horizontal_scroll_bar: horizontal_scroll_id.into(),
             horizontal_scroll_bar_handle: horizontal_scroll_handle_id.into(),
             vertical_scroll_bar: vertical_scroll_id.into(),
             vertical_scroll_bar_handle: vertical_scroll_handle_id.into(),
             ..default()
-        },));
-
-        let content_container = parent.spawn((
-            NodeBundle {
-                style: Style {
-                    justify_self: JustifySelf::Start,
-                    align_self: AlignSelf::Start,
-                    flex_direction: FlexDirection::Column,
-                    padding: UiRect::px(0., 12., 0., 12.),
-                    ..default()
-                },
-                ..default()
-            },
-            MoveToViewport {
-                scroll_view: scroll_view_id,
-                viewport: viewport_id,
-            },
-            ScrollViewContent {
-                scroll_view: scroll_view_id,
-            },
-        ));
-
-        content_container
+        }
     }
 
-    fn spawn_scroll_bar(
+    fn spawn_scroll_bar<'a>(
         parent: &'a mut ChildBuilder<'w, 's, '_>,
         axis: ScrollAxis,
         scroll_view: Entity,
@@ -629,5 +637,77 @@ impl<'w, 's, 'a> ScrollView {
         });
 
         (scroll_bar.id(), handle_id)
+    }
+
+    fn shell_bundle() -> impl Bundle {
+        NodeBundle {
+            style: Style {
+                width: Val::Percent(100.),
+                height: Val::Percent(100.),
+                ..default()
+            },
+            ..default()
+        }
+    }
+
+    fn content_bundle(scroll_view: Entity) -> impl Bundle {
+        (
+            NodeBundle {
+                style: Style {
+                    justify_self: JustifySelf::Start,
+                    align_self: AlignSelf::Start,
+                    flex_direction: FlexDirection::Column,
+                    padding: UiRect::px(0., 12., 0., 12.),
+                    ..default()
+                },
+                ..default()
+            },
+            ScrollViewContent { scroll_view },
+        )
+    }
+}
+
+pub trait UiScrollViewExt<'w, 's> {
+    fn scroll_view<'a>(
+        &'a mut self,
+        restrict_to: Option<ScrollAxis>,
+        f: impl FnOnce(&mut UiBuilder),
+    ) -> EntityCommands<'w, 's, 'a>;
+}
+
+impl<'w, 's> UiScrollViewExt<'w, 's> for UiBuilder<'w, 's, '_> {
+    fn scroll_view<'a>(
+        &'a mut self,
+        restrict_to: Option<ScrollAxis>,
+        spawn_children: impl FnOnce(&mut UiBuilder),
+    ) -> EntityCommands<'w, 's, 'a> {
+        let mut scroll_view = Entity::PLACEHOLDER;
+        let mut content_container = Entity::PLACEHOLDER;
+
+        if let Some(entity) = self.entity() {
+            self.commands().entity(entity).with_children(|parent| {
+                scroll_view = parent.spawn(ScrollView::shell_bundle()).id();
+            });
+        } else {
+            scroll_view = self.commands().spawn(ScrollView::shell_bundle()).id();
+        }
+
+        let mut scroll_view_commands = self.commands().entity(scroll_view);
+        let mut component = ScrollView::fill_scroll_view(&mut scroll_view_commands, restrict_to);
+
+        self.commands()
+            .entity(component.viewport)
+            .with_children(|parent| {
+                content_container = parent.spawn(ScrollView::content_bundle(scroll_view)).id();
+            });
+
+        component.content_container = content_container;
+        self.commands().entity(scroll_view).insert(component);
+
+        let mut new_entity = self.commands().entity(content_container);
+        let mut new_builder = new_entity.ui_builder();
+        spawn_children(&mut new_builder);
+
+        self.commands().entity(scroll_view)
     }
 }

@@ -1,8 +1,10 @@
 pub mod checkbox;
+pub mod column;
 pub mod dropdown;
 pub mod floating_panel;
 pub mod hierarchy;
 pub mod radio_group;
+pub mod row;
 pub mod scroll_view;
 pub mod slider;
 
@@ -12,6 +14,17 @@ use self::{
     checkbox::CheckboxPlugin, dropdown::DropdownPlugin, floating_panel::FloatingPanelPlugin,
     radio_group::RadioGroupPlugin, scroll_view::ScrollViewPlugin, slider::InputSliderPlugin,
 };
+
+pub mod prelude {
+    pub use super::{
+        checkbox::UiCheckboxExt,
+        column::{ColumnConfig, UiColumnExt},
+        radio_group::UiRadioGroupExt,
+        row::{RowConfig, UiRowExt},
+        scroll_view::UiScrollViewExt,
+        slider::{SliderConfig, UiSliderExt},
+    };
+}
 
 pub struct WidgetsPlugin;
 

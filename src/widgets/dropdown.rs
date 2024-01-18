@@ -4,11 +4,11 @@ use sickle_math::ease::Ease;
 use crate::{
     animated_interaction::{AnimatedInteraction, AnimationConfig},
     interactions::InteractiveBackground,
-    scroll_interaction::ScrollAxis,
+    scroll_interaction::{ScrollAxis, Scrollable},
     FluxInteraction, FluxInteractionUpdate, TrackedInteraction,
 };
 
-use super::floating_panel::{FloatingPanel, FloatingPanelConfig};
+use super::{floating_panel::{FloatingPanel, FloatingPanelConfig}, scroll_view::ScrollThrough};
 
 pub struct DropdownPlugin;
 
@@ -330,6 +330,8 @@ impl<'w, 's, 'a> Dropdown {
                     ..default()
                 },
                 DropdownOption { dropdown, option },
+                ScrollThrough,
+                Scrollable::default()
             ))
             .with_children(|parent| {
                 parent.spawn(TextBundle {

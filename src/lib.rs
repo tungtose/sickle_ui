@@ -6,6 +6,7 @@ pub mod flux_interaction;
 pub mod interactions;
 pub mod scroll_interaction;
 pub mod widgets;
+pub mod ui_builder;
 
 use drag_interaction::DragInteractionPlugin;
 pub use flux_interaction::*;

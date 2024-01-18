@@ -8,6 +8,7 @@ use crate::{
     drag_interaction::{DragState, Draggable, DraggableUpdate},
     interactions::InteractiveBackground,
     scroll_interaction::{ScrollAxis, Scrollable, ScrollableUpdate},
+    ui_builder::UiBuilder,
     TrackedInteraction,
 };
 
@@ -358,17 +359,31 @@ impl<'w, 's, 'a> Slider {
     ) -> EntityCommands<'w, 's, 'a> {
         let config = config.unwrap_or_default();
         if config.axis == SliderAxis::Horizontal {
-            Self::horizontal(parent, config)
+            let mut input = parent.spawn(Slider::horizontal_bundle());
+            Slider::fill_horizontal(&mut input, config);
+            input
         } else {
-            Self::vertical(parent, config)
+            let mut input = parent.spawn(Slider::vertical_bundle());
+            Slider::fill_vertical(&mut input, config);
+            input
         }
     }
 
-    fn horizontal(
-        parent: &'a mut ChildBuilder<'w, 's, '_>,
-        config: SliderConfig,
-    ) -> EntityCommands<'w, 's, 'a> {
-        let mut input = parent.spawn((
+    fn parentless(commands: &'a mut Commands<'w, 's>, config: Option<SliderConfig>) -> Entity {
+        let config = config.unwrap_or_default();
+        if config.axis == SliderAxis::Horizontal {
+            let mut input = commands.spawn(Slider::horizontal_bundle());
+            Slider::fill_horizontal(&mut input, config);
+            input.id()
+        } else {
+            let mut input = commands.spawn(Slider::vertical_bundle());
+            Slider::fill_vertical(&mut input, config);
+            input.id()
+        }
+    }
+
+    fn horizontal_bundle() -> impl Bundle {
+        (
             NodeBundle {
                 style: Style {
                     width: Val::Percent(100.),
@@ -389,8 +404,35 @@ impl<'w, 's, 'a> Slider {
                 tween: Slider::base_tween(),
                 ..default()
             },
-        ));
+        )
+    }
 
+    fn vertical_bundle() -> impl Bundle {
+        (
+            NodeBundle {
+                style: Style {
+                    height: Val::Percent(100.),
+                    justify_content: JustifyContent::SpaceBetween,
+                    align_items: AlignItems::Center,
+                    margin: UiRect::all(Val::Px(5.)),
+                    flex_direction: FlexDirection::Column,
+                    ..default()
+                },
+                ..default()
+            },
+            TrackedInteraction::default(),
+            InteractiveBackground {
+                highlight: Some(Color::rgba(0., 1., 1., 0.8)),
+                ..default()
+            },
+            AnimatedInteraction::<InteractiveBackground> {
+                tween: Slider::base_tween(),
+                ..default()
+            },
+        )
+    }
+
+    fn fill_horizontal(input: &mut EntityCommands<'w, 's, 'a>, config: SliderConfig) {
         let input_id = input.id();
         let mut drag_handle: Entity = Entity::PLACEHOLDER;
         let mut slider_bar: Entity = Entity::PLACEHOLDER;
@@ -450,37 +492,9 @@ impl<'w, 's, 'a> Slider {
             readout_target,
             base_ratio: None,
         });
-
-        input
     }
 
-    fn vertical(
-        parent: &'a mut ChildBuilder<'w, 's, '_>,
-        config: SliderConfig,
-    ) -> EntityCommands<'w, 's, 'a> {
-        let mut input = parent.spawn((
-            NodeBundle {
-                style: Style {
-                    height: Val::Percent(100.),
-                    justify_content: JustifyContent::SpaceBetween,
-                    align_items: AlignItems::Center,
-                    margin: UiRect::all(Val::Px(5.)),
-                    flex_direction: FlexDirection::Column,
-                    ..default()
-                },
-                ..default()
-            },
-            TrackedInteraction::default(),
-            InteractiveBackground {
-                highlight: Some(Color::rgba(0., 1., 1., 0.8)),
-                ..default()
-            },
-            AnimatedInteraction::<InteractiveBackground> {
-                tween: Slider::base_tween(),
-                ..default()
-            },
-        ));
-
+    fn fill_vertical(input: &mut EntityCommands<'w, 's, 'a>, config: SliderConfig) {
         let input_id = input.id();
         let mut drag_handle: Entity = Entity::PLACEHOLDER;
         let mut slider_bar: Entity = Entity::PLACEHOLDER;
@@ -543,8 +557,6 @@ impl<'w, 's, 'a> Slider {
             readout_target: current_value_node,
             base_ratio: None,
         });
-
-        input
     }
 
     fn base_tween() -> AnimationConfig {
@@ -639,5 +651,25 @@ impl<'w, 's, 'a> Slider {
                 ..default()
             })
             .id()
+    }
+}
+
+pub trait UiSliderExt<'w, 's> {
+    fn slider<'a>(&'a mut self, config: Option<SliderConfig>) -> EntityCommands<'w, 's, 'a>;
+}
+
+impl<'w, 's> UiSliderExt<'w, 's> for UiBuilder<'w, 's, '_> {
+    fn slider<'a>(&'a mut self, config: Option<SliderConfig>) -> EntityCommands<'w, 's, 'a> {
+        let mut slider = Entity::PLACEHOLDER;
+
+        if let Some(entity) = self.entity() {
+            self.commands().entity(entity).with_children(|parent| {
+                slider = Slider::spawn(parent, config).id();
+            });
+        } else {
+            slider = Slider::parentless(self.commands(), config);
+        }
+
+        self.commands().entity(slider)
     }
 }
