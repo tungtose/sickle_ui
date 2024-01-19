@@ -98,7 +98,7 @@ fn update_radio_button(
 #[derive(Component, Debug, Reflect)]
 #[reflect(Component)]
 pub struct RadioGroup {
-    pub selected: Option<usize>,
+    selected: Option<usize>,
 }
 
 impl Default for RadioGroup {
@@ -108,50 +108,8 @@ impl Default for RadioGroup {
 }
 
 impl<'w, 's, 'a> RadioGroup {
-    fn spawn(
-        parent: &'a mut ChildBuilder<'w, 's, '_>,
-        options: Vec<Option<String>>,
-        unselectable: bool,
-    ) -> Entity {
-        let mut group = parent.spawn((NodeBundle::default(), RadioGroup::default()));
-        let id = Some(group.id());
-
-        group.with_children(|parent| {
-            for (index, label) in options.iter().enumerate() {
-                RadioButton::spawn(
-                    parent,
-                    index.try_into().unwrap(),
-                    label.clone(),
-                    id,
-                    unselectable,
-                );
-            }
-        });
-
-        group.id()
-    }
-
-    fn parentless(
-        commands: &'a mut Commands<'w, 's>,
-        options: Vec<Option<String>>,
-        unselectable: bool,
-    ) -> Entity {
-        let mut group = commands.spawn((NodeBundle::default(), RadioGroup::default()));
-        let id = Some(group.id());
-
-        group.with_children(|parent| {
-            for (index, label) in options.iter().enumerate() {
-                RadioButton::spawn(
-                    parent,
-                    index.try_into().unwrap(),
-                    label.clone(),
-                    id,
-                    unselectable,
-                );
-            }
-        });
-
-        group.id()
+    pub fn value(&self) -> Option<usize> {
+        self.selected
     }
 }
 
@@ -300,11 +258,28 @@ impl<'w, 's> UiRadioGroupExt<'w, 's> for UiBuilder<'w, 's, '_> {
 
         if let Some(entity) = self.entity() {
             self.commands().entity(entity).with_children(|parent| {
-                radio_group = RadioGroup::spawn(parent, options, unselectable);
+                radio_group = parent
+                    .spawn((NodeBundle::default(), RadioGroup::default()))
+                    .id();
             });
         } else {
-            radio_group = RadioGroup::parentless(self.commands(), options, unselectable);
+            radio_group = self
+                .commands()
+                .spawn((NodeBundle::default(), RadioGroup::default()))
+                .id();
         }
+
+        self.commands().entity(radio_group).with_children(|parent| {
+            for (index, label) in options.iter().enumerate() {
+                RadioButton::spawn(
+                    parent,
+                    index.try_into().unwrap(),
+                    label.clone(),
+                    radio_group.into(),
+                    unselectable,
+                );
+            }
+        });
 
         self.commands().entity(radio_group)
     }

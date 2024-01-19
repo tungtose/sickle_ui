@@ -17,6 +17,8 @@ use crate::{
 use super::prelude::{ColumnConfig, UiColumnExt, UiScrollViewExt};
 
 const MIN_PANEL_SIZE: Vec2 = Vec2 { x: 150., y: 100. };
+const MIN_FLOATING_PANEL_Z_INDEX: usize = 1000;
+const PRIORITY_FLOATING_PANEL_Z_INDEX: usize = 10000;
 
 pub struct FloatingPanelPlugin;
 
@@ -43,8 +45,18 @@ fn panel_added(q_panels: Query<Entity, Added<FloatingPanel>>) -> bool {
 }
 
 fn index_floating_panel(mut q_panels: Query<&mut FloatingPanel>) {
-    for (i, mut panel) in &mut q_panels.iter_mut().enumerate() {
-        panel.z_index = i + 1000;
+    let max = if let Some(Some(m)) = q_panels.iter().map(|p| p.z_index).max() {
+        m
+    } else {
+        0
+    };
+
+    let mut offset = 1;
+    for mut panel in &mut q_panels.iter_mut() {
+        if panel.z_index.is_none() {
+            panel.z_index = Some(MIN_FLOATING_PANEL_Z_INDEX + max + offset);
+            offset += 1;
+        }
     }
 }
 
@@ -176,8 +188,12 @@ fn update_cursor_on_resize_handles(
 
 fn update_panel_size_on_resize(
     q_draggable: Query<(&Draggable, &FloatingPanelResizeHandle), Changed<Draggable>>,
-    mut q_panel: Query<&mut FloatingPanel>,
+    mut q_panels: Query<&mut FloatingPanel>,
 ) {
+    if let Some(_) = q_panels.iter().find(|p| p.priority) {
+        return;
+    }
+
     for (draggable, handle) in &q_draggable {
         if draggable.state == DragState::Inactive
             || draggable.state == DragState::MaybeDragged
@@ -186,7 +202,7 @@ fn update_panel_size_on_resize(
             continue;
         }
 
-        let Ok(mut panel) = q_panel.get_mut(handle.panel) else {
+        let Ok(mut panel) = q_panels.get_mut(handle.panel) else {
             continue;
         };
         let Some(diff) = draggable.diff else {
@@ -275,9 +291,27 @@ fn update_panel_on_title_drag(
         ),
         Changed<Draggable>,
     >,
-    mut q_panel: Query<&mut FloatingPanel>,
+    mut q_panels: Query<(Entity, &mut FloatingPanel)>,
 ) {
+    if let Some(_) = q_panels.iter().find(|(_, p)| p.priority) {
+        return;
+    }
+
+    let max_index = if let Some(Some(m)) = q_panels.iter().map(|(_, p)| p.z_index).max() {
+        m
+    } else {
+        0
+    };
+    let mut offset = 1;
+
     for (draggable, (panel_title, drag_handle)) in &q_draggable {
+        if draggable.state == DragState::Inactive
+            || draggable.state == DragState::MaybeDragged
+            || draggable.state == DragState::DragCanceled
+        {
+            continue;
+        }
+
         let panel_id = if let Some(panel_title) = panel_title {
             panel_title.panel
         } else if let Some(drag_handle) = drag_handle {
@@ -286,24 +320,29 @@ fn update_panel_on_title_drag(
             continue;
         };
 
-        let Ok(mut panel) = q_panel.get_mut(panel_id) else {
+        let Ok((_, mut panel)) = q_panels.get_mut(panel_id) else {
             continue;
         };
-
-        if draggable.state == DragState::Inactive
-            || draggable.state == DragState::MaybeDragged
-            || draggable.state == DragState::DragCanceled
-        {
-            panel.z_index = 1000;
-            continue;
-        }
 
         let Some(diff) = draggable.diff else {
             continue;
         };
 
-        panel.z_index = 1001;
+        panel.z_index = Some(max_index + offset);
         panel.position += diff;
+        offset += 1;
+    }
+
+    let mut panel_indices: Vec<(Entity, Option<usize>)> = q_panels
+        .iter()
+        .map(|(entity, panel)| (entity, panel.z_index))
+        .collect();
+    panel_indices.sort_by(|(_, a), (_, b)| a.cmp(b));
+
+    for (i, (entity, _)) in panel_indices.iter().enumerate() {
+        if let Some((_, mut panel)) = q_panels.iter_mut().find(|(e, _)| e == entity) {
+            panel.z_index = Some(MIN_FLOATING_PANEL_Z_INDEX + i + 1);
+        };
     }
 }
 
@@ -326,7 +365,12 @@ fn update_panel_layout(
         style.height = Val::Px(panel.size.y.max(MIN_PANEL_SIZE.y));
         style.left = Val::Px(panel.position.x);
         style.top = Val::Px(panel.position.y);
-        *z_index = ZIndex::Global(panel.z_index as i32);
+
+        if panel.priority {
+            *z_index = ZIndex::Global(PRIORITY_FLOATING_PANEL_Z_INDEX as i32);
+        } else if let Some(index) = panel.z_index {
+            *z_index = ZIndex::Global(index as i32);
+        }
     }
 }
 
@@ -440,7 +484,8 @@ impl Default for FloatingPanelConfig {
 pub struct FloatingPanel {
     pub size: Vec2,
     pub position: Vec2,
-    pub z_index: usize,
+    pub z_index: Option<usize>,
+    pub priority: bool,
 }
 
 impl<'w, 's, 'a> FloatingPanel {
@@ -470,7 +515,8 @@ impl<'w, 's, 'a> FloatingPanel {
             FloatingPanel {
                 size: layout.size,
                 position: layout.position.unwrap_or_default(),
-                z_index: 0,
+                z_index: None,
+                priority: false,
             },
         )
     }

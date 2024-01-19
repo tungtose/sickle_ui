@@ -556,6 +556,7 @@ impl<'w, 's> ScrollView {
             style: Style {
                 width: Val::Percent(100.),
                 height: Val::Percent(100.),
+                flex_direction: FlexDirection::Column,
                 ..default()
             },
             ..default()

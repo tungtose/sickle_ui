@@ -44,7 +44,7 @@ fn update_checkbox(
 #[derive(Component, Debug, Reflect)]
 #[reflect(Component)]
 pub struct Checkbox {
-    pub checked: bool,
+    checked: bool,
     check_node: Entity,
 }
 
@@ -58,21 +58,8 @@ impl Default for Checkbox {
 }
 
 impl<'w, 's, 'a> Checkbox {
-    fn spawn(
-        parent: &'a mut ChildBuilder<'w, 's, '_>,
-        label: Option<String>,
-    ) -> Entity {
-        let mut input = parent.spawn(Checkbox::checkbox_container_bundle());
-        Checkbox::add_content(&mut input, label);
-
-        input.id()
-    }
-
-    fn parentless(commands: &'a mut Commands<'w, 's>, label: Option<String>) -> Entity {
-        let mut input = commands.spawn(Checkbox::checkbox_container_bundle());
-        Checkbox::add_content(&mut input, label);
-
-        input.id()
+    pub fn value(&self) -> bool {
+        self.checked
     }
 
     fn checkbox_container_bundle() -> impl Bundle {
@@ -86,7 +73,6 @@ impl<'w, 's, 'a> Checkbox {
             ButtonBundle {
                 style: Style {
                     height: Val::Px(26.),
-                    align_self: AlignSelf::Start,
                     align_content: AlignContent::Center,
                     justify_content: JustifyContent::Start,
                     margin: UiRect::all(Val::Px(5.)),
@@ -180,11 +166,17 @@ impl<'w, 's> UiCheckboxExt<'w, 's> for UiBuilder<'w, 's, '_> {
 
         if let Some(entity) = self.entity() {
             self.commands().entity(entity).with_children(|parent| {
-                checkbox = Checkbox::spawn(parent, label);
+                checkbox = parent.spawn(Checkbox::checkbox_container_bundle()).id();
             });
         } else {
-            checkbox = Checkbox::parentless(self.commands(), label);
+            checkbox = self
+                .commands()
+                .spawn(Checkbox::checkbox_container_bundle())
+                .id();
         }
+
+        let mut input = self.commands().entity(checkbox);
+        Checkbox::add_content(&mut input, label);
 
         self.commands().entity(checkbox)
     }

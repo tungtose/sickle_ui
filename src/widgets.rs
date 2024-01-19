@@ -2,7 +2,6 @@ pub mod checkbox;
 pub mod column;
 pub mod dropdown;
 pub mod floating_panel;
-pub mod hierarchy;
 pub mod radio_group;
 pub mod row;
 pub mod scroll_view;
@@ -36,7 +35,6 @@ impl Plugin for WidgetsPlugin {
             CheckboxPlugin,
             DropdownPlugin,
             FloatingPanelPlugin,
-            hierarchy::HierarchyPlugin,
             InputSliderPlugin,
             RadioGroupPlugin,
             ScrollViewPlugin,

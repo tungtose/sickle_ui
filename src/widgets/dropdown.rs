@@ -10,6 +10,7 @@ use crate::{
 };
 
 use super::{
+    floating_panel::FloatingPanel,
     // floating_panel::FloatingPanel,
     prelude::{FloatingPanelConfig, FloatingPanelLayout, UiFloatingPanelExt},
     scroll_view::ScrollThrough,
@@ -103,10 +104,10 @@ fn handle_option_press(
 }
 
 fn update_dropdown_panel_visibility(
-    mut q_panels: Query<(&DropdownPanel, &mut Style)>,
+    mut q_panels: Query<(&DropdownPanel, &mut Style, &mut FloatingPanel)>,
     q_dropdown: Query<Ref<Dropdown>>,
 ) {
-    for (panel, mut style) in &mut q_panels {
+    for (panel, mut style, mut floating_panel) in &mut q_panels {
         let Ok(dropdown) = q_dropdown.get(panel.dropdown) else {
             continue;
         };
@@ -117,8 +118,10 @@ fn update_dropdown_panel_visibility(
 
         if dropdown.is_open {
             style.display = Display::Flex;
+            floating_panel.priority = true;
         } else if style.display != Display::None {
             style.display = Display::None;
+            floating_panel.priority = false;
         }
     }
 }
@@ -178,6 +181,10 @@ impl Default for Dropdown {
 }
 
 impl<'w, 's, 'a> Dropdown {
+    pub fn value(&self) -> Option<usize> {
+        self.value
+    }
+
     fn base_tween() -> AnimationConfig {
         AnimationConfig {
             duration: 0.1,
