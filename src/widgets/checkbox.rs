@@ -58,14 +58,14 @@ impl Default for Checkbox {
 }
 
 impl<'w, 's, 'a> Checkbox {
-    pub fn spawn(
+    fn spawn(
         parent: &'a mut ChildBuilder<'w, 's, '_>,
         label: Option<String>,
-    ) -> EntityCommands<'w, 's, 'a> {
+    ) -> Entity {
         let mut input = parent.spawn(Checkbox::checkbox_container_bundle());
         Checkbox::add_content(&mut input, label);
 
-        input
+        input.id()
     }
 
     fn parentless(commands: &'a mut Commands<'w, 's>, label: Option<String>) -> Entity {
@@ -180,7 +180,7 @@ impl<'w, 's> UiCheckboxExt<'w, 's> for UiBuilder<'w, 's, '_> {
 
         if let Some(entity) = self.entity() {
             self.commands().entity(entity).with_children(|parent| {
-                checkbox = Checkbox::spawn(parent, label).id();
+                checkbox = Checkbox::spawn(parent, label);
             });
         } else {
             checkbox = Checkbox::parentless(self.commands(), label);

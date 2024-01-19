@@ -10,10 +10,11 @@ use crate::{
     drag_interaction::{DragState, Draggable, DraggableUpdate},
     interactions::InteractiveBackground,
     scroll_interaction::ScrollAxis,
+    ui_builder::{UiBuilder, UiBuilderExt},
     FluxInteraction, FluxInteractionUpdate, TrackedInteraction,
 };
 
-use super::{hierarchy::MoveToParent, scroll_view::ScrollView};
+use super::prelude::{ColumnConfig, UiColumnExt, UiScrollViewExt};
 
 const MIN_PANEL_SIZE: Vec2 = Vec2 { x: 150., y: 100. };
 
@@ -43,7 +44,7 @@ fn panel_added(q_panels: Query<Entity, Added<FloatingPanel>>) -> bool {
 
 fn index_floating_panel(mut q_panels: Query<&mut FloatingPanel>) {
     for (i, mut panel) in &mut q_panels.iter_mut().enumerate() {
-        panel.z_index = i + 1;
+        panel.z_index = i + 1000;
     }
 }
 
@@ -277,13 +278,6 @@ fn update_panel_on_title_drag(
     mut q_panel: Query<&mut FloatingPanel>,
 ) {
     for (draggable, (panel_title, drag_handle)) in &q_draggable {
-        if draggable.state == DragState::Inactive
-            || draggable.state == DragState::MaybeDragged
-            || draggable.state == DragState::DragCanceled
-        {
-            continue;
-        }
-
         let panel_id = if let Some(panel_title) = panel_title {
             panel_title.panel
         } else if let Some(drag_handle) = drag_handle {
@@ -295,10 +289,20 @@ fn update_panel_on_title_drag(
         let Ok(mut panel) = q_panel.get_mut(panel_id) else {
             continue;
         };
+
+        if draggable.state == DragState::Inactive
+            || draggable.state == DragState::MaybeDragged
+            || draggable.state == DragState::DragCanceled
+        {
+            panel.z_index = 1000;
+            continue;
+        }
+
         let Some(diff) = draggable.diff else {
             continue;
         };
 
+        panel.z_index = 1001;
         panel.position += diff;
     }
 }
@@ -322,7 +326,7 @@ fn update_panel_layout(
         style.height = Val::Px(panel.size.y.max(MIN_PANEL_SIZE.y));
         style.left = Val::Px(panel.position.x);
         style.top = Val::Px(panel.position.y);
-        *z_index = ZIndex::Local(panel.z_index as i32);
+        *z_index = ZIndex::Global(panel.z_index as i32);
     }
 }
 
@@ -440,124 +444,34 @@ pub struct FloatingPanel {
 }
 
 impl<'w, 's, 'a> FloatingPanel {
-    pub fn open(
-        commands: &'a mut Commands<'w, 's>,
-        config: FloatingPanelConfig,
-        size: Vec2,
-        position: Option<Vec2>,
-        hidden: bool,
-    ) -> (Entity, EntityCommands<'w, 's, 'a>) {
-        let restrict_scroll = config.restrict_scroll;
-
-        let mut panel = commands.spawn((
-            NodeBundle {
-                style: Style {
-                    display: if hidden { Display::None } else { Display::Flex },
-                    position_type: PositionType::Absolute,
-                    width: Val::Px(size.x),
-                    height: Val::Px(size.y),
-                    border: UiRect::all(Val::Px(2.)),
-                    flex_direction: FlexDirection::Column,
-                    align_items: AlignItems::Start,
-                    ..default()
-                },
-                border_color: Color::BLACK.into(),
-                background_color: Color::GRAY.into(),
-                focus_policy: bevy::ui::FocusPolicy::Block,
-                ..default()
-            },
-            config,
-            FloatingPanel {
-                size,
-                position: position.unwrap_or_default(),
-                z_index: 0,
-            },
-        ));
-
-        let panel_id = panel.id();
-        let mut scroll_id = Entity::PLACEHOLDER;
-        panel.with_children(|parent| {
-            parent
-                .spawn(NodeBundle {
-                    style: Style {
-                        width: Val::Percent(100.),
-                        height: Val::Percent(100.),
-                        ..default()
-                    },
-                    ..default()
-                })
-                .with_children(|parent| {
-                    if let Some(direction) = restrict_scroll {
-                        match direction {
-                            ScrollAxis::Horizontal => {
-                                scroll_id = ScrollView::horizontal(parent).id();
-                            }
-                            ScrollAxis::Vertical => {
-                                scroll_id = ScrollView::vertical(parent).id();
-                            }
-                        }
-                    } else {
-                        scroll_id = ScrollView::spawn(parent).id();
-                    }
-                });
-        });
-
-        (panel_id, commands.entity(scroll_id))
-    }
-
-    pub fn build(
-        parent: &'a mut ChildBuilder<'w, 's, '_>,
-        config: FloatingPanelConfig,
-        size: Vec2,
-        position: Option<Vec2>,
-        hidden: bool,
-    ) -> (Entity, EntityCommands<'w, 's, 'a>) {
-        let restrict_scroll = config.restrict_scroll;
-
-        let mut panel = parent.spawn((
-            NodeBundle {
-                style: Style {
-                    display: if hidden { Display::None } else { Display::Flex },
-                    position_type: PositionType::Absolute,
-                    width: Val::Px(size.x),
-                    height: Val::Px(size.y),
-                    border: UiRect::all(Val::Px(2.)),
-                    flex_direction: FlexDirection::Column,
-                    align_items: AlignItems::Start,
-                    ..default()
-                },
-                border_color: Color::BLACK.into(),
-                background_color: Color::GRAY.into(),
-                focus_policy: bevy::ui::FocusPolicy::Block,
-                ..default()
-            },
-            config,
-            FloatingPanel {
-                size,
-                position: position.unwrap_or_default(),
-                z_index: 0,
-            },
-            MoveToParent { parent: None },
-        ));
-
-        let panel_id = panel.id();
-        let mut container_id = Entity::PLACEHOLDER;
-        panel.with_children(|parent| {
-            container_id = parent
-                .spawn(NodeBundle {
-                    style: Style {
-                        width: Val::Percent(100.),
-                        height: Val::Percent(100.),
-                        ..default()
-                    },
-                    ..default()
-                })
-                .id();
-        });
-
+    fn base_bundle(config: FloatingPanelConfig, layout: FloatingPanelLayout) -> impl Bundle {
         (
-            panel_id,
-            ScrollView::spawn_docked(parent, container_id.into(), restrict_scroll),
+            NodeBundle {
+                style: Style {
+                    display: if layout.hidden {
+                        Display::None
+                    } else {
+                        Display::Flex
+                    },
+                    position_type: PositionType::Absolute,
+                    width: Val::Px(layout.size.x),
+                    height: Val::Px(layout.size.y),
+                    border: UiRect::all(Val::Px(2.)),
+                    flex_direction: FlexDirection::Column,
+                    align_items: AlignItems::Start,
+                    ..default()
+                },
+                border_color: Color::BLACK.into(),
+                background_color: Color::GRAY.into(),
+                focus_policy: bevy::ui::FocusPolicy::Block,
+                ..default()
+            },
+            config,
+            FloatingPanel {
+                size: layout.size,
+                position: layout.position.unwrap_or_default(),
+                z_index: 0,
+            },
         )
     }
 
@@ -773,5 +687,60 @@ impl<'w, 's, 'a> FloatingPanel {
             AnimatedInteraction::<InteractiveBackground> { tween, ..default() },
             Draggable::default(),
         ));
+    }
+}
+
+#[derive(Debug, Default)]
+pub struct FloatingPanelLayout {
+    pub size: Vec2,
+    pub position: Option<Vec2>,
+    pub hidden: bool,
+}
+
+pub trait UiFloatingPanelExt<'w, 's> {
+    fn floating_panel<'a>(
+        &'a mut self,
+        config: FloatingPanelConfig,
+        layout: FloatingPanelLayout,
+        spawn_children: impl FnOnce(&mut UiBuilder),
+    ) -> EntityCommands<'w, 's, 'a>;
+}
+
+impl<'w, 's> UiFloatingPanelExt<'w, 's> for UiBuilder<'w, 's, '_> {
+    fn floating_panel<'a>(
+        &'a mut self,
+        config: FloatingPanelConfig,
+        layout: FloatingPanelLayout,
+        spawn_children: impl FnOnce(&mut UiBuilder),
+    ) -> EntityCommands<'w, 's, 'a> {
+        let mut new_parent = Entity::PLACEHOLDER;
+        let restrict_to = config.restrict_scroll;
+
+        if let Some(entity) = self.entity() {
+            self.commands().entity(entity).with_children(|parent| {
+                new_parent = parent
+                    .spawn(FloatingPanel::base_bundle(config, layout))
+                    .id();
+            });
+        } else {
+            new_parent = self
+                .commands()
+                .spawn(FloatingPanel::base_bundle(config, layout))
+                .id();
+        }
+
+        let mut new_entity = self.commands().entity(new_parent);
+        let mut new_builder = new_entity.ui_builder();
+        new_builder.column(
+            ColumnConfig {
+                width: Val::Percent(100.),
+                ..default()
+            },
+            |column| {
+                column.scroll_view(restrict_to, spawn_children);
+            },
+        );
+
+        self.commands().entity(new_parent)
     }
 }

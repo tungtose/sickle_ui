@@ -19,6 +19,8 @@ pub mod prelude {
     pub use super::{
         checkbox::UiCheckboxExt,
         column::{ColumnConfig, UiColumnExt},
+        dropdown::UiDropdownExt,
+        floating_panel::{FloatingPanelConfig, FloatingPanelLayout, UiFloatingPanelExt},
         radio_group::UiRadioGroupExt,
         row::{RowConfig, UiRowExt},
         scroll_view::UiScrollViewExt,

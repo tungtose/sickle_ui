@@ -353,19 +353,16 @@ impl<'w, 's, 'a> Slider {
         self.config.min.lerp(self.config.max, self.ratio)
     }
 
-    pub fn spawn(
-        parent: &'a mut ChildBuilder<'w, 's, '_>,
-        config: Option<SliderConfig>,
-    ) -> EntityCommands<'w, 's, 'a> {
+    fn spawn(parent: &'a mut ChildBuilder<'w, 's, '_>, config: Option<SliderConfig>) -> Entity {
         let config = config.unwrap_or_default();
         if config.axis == SliderAxis::Horizontal {
             let mut input = parent.spawn(Slider::horizontal_bundle());
             Slider::fill_horizontal(&mut input, config);
-            input
+            input.id()
         } else {
             let mut input = parent.spawn(Slider::vertical_bundle());
             Slider::fill_vertical(&mut input, config);
-            input
+            input.id()
         }
     }
 
@@ -664,7 +661,7 @@ impl<'w, 's> UiSliderExt<'w, 's> for UiBuilder<'w, 's, '_> {
 
         if let Some(entity) = self.entity() {
             self.commands().entity(entity).with_children(|parent| {
-                slider = Slider::spawn(parent, config).id();
+                slider = Slider::spawn(parent, config);
             });
         } else {
             slider = Slider::parentless(self.commands(), config);

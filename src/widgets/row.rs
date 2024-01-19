@@ -8,11 +8,26 @@ pub struct RowConfig {
     pub background_color: Color,
 }
 
+impl RowConfig {
+    fn row_bundle(&self) -> impl Bundle {
+        NodeBundle {
+            style: Style {
+                width: Val::Percent(100.),
+                height: self.height,
+                align_items: AlignItems::Center,
+                ..default()
+            },
+            background_color: self.background_color.into(),
+            ..default()
+        }
+    }
+}
+
 pub trait UiRowExt<'w, 's> {
     fn row<'a>(
         &'a mut self,
         config: RowConfig,
-        f: impl FnOnce(&mut UiBuilder),
+        spawn_children: impl FnOnce(&mut UiBuilder),
     ) -> EntityCommands<'w, 's, 'a>;
 }
 
@@ -26,10 +41,10 @@ impl<'w, 's> UiRowExt<'w, 's> for UiBuilder<'w, 's, '_> {
 
         if let Some(entity) = self.entity() {
             self.commands().entity(entity).with_children(|parent| {
-                new_parent = parent.spawn(row_bundle(config)).id();
+                new_parent = parent.spawn(config.row_bundle()).id();
             });
         } else {
-            new_parent = self.commands().spawn(row_bundle(config)).id();
+            new_parent = self.commands().spawn(config.row_bundle()).id();
         }
 
         let mut new_entity = self.commands().entity(new_parent);
@@ -37,18 +52,5 @@ impl<'w, 's> UiRowExt<'w, 's> for UiBuilder<'w, 's, '_> {
         spawn_children(&mut new_builder);
 
         self.commands().entity(new_parent)
-    }
-}
-
-fn row_bundle(config: RowConfig) -> impl Bundle {
-    NodeBundle {
-        style: Style {
-            width: Val::Percent(100.),
-            height: config.height,
-            align_items: AlignItems::Center,
-            ..default()
-        },
-        background_color: config.background_color.into(),
-        ..default()
     }
 }

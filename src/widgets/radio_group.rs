@@ -108,11 +108,11 @@ impl Default for RadioGroup {
 }
 
 impl<'w, 's, 'a> RadioGroup {
-    pub fn spawn(
+    fn spawn(
         parent: &'a mut ChildBuilder<'w, 's, '_>,
         options: Vec<Option<String>>,
         unselectable: bool,
-    ) -> EntityCommands<'w, 's, 'a> {
+    ) -> Entity {
         let mut group = parent.spawn((NodeBundle::default(), RadioGroup::default()));
         let id = Some(group.id());
 
@@ -128,7 +128,7 @@ impl<'w, 's, 'a> RadioGroup {
             }
         });
 
-        group
+        group.id()
     }
 
     fn parentless(
@@ -178,7 +178,7 @@ impl Default for RadioButton {
 }
 
 impl<'w, 's, 'a> RadioButton {
-    pub fn spawn(
+    fn spawn(
         parent: &'a mut ChildBuilder<'w, 's, '_>,
         index: usize,
         label: Option<String>,
@@ -300,7 +300,7 @@ impl<'w, 's> UiRadioGroupExt<'w, 's> for UiBuilder<'w, 's, '_> {
 
         if let Some(entity) = self.entity() {
             self.commands().entity(entity).with_children(|parent| {
-                radio_group = RadioGroup::spawn(parent, options, unselectable).id();
+                radio_group = RadioGroup::spawn(parent, options, unselectable);
             });
         } else {
             radio_group = RadioGroup::parentless(self.commands(), options, unselectable);
