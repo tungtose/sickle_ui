@@ -249,7 +249,6 @@ impl<'w, 's, 'a> Dropdown {
                         height: Val::Px(26.),
                         justify_content: JustifyContent::Start,
                         align_content: AlignContent::Center,
-                        margin: UiRect::all(Val::Px(5.)),
                         ..default()
                     },
                     background_color: Color::NONE.into(),

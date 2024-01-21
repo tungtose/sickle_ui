@@ -48,3 +48,32 @@ impl<'w, 's, 'a> UiBuilderExt<'w, 's, 'a> for Commands<'w, 's> {
         }
     }
 }
+
+// TODO: Replace strings with impl Into::<String>
+
+/*
+
+pub struct MenuConfig{
+    pub name: String,
+    pub alt_code: Option<KeyCode>,
+}
+
+pub struct MenuItemConfig{
+    pub name: String,
+    pub icon: Option<Handle<Image>>,
+    pub alt_code: Option<KeyCode>,
+    pub shortcut: Option<Vec<KeyCode>>,
+}
+
+commands.ui_builder().menu(MenuConfig{...}, |menu|{
+    menu.menu_item(MenuItemConfig{...}).insert(MyMenu::ItemOne);
+    menu.menu_item(MenuItemConfig{...}).insert(MyMenu::ItemTwo);
+    menu.menu_item(MenuItemConfig{...}).insert(MyMenu::ItemThree);
+    menu.sub_menu(MenuConfig{...}, |sub_menu|{
+        sub_menu.menu_item(MenuItemConfig{...}).insert(MyMenu::ItemOne);
+        sub_menu.menu_item(MenuItemConfig{...}).insert(MyMenu::ItemTwo);
+        sub_menu.menu_item(MenuItemConfig{...}).insert(MyMenu::ItemThree);
+    });
+})
+
+*/

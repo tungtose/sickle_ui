@@ -582,6 +582,15 @@ impl<'w, 's> ScrollView {
             Val::Auto
         };
 
+        let padding = if let Some(axis) = restrict_to {
+            match axis {
+                ScrollAxis::Horizontal => UiRect::px(0., 0., 0., 12.),
+                ScrollAxis::Vertical => UiRect::px(0., 12., 0., 0.),
+            }
+        } else {
+            UiRect::px(0., 12., 0., 12.)
+        };
+
         (
             NodeBundle {
                 style: Style {
@@ -590,7 +599,7 @@ impl<'w, 's> ScrollView {
                     justify_self: JustifySelf::Start,
                     align_self: AlignSelf::Start,
                     flex_direction: FlexDirection::Column,
-                    padding: UiRect::px(0., 12., 0., 12.),
+                    padding,
                     ..default()
                 },
                 ..default()
