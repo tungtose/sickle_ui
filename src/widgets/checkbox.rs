@@ -90,7 +90,7 @@ impl<'w, 's, 'a> Checkbox {
         )
     }
 
-    fn add_content(input: &mut EntityCommands<'w, 's, 'a>, label: Option<String>) {
+    fn add_content(input: &mut EntityCommands<'w, 's, 'a>, label: Option<impl Into<String>>) {
         let mut check_node: Entity = Entity::PLACEHOLDER;
         input.with_children(|parent| {
             parent
@@ -134,7 +134,7 @@ impl<'w, 's, 'a> Checkbox {
         });
     }
 
-    fn add_label(parent: &'a mut ChildBuilder<'w, 's, '_>, label: String) -> Entity {
+    fn add_label(parent: &'a mut ChildBuilder<'w, 's, '_>, label: impl Into<String>) -> Entity {
         parent
             .spawn(TextBundle {
                 style: Style {
@@ -157,11 +157,11 @@ impl<'w, 's, 'a> Checkbox {
 }
 
 pub trait UiCheckboxExt<'w, 's> {
-    fn checkbox<'a>(&'a mut self, label: Option<String>) -> EntityCommands<'w, 's, 'a>;
+    fn checkbox<'a>(&'a mut self, label: Option<impl Into<String>>) -> EntityCommands<'w, 's, 'a>;
 }
 
 impl<'w, 's> UiCheckboxExt<'w, 's> for UiBuilder<'w, 's, '_> {
-    fn checkbox<'a>(&'a mut self, label: Option<String>) -> EntityCommands<'w, 's, 'a> {
+    fn checkbox<'a>(&'a mut self, label: Option<impl Into<String>>) -> EntityCommands<'w, 's, 'a> {
         let mut checkbox = Entity::PLACEHOLDER;
 
         if let Some(entity) = self.entity() {

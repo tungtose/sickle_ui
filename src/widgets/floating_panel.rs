@@ -14,7 +14,7 @@ use crate::{
     FluxInteraction, FluxInteractionUpdate, TrackedInteraction,
 };
 
-use super::prelude::{ColumnConfig, UiColumnExt, UiScrollViewExt};
+use super::prelude::UiScrollViewExt;
 
 const MIN_PANEL_SIZE: Vec2 = Vec2 { x: 150., y: 100. };
 const MIN_FLOATING_PANEL_Z_INDEX: usize = 1000;
@@ -777,15 +777,7 @@ impl<'w, 's> UiFloatingPanelExt<'w, 's> for UiBuilder<'w, 's, '_> {
 
         let mut new_entity = self.commands().entity(new_parent);
         let mut new_builder = new_entity.ui_builder();
-        new_builder.column(
-            ColumnConfig {
-                width: Val::Percent(100.),
-                ..default()
-            },
-            |column| {
-                column.scroll_view(restrict_to, spawn_children);
-            },
-        );
+        new_builder.scroll_view(restrict_to, spawn_children);
 
         self.commands().entity(new_parent)
     }

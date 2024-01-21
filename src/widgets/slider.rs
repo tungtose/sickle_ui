@@ -213,7 +213,7 @@ pub struct SliderConfig {
 
 impl SliderConfig {
     pub fn new(
-        label: Option<String>,
+        label: Option<impl Into<String>>,
         min: f32,
         max: f32,
         initial_value: f32,
@@ -233,19 +233,19 @@ impl SliderConfig {
             initial_value,
             show_current,
             axis,
-            label,
+            label: SliderConfig::into_label(label),
         }
     }
 
     pub fn horizontal(
-        label: Option<String>,
+        label: Option<impl Into<String>>,
         min: f32,
         max: f32,
         initial_value: f32,
         show_current: bool,
     ) -> Self {
         Self::new(
-            label,
+            SliderConfig::into_label(label),
             min,
             max,
             initial_value,
@@ -255,14 +255,14 @@ impl SliderConfig {
     }
 
     pub fn vertical(
-        label: Option<String>,
+        label: Option<impl Into<String>>,
         min: f32,
         max: f32,
         initial_value: f32,
         show_current: bool,
     ) -> Self {
         Self::new(
-            label,
+            SliderConfig::into_label(label),
             min,
             max,
             initial_value,
@@ -280,6 +280,14 @@ impl SliderConfig {
         }
 
         panic!("Value must be between min and max!");
+    }
+
+    fn into_label(label: Option<impl Into<String>>) -> Option<String> {
+        if let Some(label) = label {
+            Some(label.into())
+        } else {
+            None
+        }
     }
 }
 

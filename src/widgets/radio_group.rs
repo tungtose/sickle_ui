@@ -1,3 +1,5 @@
+use std::collections::VecDeque;
+
 use bevy::{ecs::system::EntityCommands, prelude::*, ui::FocusPolicy};
 use sickle_math::ease::Ease;
 
@@ -139,7 +141,7 @@ impl<'w, 's, 'a> RadioButton {
     fn spawn(
         parent: &'a mut ChildBuilder<'w, 's, '_>,
         index: usize,
-        label: Option<String>,
+        label: impl Into<String>,
         group: Option<Entity>,
         unselectable: bool,
     ) -> EntityCommands<'w, 's, 'a> {
@@ -202,9 +204,7 @@ impl<'w, 's, 'a> RadioButton {
                         .id();
                 });
 
-            if let Some(label) = label {
-                RadioButton::add_label(parent, label);
-            }
+            RadioButton::add_label(parent, label);
         });
 
         input.insert(RadioButton {
@@ -218,7 +218,7 @@ impl<'w, 's, 'a> RadioButton {
         input
     }
 
-    fn add_label(parent: &'a mut ChildBuilder<'w, 's, '_>, label: String) -> Entity {
+    fn add_label(parent: &'a mut ChildBuilder<'w, 's, '_>, label: impl Into<String>) -> Entity {
         parent
             .spawn(TextBundle {
                 style: Style {
@@ -243,7 +243,7 @@ impl<'w, 's, 'a> RadioButton {
 pub trait UiRadioGroupExt<'w, 's> {
     fn radio_group<'a>(
         &'a mut self,
-        options: Vec<Option<String>>,
+        options: Vec<impl Into<String>>,
         unselectable: bool,
     ) -> EntityCommands<'w, 's, 'a>;
 }
@@ -251,7 +251,7 @@ pub trait UiRadioGroupExt<'w, 's> {
 impl<'w, 's> UiRadioGroupExt<'w, 's> for UiBuilder<'w, 's, '_> {
     fn radio_group<'a>(
         &'a mut self,
-        options: Vec<Option<String>>,
+        options: Vec<impl Into<String>>,
         unselectable: bool,
     ) -> EntityCommands<'w, 's, 'a> {
         let mut radio_group = Entity::PLACEHOLDER;
@@ -269,12 +269,15 @@ impl<'w, 's> UiRadioGroupExt<'w, 's> for UiBuilder<'w, 's, '_> {
                 .id();
         }
 
+        let option_count = options.len();
+        let mut queue = VecDeque::from(options);
         self.commands().entity(radio_group).with_children(|parent| {
-            for (index, label) in options.iter().enumerate() {
+            for i in 0..option_count {
+                let label = queue.pop_front().unwrap();
                 RadioButton::spawn(
                     parent,
-                    index.try_into().unwrap(),
-                    label.clone(),
+                    i.try_into().unwrap(),
+                    label,
                     radio_group.into(),
                     unselectable,
                 );

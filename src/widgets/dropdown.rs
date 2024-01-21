@@ -1,3 +1,5 @@
+use std::collections::VecDeque;
+
 use bevy::{ecs::system::EntityCommands, prelude::*, ui::FocusPolicy};
 use sickle_math::ease::Ease;
 
@@ -288,18 +290,26 @@ impl<'w, 's, 'a> Dropdown {
 }
 
 pub trait UiDropdownExt<'w, 's> {
-    fn dropdown<'a>(&'a mut self, options: Vec<String>) -> EntityCommands<'w, 's, 'a>;
+    fn dropdown<'a>(&'a mut self, options: Vec<impl Into<String>>) -> EntityCommands<'w, 's, 'a>;
 }
 
 impl<'w, 's> UiDropdownExt<'w, 's> for UiBuilder<'w, 's, '_> {
-    fn dropdown<'a>(&'a mut self, options: Vec<String>) -> EntityCommands<'w, 's, 'a> {
+    fn dropdown<'a>(&'a mut self, options: Vec<impl Into<String>>) -> EntityCommands<'w, 's, 'a> {
         let mut dropdown = Entity::PLACEHOLDER;
         let mut selected = Entity::PLACEHOLDER;
+
+        let option_count = options.len();
+        let mut string_options: Vec<String> = Vec::with_capacity(option_count);
+        let mut queue = VecDeque::from(options);
+        for _ in 0..option_count {
+            let label: String = queue.pop_front().unwrap().into();
+            string_options.push(label);
+        }
 
         if let Some(entity) = self.entity() {
             self.commands().entity(entity).with_children(|parent| {
                 dropdown = parent
-                    .spawn(Dropdown::base_bundle(options.clone()))
+                    .spawn(Dropdown::base_bundle(string_options.clone()))
                     .with_children(|parent| {
                         selected = parent.spawn(Dropdown::label_bundle()).id();
                     })
@@ -308,7 +318,7 @@ impl<'w, 's> UiDropdownExt<'w, 's> for UiBuilder<'w, 's, '_> {
         } else {
             dropdown = self
                 .commands()
-                .spawn(Dropdown::base_bundle(options.clone()))
+                .spawn(Dropdown::base_bundle(string_options.clone()))
                 .with_children(|parent| {
                     selected = parent.spawn(Dropdown::label_bundle()).id();
                 })
@@ -337,7 +347,7 @@ impl<'w, 's> UiDropdownExt<'w, 's> for UiBuilder<'w, 's, '_> {
                     };
 
                     entity_commands.with_children(|parent| {
-                        for (index, label) in options.iter().enumerate() {
+                        for (index, label) in string_options.iter().enumerate() {
                             Dropdown::option(parent, index, label.clone(), dropdown);
                         }
                     });

@@ -12,8 +12,8 @@ impl ColumnConfig {
     fn column_bundle(&self) -> impl Bundle {
         NodeBundle {
             style: Style {
-                height: Val::Percent(100.),
                 width: self.width,
+                height: Val::Percent(100.),
                 flex_direction: FlexDirection::Column,
                 ..default()
             },
