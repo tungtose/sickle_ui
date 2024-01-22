@@ -8,6 +8,11 @@ use crate::{
     FluxInteraction, TrackedInteraction,
 };
 
+use super::{
+    label::LabelConfig,
+    prelude::{UiContainerExt, UiLabelExt},
+};
+
 pub struct CheckboxPlugin;
 
 impl Plugin for CheckboxPlugin {
@@ -62,13 +67,15 @@ impl<'w, 's, 'a> Checkbox {
         self.checked
     }
 
-    fn checkbox_container_bundle() -> impl Bundle {
-        let tween = AnimationConfig {
+    fn base_tween() -> AnimationConfig {
+        AnimationConfig {
             duration: 0.1,
             easing: Ease::OutExpo,
             ..default()
-        };
+        }
+    }
 
+    fn checkbox_container() -> impl Bundle {
         (
             ButtonBundle {
                 style: Style {
@@ -86,73 +93,41 @@ impl<'w, 's, 'a> Checkbox {
                 highlight: Some(Color::rgba(0., 1., 1., 0.3)),
                 ..default()
             },
-            AnimatedInteraction::<InteractiveBackground> { tween, ..default() },
+            AnimatedInteraction::<InteractiveBackground> {
+                tween: Checkbox::base_tween(),
+                ..default()
+            },
         )
     }
 
-    fn add_content(input: &mut EntityCommands<'w, 's, 'a>, label: Option<impl Into<String>>) {
-        let mut check_node: Entity = Entity::PLACEHOLDER;
-        input.with_children(|parent| {
-            parent
-                .spawn(NodeBundle {
-                    style: Style {
-                        width: Val::Px(16.),
-                        height: Val::Px(16.),
-                        margin: UiRect::all(Val::Px(5.)),
-                        border: UiRect::all(Val::Px(1.)),
-                        ..default()
-                    },
-                    border_color: Color::DARK_GRAY.into(),
-                    focus_policy: FocusPolicy::Pass,
-                    ..default()
-                })
-                .with_children(|builder| {
-                    check_node = builder
-                        .spawn(NodeBundle {
-                            style: Style {
-                                display: Display::None,
-                                width: Val::Px(10.),
-                                height: Val::Px(10.),
-                                margin: UiRect::all(Val::Px(2.)),
-                                ..default()
-                            },
-                            background_color: Color::DARK_GRAY.into(),
-                            focus_policy: FocusPolicy::Pass,
-                            ..default()
-                        })
-                        .id();
-                });
-
-            if let Some(label) = label {
-                Checkbox::add_label(parent, label);
-            }
-        });
-
-        input.insert(Checkbox {
-            check_node,
-            checked: false,
-        });
+    fn checkmark_background() -> impl Bundle {
+        NodeBundle {
+            style: Style {
+                width: Val::Px(16.),
+                height: Val::Px(16.),
+                margin: UiRect::all(Val::Px(5.)),
+                border: UiRect::all(Val::Px(1.)),
+                ..default()
+            },
+            border_color: Color::DARK_GRAY.into(),
+            focus_policy: FocusPolicy::Pass,
+            ..default()
+        }
     }
 
-    fn add_label(parent: &'a mut ChildBuilder<'w, 's, '_>, label: impl Into<String>) -> Entity {
-        parent
-            .spawn(TextBundle {
-                style: Style {
-                    align_self: AlignSelf::Center,
-                    margin: UiRect::right(Val::Px(10.)),
-                    ..default()
-                },
-                text: Text::from_section(
-                    label,
-                    TextStyle {
-                        color: Color::BLACK,
-                        ..default()
-                    },
-                ),
-                focus_policy: FocusPolicy::Pass,
+    fn checkmark() -> impl Bundle {
+        NodeBundle {
+            style: Style {
+                display: Display::None,
+                width: Val::Px(10.),
+                height: Val::Px(10.),
+                margin: UiRect::all(Val::Px(2.)),
                 ..default()
-            })
-            .id()
+            },
+            background_color: Color::DARK_GRAY.into(),
+            focus_policy: FocusPolicy::Pass,
+            ..default()
+        }
     }
 }
 
@@ -162,22 +137,27 @@ pub trait UiCheckboxExt<'w, 's> {
 
 impl<'w, 's> UiCheckboxExt<'w, 's> for UiBuilder<'w, 's, '_> {
     fn checkbox<'a>(&'a mut self, label: Option<impl Into<String>>) -> EntityCommands<'w, 's, 'a> {
-        let mut checkbox = Entity::PLACEHOLDER;
+        let mut check_node: Entity = Entity::PLACEHOLDER;
 
-        if let Some(entity) = self.entity() {
-            self.commands().entity(entity).with_children(|parent| {
-                checkbox = parent.spawn(Checkbox::checkbox_container_bundle()).id();
+        let mut input = self.container(Checkbox::checkbox_container(), |container| {
+            container.container(Checkbox::checkmark_background(), |checkmark_bg| {
+                check_node = checkmark_bg.container(Checkbox::checkmark(), |_| {}).id();
             });
-        } else {
-            checkbox = self
-                .commands()
-                .spawn(Checkbox::checkbox_container_bundle())
-                .id();
-        }
 
-        let mut input = self.commands().entity(checkbox);
-        Checkbox::add_content(&mut input, label);
+            if let Some(label) = label {
+                container.label(LabelConfig {
+                    label: label.into(),
+                    margin: UiRect::right(Val::Px(10.)),
+                    ..default()
+                });
+            }
+        });
 
-        self.commands().entity(checkbox)
+        input.insert(Checkbox {
+            check_node,
+            checked: false,
+        });
+
+        input
     }
 }

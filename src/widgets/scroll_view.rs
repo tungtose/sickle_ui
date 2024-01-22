@@ -6,9 +6,11 @@ use crate::{
     drag_interaction::{DragState, Draggable, DraggableUpdate},
     interactions::InteractiveBackground,
     scroll_interaction::{ScrollAxis, Scrollable, ScrollableUpdate},
-    ui_builder::{UiBuilder, UiBuilderExt},
+    ui_builder::UiBuilder,
     TrackedInteraction,
 };
+
+use super::prelude::UiContainerExt;
 
 pub struct ScrollViewPlugin;
 
@@ -383,175 +385,15 @@ impl Default for ScrollView {
 }
 
 impl<'w, 's> ScrollView {
-    fn fill_scroll_view<'a>(
-        frame: &'a mut EntityCommands<'w, 's, '_>,
-        restrict_to: Option<ScrollAxis>,
-    ) -> ScrollView {
-        let mut viewport_id = Entity::PLACEHOLDER;
-        let mut horizontal_scroll_id = Entity::PLACEHOLDER;
-        let mut horizontal_scroll_handle_id = Entity::PLACEHOLDER;
-        let mut vertical_scroll_id = Entity::PLACEHOLDER;
-        let mut vertical_scroll_handle_id = Entity::PLACEHOLDER;
-        let scroll_view_id = frame.id();
-
-        frame.with_children(|parent| {
-            viewport_id = parent
-                .spawn((
-                    NodeBundle {
-                        style: Style {
-                            position_type: PositionType::Absolute,
-                            height: Val::Percent(100.),
-                            width: Val::Percent(100.),
-                            overflow: Overflow::clip(),
-                            ..default()
-                        },
-                        background_color: Color::DARK_GRAY.into(),
-                        ..default()
-                    },
-                    ScrollViewViewport {
-                        scroll_view: scroll_view_id,
-                    },
-                    Interaction::default(),
-                    Scrollable::default(),
-                ))
-                .id();
-
-            parent
-                .spawn(NodeBundle {
-                    style: Style {
-                        position_type: PositionType::Absolute,
-                        width: Val::Percent(100.),
-                        height: Val::Percent(100.),
-                        justify_content: JustifyContent::End,
-                        align_content: AlignContent::Stretch,
-                        ..default()
-                    },
-                    z_index: ZIndex::Local(1),
-                    ..default()
-                })
-                .with_children(|parent| {
-                    if let Some(restrict_to) = restrict_to {
-                        match restrict_to {
-                            ScrollAxis::Horizontal => {
-                                (horizontal_scroll_id, horizontal_scroll_handle_id) =
-                                    ScrollView::spawn_scroll_bar(
-                                        parent,
-                                        ScrollAxis::Horizontal,
-                                        scroll_view_id,
-                                    )
-                            }
-                            ScrollAxis::Vertical => {
-                                (vertical_scroll_id, vertical_scroll_handle_id) =
-                                    ScrollView::spawn_scroll_bar(
-                                        parent,
-                                        ScrollAxis::Vertical,
-                                        scroll_view_id,
-                                    )
-                            }
-                        }
-                    } else {
-                        (horizontal_scroll_id, horizontal_scroll_handle_id) =
-                            ScrollView::spawn_scroll_bar(
-                                parent,
-                                ScrollAxis::Horizontal,
-                                scroll_view_id,
-                            );
-                        (vertical_scroll_id, vertical_scroll_handle_id) =
-                            ScrollView::spawn_scroll_bar(
-                                parent,
-                                ScrollAxis::Vertical,
-                                scroll_view_id,
-                            );
-                    }
-                });
-        });
-
-        ScrollView {
-            viewport: viewport_id,
-            horizontal_scroll_bar: horizontal_scroll_id.into(),
-            horizontal_scroll_bar_handle: horizontal_scroll_handle_id.into(),
-            vertical_scroll_bar: vertical_scroll_id.into(),
-            vertical_scroll_bar_handle: vertical_scroll_handle_id.into(),
+    fn base_tween() -> AnimationConfig {
+        AnimationConfig {
+            duration: 0.1,
+            easing: Ease::OutExpo,
             ..default()
         }
     }
 
-    fn spawn_scroll_bar<'a>(
-        parent: &'a mut ChildBuilder<'w, 's, '_>,
-        axis: ScrollAxis,
-        scroll_view: Entity,
-    ) -> (Entity, Entity) {
-        let tween = AnimationConfig {
-            duration: 0.1,
-            easing: Ease::OutExpo,
-            ..default()
-        };
-
-        let mut scroll_bar = parent.spawn(NodeBundle {
-            style: Style {
-                position_type: PositionType::Absolute,
-                width: match axis {
-                    ScrollAxis::Horizontal => Val::Percent(100.),
-                    ScrollAxis::Vertical => Val::Px(12.),
-                },
-                height: match axis {
-                    ScrollAxis::Horizontal => Val::Px(12.),
-                    ScrollAxis::Vertical => Val::Percent(100.),
-                },
-                flex_direction: match axis {
-                    ScrollAxis::Horizontal => FlexDirection::Row,
-                    ScrollAxis::Vertical => FlexDirection::Column,
-                },
-                align_self: AlignSelf::End,
-                justify_content: JustifyContent::Start,
-                ..default()
-            },
-            background_color: Color::GRAY.into(),
-            ..default()
-        });
-
-        let mut handle_id = Entity::PLACEHOLDER;
-        scroll_bar.with_children(|parent| {
-            handle_id = parent
-                .spawn((
-                    ButtonBundle {
-                        style: Style {
-                            width: match axis {
-                                ScrollAxis::Horizontal => Val::Auto,
-                                ScrollAxis::Vertical => Val::Percent(100.),
-                            },
-                            height: match axis {
-                                ScrollAxis::Horizontal => Val::Percent(100.),
-                                ScrollAxis::Vertical => Val::Auto,
-                            },
-                            ..default()
-                        },
-                        background_color: Color::rgba(0., 1., 1., 0.4).into(),
-                        ..default()
-                    },
-                    ScrollBarHandle { axis, scroll_view },
-                    TrackedInteraction::default(),
-                    InteractiveBackground {
-                        highlight: Some(Color::rgba(0., 1., 1., 0.8)),
-                        ..default()
-                    },
-                    AnimatedInteraction::<InteractiveBackground> { tween, ..default() },
-                    Draggable::default(),
-                    Scrollable::default(),
-                ))
-                .id();
-        });
-
-        scroll_bar.insert(ScrollBar {
-            axis,
-            scroll_view,
-            handle: handle_id,
-        });
-
-        (scroll_bar.id(), handle_id)
-    }
-
-    fn frame_bundle() -> impl Bundle {
+    fn frame() -> impl Bundle {
         NodeBundle {
             style: Style {
                 width: Val::Percent(100.),
@@ -563,7 +405,25 @@ impl<'w, 's> ScrollView {
         }
     }
 
-    fn content_bundle(scroll_view: Entity, restrict_to: Option<ScrollAxis>) -> impl Bundle {
+    fn viewport() -> impl Bundle {
+        (
+            NodeBundle {
+                style: Style {
+                    position_type: PositionType::Absolute,
+                    height: Val::Percent(100.),
+                    width: Val::Percent(100.),
+                    overflow: Overflow::clip(),
+                    ..default()
+                },
+                background_color: Color::DARK_GRAY.into(),
+                ..default()
+            },
+            Interaction::default(),
+            Scrollable::default(),
+        )
+    }
+
+    fn content(scroll_view: Entity, restrict_to: Option<ScrollAxis>) -> impl Bundle {
         let width = if let Some(axis) = restrict_to {
             match axis {
                 ScrollAxis::Horizontal => Val::Auto,
@@ -607,6 +467,77 @@ impl<'w, 's> ScrollView {
             ScrollViewContent { scroll_view },
         )
     }
+
+    fn scroll_bar_container() -> impl Bundle {
+        NodeBundle {
+            style: Style {
+                position_type: PositionType::Absolute,
+                width: Val::Percent(100.),
+                height: Val::Percent(100.),
+                justify_content: JustifyContent::End,
+                align_content: AlignContent::Stretch,
+                ..default()
+            },
+            z_index: ZIndex::Local(1),
+            ..default()
+        }
+    }
+
+    fn scroll_bar(axis: ScrollAxis) -> impl Bundle {
+        NodeBundle {
+            style: Style {
+                position_type: PositionType::Absolute,
+                width: match axis {
+                    ScrollAxis::Horizontal => Val::Percent(100.),
+                    ScrollAxis::Vertical => Val::Px(12.),
+                },
+                height: match axis {
+                    ScrollAxis::Horizontal => Val::Px(12.),
+                    ScrollAxis::Vertical => Val::Percent(100.),
+                },
+                flex_direction: match axis {
+                    ScrollAxis::Horizontal => FlexDirection::Row,
+                    ScrollAxis::Vertical => FlexDirection::Column,
+                },
+                align_self: AlignSelf::End,
+                justify_content: JustifyContent::Start,
+                ..default()
+            },
+            background_color: Color::GRAY.into(),
+            ..default()
+        }
+    }
+
+    fn scroll_bar_handle(axis: ScrollAxis) -> impl Bundle {
+        (
+            ButtonBundle {
+                style: Style {
+                    width: match axis {
+                        ScrollAxis::Horizontal => Val::Auto,
+                        ScrollAxis::Vertical => Val::Percent(100.),
+                    },
+                    height: match axis {
+                        ScrollAxis::Horizontal => Val::Percent(100.),
+                        ScrollAxis::Vertical => Val::Auto,
+                    },
+                    ..default()
+                },
+                background_color: Color::rgba(0., 1., 1., 0.4).into(),
+                ..default()
+            },
+            TrackedInteraction::default(),
+            InteractiveBackground {
+                highlight: Some(Color::rgba(0., 1., 1., 0.8)),
+                ..default()
+            },
+            AnimatedInteraction::<InteractiveBackground> {
+                tween: ScrollView::base_tween(),
+                ..default()
+            },
+            Draggable::default(),
+            Scrollable::default(),
+        )
+    }
 }
 
 pub trait UiScrollViewExt<'w, 's> {
@@ -623,35 +554,86 @@ impl<'w, 's> UiScrollViewExt<'w, 's> for UiBuilder<'w, 's, '_> {
         restrict_to: Option<ScrollAxis>,
         spawn_children: impl FnOnce(&mut UiBuilder),
     ) -> EntityCommands<'w, 's, 'a> {
-        let mut scroll_view = Entity::PLACEHOLDER;
+        let mut viewport = Entity::PLACEHOLDER;
         let mut content_container = Entity::PLACEHOLDER;
+        let mut horizontal_scroll_id: Option<Entity> = None;
+        let mut horizontal_scroll_handle_id: Option<Entity> = None;
+        let mut vertical_scroll_id: Option<Entity> = None;
+        let mut vertical_scroll_handle_id: Option<Entity> = None;
 
-        if let Some(entity) = self.entity() {
-            self.commands().entity(entity).with_children(|parent| {
-                scroll_view = parent.spawn(ScrollView::frame_bundle()).id();
+        let mut scroll_view = self.container(ScrollView::frame(), |frame| {
+            let scroll_axes = if let Some(restrict_to) = restrict_to {
+                vec![restrict_to]
+            } else {
+                vec![ScrollAxis::Horizontal, ScrollAxis::Vertical]
+            };
+
+            let scroll_view_id = frame.id().unwrap();
+            viewport = frame
+                .container(
+                    (
+                        ScrollView::viewport(),
+                        ScrollViewViewport {
+                            scroll_view: scroll_view_id,
+                        },
+                    ),
+                    |viewport| {
+                        content_container = viewport
+                            .container(
+                                ScrollView::content(scroll_view_id, restrict_to),
+                                spawn_children,
+                            )
+                            .id();
+                    },
+                )
+                .id();
+
+            frame.container(ScrollView::scroll_bar_container(), |scroll_bar_container| {
+                for axis in scroll_axes.iter() {
+                    let mut handle_id = Entity::PLACEHOLDER;
+                    let mut scroll_bar = scroll_bar_container.container(
+                        ScrollView::scroll_bar(*axis),
+                        |scroll_bar| {
+                            handle_id = scroll_bar
+                                .spawn((
+                                    ScrollView::scroll_bar_handle(*axis),
+                                    ScrollBarHandle {
+                                        axis: *axis,
+                                        scroll_view: scroll_view_id,
+                                    },
+                                ))
+                                .id();
+                        },
+                    );
+                    scroll_bar.insert(ScrollBar {
+                        axis: *axis,
+                        scroll_view: scroll_view_id,
+                        handle: handle_id,
+                    });
+                    match axis {
+                        ScrollAxis::Horizontal => {
+                            horizontal_scroll_id = scroll_bar.id().into();
+                            horizontal_scroll_handle_id = handle_id.into();
+                        }
+                        ScrollAxis::Vertical => {
+                            vertical_scroll_id = scroll_bar.id().into();
+                            vertical_scroll_handle_id = handle_id.into();
+                        }
+                    }
+                }
             });
-        } else {
-            scroll_view = self.commands().spawn(ScrollView::frame_bundle()).id();
-        }
+        });
 
-        let mut scroll_view_commands = self.commands().entity(scroll_view);
-        let mut component = ScrollView::fill_scroll_view(&mut scroll_view_commands, restrict_to);
+        scroll_view.insert(ScrollView {
+            viewport,
+            content_container,
+            horizontal_scroll_bar: horizontal_scroll_id,
+            horizontal_scroll_bar_handle: horizontal_scroll_handle_id,
+            vertical_scroll_bar: vertical_scroll_id,
+            vertical_scroll_bar_handle: vertical_scroll_handle_id,
+            ..default()
+        });
 
-        self.commands()
-            .entity(component.viewport)
-            .with_children(|parent| {
-                content_container = parent
-                    .spawn(ScrollView::content_bundle(scroll_view, restrict_to))
-                    .id();
-            });
-
-        component.content_container = content_container;
-        self.commands().entity(scroll_view).insert(component);
-
-        let mut new_entity = self.commands().entity(content_container);
-        let mut new_builder = new_entity.ui_builder();
-        spawn_children(&mut new_builder);
-
-        self.commands().entity(scroll_view)
+        scroll_view
     }
 }

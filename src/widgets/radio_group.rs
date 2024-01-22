@@ -10,6 +10,8 @@ use crate::{
     FluxInteraction, TrackedInteraction,
 };
 
+use super::prelude::{LabelConfig, UiContainerExt, UiLabelExt};
+
 pub struct RadioGroupPlugin;
 
 impl Plugin for RadioGroupPlugin {
@@ -138,20 +140,16 @@ impl Default for RadioButton {
 }
 
 impl<'w, 's, 'a> RadioButton {
-    fn spawn(
-        parent: &'a mut ChildBuilder<'w, 's, '_>,
-        index: usize,
-        label: impl Into<String>,
-        group: Option<Entity>,
-        unselectable: bool,
-    ) -> EntityCommands<'w, 's, 'a> {
-        let tween = AnimationConfig {
+    fn base_tween() -> AnimationConfig {
+        AnimationConfig {
             duration: 0.1,
             easing: Ease::OutExpo,
             ..default()
-        };
+        }
+    }
 
-        let mut input = parent.spawn((
+    fn button() -> impl Bundle {
+        (
             ButtonBundle {
                 style: Style {
                     height: Val::Px(26.),
@@ -169,74 +167,41 @@ impl<'w, 's, 'a> RadioButton {
                 highlight: Some(Color::rgba(0., 1., 1., 0.3)),
                 ..default()
             },
-            AnimatedInteraction::<InteractiveBackground> { tween, ..default() },
-        ));
-
-        let mut check_node: Entity = Entity::PLACEHOLDER;
-        input.with_children(|parent| {
-            parent
-                .spawn(NodeBundle {
-                    style: Style {
-                        width: Val::Px(16.),
-                        height: Val::Px(16.),
-                        margin: UiRect::all(Val::Px(5.)),
-                        border: UiRect::all(Val::Px(1.)),
-                        ..default()
-                    },
-                    border_color: Color::DARK_GRAY.into(),
-                    focus_policy: FocusPolicy::Pass,
-                    ..default()
-                })
-                .with_children(|builder| {
-                    check_node = builder
-                        .spawn(NodeBundle {
-                            style: Style {
-                                display: Display::None,
-                                width: Val::Px(10.),
-                                height: Val::Px(10.),
-                                margin: UiRect::all(Val::Px(2.)),
-                                ..default()
-                            },
-                            background_color: Color::DARK_GRAY.into(),
-                            focus_policy: FocusPolicy::Pass,
-                            ..default()
-                        })
-                        .id();
-                });
-
-            RadioButton::add_label(parent, label);
-        });
-
-        input.insert(RadioButton {
-            index,
-            checked: false,
-            unselectable,
-            check_node,
-            group,
-        });
-
-        input
+            AnimatedInteraction::<InteractiveBackground> {
+                tween: RadioButton::base_tween(),
+                ..default()
+            },
+        )
     }
 
-    fn add_label(parent: &'a mut ChildBuilder<'w, 's, '_>, label: impl Into<String>) -> Entity {
-        parent
-            .spawn(TextBundle {
-                style: Style {
-                    align_self: AlignSelf::Center,
-                    margin: UiRect::right(Val::Px(10.)),
-                    ..default()
-                },
-                text: Text::from_section(
-                    label,
-                    TextStyle {
-                        color: Color::BLACK,
-                        ..default()
-                    },
-                ),
-                focus_policy: FocusPolicy::Pass,
+    fn radio_mark_background() -> impl Bundle {
+        NodeBundle {
+            style: Style {
+                width: Val::Px(16.),
+                height: Val::Px(16.),
+                margin: UiRect::all(Val::Px(5.)),
+                border: UiRect::all(Val::Px(1.)),
                 ..default()
-            })
-            .id()
+            },
+            border_color: Color::DARK_GRAY.into(),
+            focus_policy: FocusPolicy::Pass,
+            ..default()
+        }
+    }
+
+    fn radio_mark() -> impl Bundle {
+        NodeBundle {
+            style: Style {
+                display: Display::None,
+                width: Val::Px(10.),
+                height: Val::Px(10.),
+                margin: UiRect::all(Val::Px(2.)),
+                ..default()
+            },
+            background_color: Color::DARK_GRAY.into(),
+            focus_policy: FocusPolicy::Pass,
+            ..default()
+        }
     }
 }
 
@@ -254,36 +219,39 @@ impl<'w, 's> UiRadioGroupExt<'w, 's> for UiBuilder<'w, 's, '_> {
         options: Vec<impl Into<String>>,
         unselectable: bool,
     ) -> EntityCommands<'w, 's, 'a> {
-        let mut radio_group = Entity::PLACEHOLDER;
-
-        if let Some(entity) = self.entity() {
-            self.commands().entity(entity).with_children(|parent| {
-                radio_group = parent
-                    .spawn((NodeBundle::default(), RadioGroup::default()))
-                    .id();
-            });
-        } else {
-            radio_group = self
-                .commands()
-                .spawn((NodeBundle::default(), RadioGroup::default()))
-                .id();
-        }
-
         let option_count = options.len();
         let mut queue = VecDeque::from(options);
-        self.commands().entity(radio_group).with_children(|parent| {
-            for i in 0..option_count {
-                let label = queue.pop_front().unwrap();
-                RadioButton::spawn(
-                    parent,
-                    i.try_into().unwrap(),
-                    label,
-                    radio_group.into(),
-                    unselectable,
-                );
-            }
-        });
-
-        self.commands().entity(radio_group)
+        self.container(
+            (NodeBundle::default(), RadioGroup::default()),
+            |radio_group| {
+                for i in 0..option_count {
+                    let label = queue.pop_front().unwrap();
+                    let id = radio_group.id();
+                    let mut check_node: Entity = Entity::PLACEHOLDER;
+                    radio_group
+                        .container(RadioButton::button(), |button| {
+                            button.container(
+                                RadioButton::radio_mark_background(),
+                                |radio_mark_bg| {
+                                    check_node =
+                                        radio_mark_bg.spawn(RadioButton::radio_mark()).id();
+                                },
+                            );
+                            button.label(LabelConfig {
+                                label: label.into(),
+                                margin: UiRect::right(Val::Px(10.)),
+                                ..default()
+                            });
+                        })
+                        .insert(RadioButton {
+                            index: i.try_into().unwrap(),
+                            checked: false,
+                            unselectable,
+                            check_node,
+                            group: id,
+                        });
+                }
+            },
+        )
     }
 }

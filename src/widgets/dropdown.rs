@@ -1,20 +1,22 @@
 use std::collections::VecDeque;
 
-use bevy::{ecs::system::EntityCommands, prelude::*, ui::FocusPolicy};
+use bevy::{ecs::system::EntityCommands, prelude::*};
 use sickle_math::ease::Ease;
 
 use crate::{
     animated_interaction::{AnimatedInteraction, AnimationConfig},
     interactions::InteractiveBackground,
     scroll_interaction::{ScrollAxis, Scrollable},
-    ui_builder::{UiBuilder, UiBuilderExt},
+    ui_builder::UiBuilder,
     FluxInteraction, FluxInteractionUpdate, TrackedInteraction,
 };
 
 use super::{
     floating_panel::FloatingPanel,
-    // floating_panel::FloatingPanel,
-    prelude::{FloatingPanelConfig, FloatingPanelLayout, UiFloatingPanelExt},
+    prelude::{
+        FloatingPanelConfig, FloatingPanelLayout, LabelConfig, UiContainerExt, UiFloatingPanelExt,
+        UiLabelExt,
+    },
     scroll_view::ScrollThrough,
 };
 
@@ -224,67 +226,31 @@ impl<'w, 's, 'a> Dropdown {
         )
     }
 
-    fn label_bundle() -> impl Bundle {
-        TextBundle {
-            style: Style {
-                align_self: AlignSelf::Center,
-                margin: UiRect::right(Val::Px(10.)),
+    fn option_bundle(option: usize, dropdown: Entity) -> impl Bundle {
+        (
+            ButtonBundle {
+                style: Style {
+                    height: Val::Px(26.),
+                    justify_content: JustifyContent::Start,
+                    align_content: AlignContent::Center,
+                    ..default()
+                },
+                background_color: Color::NONE.into(),
                 ..default()
             },
-            focus_policy: FocusPolicy::Pass,
-            ..default()
-        }
-    }
-
-    fn option(
-        parent: &'a mut ChildBuilder<'w, 's, '_>,
-        option: usize,
-        label: String,
-        dropdown: Entity,
-    ) {
-        parent
-            .spawn((
-                ButtonBundle {
-                    style: Style {
-                        height: Val::Px(26.),
-                        justify_content: JustifyContent::Start,
-                        align_content: AlignContent::Center,
-                        ..default()
-                    },
-                    background_color: Color::NONE.into(),
-                    ..default()
-                },
-                TrackedInteraction::default(),
-                InteractiveBackground {
-                    highlight: Some(Color::rgba(0., 1., 1., 0.3)),
-                    ..default()
-                },
-                AnimatedInteraction::<InteractiveBackground> {
-                    tween: Dropdown::base_tween(),
-                    ..default()
-                },
-                DropdownOption { dropdown, option },
-                ScrollThrough,
-                Scrollable::default(),
-            ))
-            .with_children(|parent| {
-                parent.spawn(TextBundle {
-                    style: Style {
-                        align_self: AlignSelf::Center,
-                        margin: UiRect::horizontal(Val::Px(10.)),
-                        ..default()
-                    },
-                    text: Text::from_section(
-                        label,
-                        TextStyle {
-                            color: Color::BLACK,
-                            ..default()
-                        },
-                    ),
-                    focus_policy: FocusPolicy::Pass,
-                    ..default()
-                });
-            });
+            TrackedInteraction::default(),
+            InteractiveBackground {
+                highlight: Some(Color::rgba(0., 1., 1., 0.3)),
+                ..default()
+            },
+            AnimatedInteraction::<InteractiveBackground> {
+                tween: Dropdown::base_tween(),
+                ..default()
+            },
+            DropdownOption { dropdown, option },
+            ScrollThrough,
+            Scrollable::default(),
+        )
     }
 }
 
@@ -294,8 +260,8 @@ pub trait UiDropdownExt<'w, 's> {
 
 impl<'w, 's> UiDropdownExt<'w, 's> for UiBuilder<'w, 's, '_> {
     fn dropdown<'a>(&'a mut self, options: Vec<impl Into<String>>) -> EntityCommands<'w, 's, 'a> {
-        let mut dropdown = Entity::PLACEHOLDER;
         let mut selected = Entity::PLACEHOLDER;
+        let mut panel_id = Entity::PLACEHOLDER;
 
         let option_count = options.len();
         let mut string_options: Vec<String> = Vec::with_capacity(option_count);
@@ -305,64 +271,56 @@ impl<'w, 's> UiDropdownExt<'w, 's> for UiBuilder<'w, 's, '_> {
             string_options.push(label);
         }
 
-        if let Some(entity) = self.entity() {
-            self.commands().entity(entity).with_children(|parent| {
-                dropdown = parent
-                    .spawn(Dropdown::base_bundle(string_options.clone()))
-                    .with_children(|parent| {
-                        selected = parent.spawn(Dropdown::label_bundle()).id();
+        let mut dropdown =
+            self.container(Dropdown::base_bundle(string_options.clone()), |builder| {
+                let dropdown_id = builder.id().unwrap();
+                selected = builder
+                    .label(LabelConfig {
+                        margin: UiRect::right(Val::Px(10.)),
+                        ..default()
+                    })
+                    .id();
+                panel_id = builder
+                    .floating_panel(
+                        FloatingPanelConfig {
+                            draggable: false,
+                            resizable: false,
+                            restrict_scroll: ScrollAxis::Vertical.into(),
+                            ..default()
+                        },
+                        FloatingPanelLayout {
+                            size: Vec2 { x: 200., y: 100. },
+                            position: None,
+                            hidden: true,
+                        },
+                        |container| {
+                            for (index, label) in string_options.iter().enumerate() {
+                                container.container(
+                                    Dropdown::option_bundle(index, dropdown_id),
+                                    |option| {
+                                        option.label(LabelConfig {
+                                            label: label.clone(),
+                                            margin: UiRect::horizontal(Val::Px(10.)),
+                                            color: Color::WHITE,
+                                            ..default()
+                                        });
+                                    },
+                                );
+                            }
+                        },
+                    )
+                    .insert(DropdownPanel {
+                        dropdown: dropdown_id,
                     })
                     .id();
             });
-        } else {
-            dropdown = self
-                .commands()
-                .spawn(Dropdown::base_bundle(string_options.clone()))
-                .with_children(|parent| {
-                    selected = parent.spawn(Dropdown::label_bundle()).id();
-                })
-                .id();
-        }
 
-        let mut new_entity = self.commands().entity(dropdown);
-        let mut new_builder = new_entity.ui_builder();
-
-        let panel_id = new_builder
-            .floating_panel(
-                FloatingPanelConfig {
-                    draggable: false,
-                    resizable: false,
-                    restrict_scroll: ScrollAxis::Vertical.into(),
-                    ..default()
-                },
-                FloatingPanelLayout {
-                    size: Vec2 { x: 200., y: 100. },
-                    position: None,
-                    hidden: true,
-                },
-                |container| {
-                    let Ok(mut entity_commands) = container.entity_commands() else {
-                        return;
-                    };
-
-                    entity_commands.with_children(|parent| {
-                        for (index, label) in string_options.iter().enumerate() {
-                            Dropdown::option(parent, index, label.clone(), dropdown);
-                        }
-                    });
-                },
-            )
-            .insert(DropdownPanel { dropdown })
-            .id();
-
-        let mut entity_commands = self.commands().entity(dropdown);
-
-        entity_commands.insert(Dropdown {
+        dropdown.insert(Dropdown {
             button_label: selected,
             panel: panel_id,
             ..default()
         });
 
-        entity_commands
+        dropdown
     }
 }

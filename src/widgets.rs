@@ -1,7 +1,10 @@
 pub mod checkbox;
 pub mod column;
+pub mod container;
 pub mod dropdown;
 pub mod floating_panel;
+pub mod label;
+pub mod menu;
 pub mod radio_group;
 pub mod row;
 pub mod scroll_view;
@@ -11,15 +14,19 @@ use bevy::prelude::*;
 
 use self::{
     checkbox::CheckboxPlugin, dropdown::DropdownPlugin, floating_panel::FloatingPanelPlugin,
-    radio_group::RadioGroupPlugin, scroll_view::ScrollViewPlugin, slider::InputSliderPlugin,
+    menu::MenuPlugin, radio_group::RadioGroupPlugin, scroll_view::ScrollViewPlugin,
+    slider::InputSliderPlugin,
 };
 
 pub mod prelude {
     pub use super::{
         checkbox::UiCheckboxExt,
         column::{ColumnConfig, UiColumnExt},
+        container::UiContainerExt,
         dropdown::UiDropdownExt,
         floating_panel::{FloatingPanelConfig, FloatingPanelLayout, UiFloatingPanelExt},
+        label::{LabelConfig, UiLabelExt},
+        menu::{MenuConfig, MenuItemConfig, UiMenuExt},
         radio_group::UiRadioGroupExt,
         row::{RowConfig, UiRowExt},
         scroll_view::UiScrollViewExt,
@@ -38,6 +45,7 @@ impl Plugin for WidgetsPlugin {
             InputSliderPlugin,
             RadioGroupPlugin,
             ScrollViewPlugin,
+            MenuPlugin,
         ));
     }
 }

@@ -5,6 +5,8 @@ use bevy::{
 };
 use sickle_math::ease::Ease;
 
+use super::prelude::UiScrollViewExt;
+use super::prelude::{LabelConfig, UiContainerExt, UiLabelExt};
 use crate::{
     animated_interaction::{AnimatedInteraction, AnimationConfig},
     drag_interaction::{DragState, Draggable, DraggableUpdate},
@@ -13,8 +15,6 @@ use crate::{
     ui_builder::{UiBuilder, UiBuilderExt},
     FluxInteraction, FluxInteractionUpdate, TrackedInteraction,
 };
-
-use super::prelude::UiScrollViewExt;
 
 const MIN_PANEL_SIZE: Vec2 = Vec2 { x: 150., y: 100. };
 const MIN_FLOATING_PANEL_Z_INDEX: usize = 1000;
@@ -81,12 +81,11 @@ fn process_panel_config_update(
             {
                 commands.entity(*drag_handle_id).despawn_recursive();
             }
-
-            let mut title_id = Entity::PLACEHOLDER;
-            commands.entity(panel_id).with_children(|parent| {
-                title_id =
-                    FloatingPanel::add_panel_title(parent, panel_id, title, config.draggable);
-            });
+            let title_id = FloatingPanel::panel_title(
+                &mut commands.entity(panel_id).ui_builder(),
+                title,
+                config.draggable,
+            );
             commands.entity(panel_id).insert_children(0, &[title_id]);
         } else {
             if let Some(text_id) = children.iter().find(|&&child| q_title.get(child).is_ok()) {
@@ -97,10 +96,12 @@ fn process_panel_config_update(
                     .iter()
                     .find(|&&child| q_drag_handle.get(child).is_ok())
                 {
-                    let mut drag_handle_id = Entity::PLACEHOLDER;
-                    commands.entity(panel_id).with_children(|parent| {
-                        drag_handle_id = FloatingPanel::add_panel_drag_handle(parent, panel_id);
-                    });
+                    let drag_handle_id = commands
+                        .entity(panel_id)
+                        .ui_builder()
+                        .spawn(FloatingPanel::drag_handle(panel_id))
+                        .id();
+
                     commands
                         .entity(panel_id)
                         .insert_children(0, &[drag_handle_id]);
@@ -120,10 +121,8 @@ fn process_panel_config_update(
                 .iter()
                 .find(|&&child| q_resize_handles.get(child).is_ok())
             {
-                let mut resize_handles_id = Entity::PLACEHOLDER;
-                commands.entity(panel_id).with_children(|parent| {
-                    resize_handles_id = FloatingPanel::add_resize_handles(parent, panel_id);
-                });
+                let resize_handles_id =
+                    FloatingPanel::resize_handles(&mut commands.entity(panel_id).ui_builder());
                 commands
                     .entity(panel_id)
                     .insert_children(0, &[resize_handles_id]);
@@ -489,7 +488,21 @@ pub struct FloatingPanel {
 }
 
 impl<'w, 's, 'a> FloatingPanel {
-    fn base_bundle(config: FloatingPanelConfig, layout: FloatingPanelLayout) -> impl Bundle {
+    fn base_tween() -> AnimationConfig {
+        AnimationConfig {
+            duration: 0.1,
+            easing: Ease::OutExpo,
+            ..default()
+        }
+    }
+    fn resize_zone_size() -> f32 {
+        4.
+    }
+    fn resize_zone_pullback() -> f32 {
+        2.
+    }
+
+    fn frame(config: FloatingPanelConfig, layout: FloatingPanelLayout) -> impl Bundle {
         (
             NodeBundle {
                 style: Style {
@@ -521,13 +534,8 @@ impl<'w, 's, 'a> FloatingPanel {
         )
     }
 
-    fn add_panel_title(
-        parent: &'a mut ChildBuilder<'w, 's, '_>,
-        panel: Entity,
-        title: String,
-        draggable: bool,
-    ) -> Entity {
-        let mut title_node = parent.spawn((
+    fn title_container(panel: Entity) -> impl Bundle {
+        (
             ButtonBundle {
                 style: Style {
                     border: UiRect::right(Val::Px(2.)),
@@ -538,31 +546,11 @@ impl<'w, 's, 'a> FloatingPanel {
                 ..default()
             },
             FloatingPanelTitle { panel },
-        ));
-
-        if draggable {
-            title_node.insert((TrackedInteraction::default(), Draggable::default()));
-        }
-
-        let mut text_id = Entity::PLACEHOLDER;
-        title_node.with_children(|parent| {
-            text_id = parent
-                .spawn(TextBundle {
-                    style: Style {
-                        margin: UiRect::px(5., 5., 5., 2.),
-                        ..default()
-                    },
-                    text: Text::from_section(title, TextStyle::default()),
-                    ..default()
-                })
-                .id();
-        });
-
-        title_node.id()
+        )
     }
 
-    fn add_panel_drag_handle(parent: &'a mut ChildBuilder<'w, 's, '_>, panel: Entity) -> Entity {
-        let drag_handle = parent.spawn((
+    fn drag_handle(panel: Entity) -> impl Bundle {
+        (
             ButtonBundle {
                 style: Style {
                     width: Val::Percent(100.),
@@ -577,22 +565,17 @@ impl<'w, 's, 'a> FloatingPanel {
             FloatingPanelDragHandle { panel },
             TrackedInteraction::default(),
             Draggable::default(),
-        ));
-
-        drag_handle.id()
+        )
     }
 
-    fn add_resize_handles(parent: &'a mut ChildBuilder<'w, 's, '_>, panel: Entity) -> Entity {
-        let zone_size = 4.;
-        let zone_pullback = 2.;
-
-        let mut handles = parent.spawn((
+    fn resize_handle_container(panel: Entity) -> impl Bundle {
+        (
             NodeBundle {
                 style: Style {
                     position_type: PositionType::Absolute,
                     width: Val::Percent(100.),
                     height: Val::Percent(100.),
-                    margin: UiRect::all(Val::Px(-zone_pullback)),
+                    margin: UiRect::all(Val::Px(-FloatingPanel::resize_zone_pullback())),
                     flex_direction: FlexDirection::Column,
                     ..default()
                 },
@@ -600,107 +583,11 @@ impl<'w, 's, 'a> FloatingPanel {
                 ..default()
             },
             FloatingPanelResizeHandleContainer { panel },
-        ));
-
-        handles.with_children(|parent| {
-            parent
-                .spawn(NodeBundle {
-                    style: Style {
-                        width: Val::Percent(100.),
-                        height: Val::Px(zone_size),
-                        ..default()
-                    },
-                    ..default()
-                })
-                .with_children(|parent| {
-                    FloatingPanel::add_resize_handle(
-                        parent,
-                        zone_size,
-                        panel,
-                        ResizeDirection::NorthWest,
-                    );
-                    FloatingPanel::add_resize_handle(
-                        parent,
-                        zone_size,
-                        panel,
-                        ResizeDirection::North,
-                    );
-                    FloatingPanel::add_resize_handle(
-                        parent,
-                        zone_size,
-                        panel,
-                        ResizeDirection::NorthEast,
-                    );
-                });
-            parent
-                .spawn(NodeBundle {
-                    style: Style {
-                        width: Val::Percent(100.),
-                        height: Val::Percent(100.),
-                        justify_content: JustifyContent::SpaceBetween,
-                        ..default()
-                    },
-                    ..default()
-                })
-                .with_children(|parent| {
-                    FloatingPanel::add_resize_handle(
-                        parent,
-                        zone_size,
-                        panel,
-                        ResizeDirection::West,
-                    );
-                    FloatingPanel::add_resize_handle(
-                        parent,
-                        zone_size,
-                        panel,
-                        ResizeDirection::East,
-                    );
-                });
-            parent
-                .spawn(NodeBundle {
-                    style: Style {
-                        width: Val::Percent(100.),
-                        height: Val::Px(zone_size),
-                        ..default()
-                    },
-                    ..default()
-                })
-                .with_children(|parent| {
-                    FloatingPanel::add_resize_handle(
-                        parent,
-                        zone_size,
-                        panel,
-                        ResizeDirection::SouthWest,
-                    );
-                    FloatingPanel::add_resize_handle(
-                        parent,
-                        zone_size,
-                        panel,
-                        ResizeDirection::South,
-                    );
-                    FloatingPanel::add_resize_handle(
-                        parent,
-                        zone_size,
-                        panel,
-                        ResizeDirection::SouthEast,
-                    );
-                });
-        });
-
-        handles.id()
+        )
     }
 
-    fn add_resize_handle(
-        parent: &'a mut ChildBuilder<'w, 's, '_>,
-        zone_size: f32,
-        panel: Entity,
-        direction: ResizeDirection,
-    ) {
-        let tween = AnimationConfig {
-            duration: 0.1,
-            easing: Ease::OutExpo,
-            ..default()
-        };
+    fn resize_handle(panel: Entity, direction: ResizeDirection) -> impl Bundle {
+        let zone_size = FloatingPanel::resize_zone_size();
 
         let (width, height) = match direction {
             ResizeDirection::North => (Val::Percent(100.), Val::Px(zone_size)),
@@ -712,8 +599,7 @@ impl<'w, 's, 'a> FloatingPanel {
             ResizeDirection::West => (Val::Px(zone_size), Val::Percent(100.)),
             ResizeDirection::NorthWest => (Val::Px(zone_size), Val::Px(zone_size)),
         };
-
-        parent.spawn((
+        (
             NodeBundle {
                 style: Style {
                     width,
@@ -730,9 +616,107 @@ impl<'w, 's, 'a> FloatingPanel {
                 highlight: Some(Color::rgb(0., 0.5, 1.)),
                 ..default()
             },
-            AnimatedInteraction::<InteractiveBackground> { tween, ..default() },
+            AnimatedInteraction::<InteractiveBackground> {
+                tween: FloatingPanel::base_tween(),
+                ..default()
+            },
             Draggable::default(),
-        ));
+        )
+    }
+
+    fn panel_title(panel: &mut UiBuilder, title: String, draggable: bool) -> Entity {
+        let panel_id = panel.id().unwrap();
+        let mut title = panel.container(FloatingPanel::title_container(panel_id), |container| {
+            container.label(LabelConfig {
+                label: title,
+                margin: UiRect::px(5., 5., 5., 2.),
+                color: Color::WHITE,
+                ..default()
+            });
+        });
+
+        if draggable {
+            title.insert((TrackedInteraction::default(), Draggable::default()));
+        }
+
+        title.id()
+    }
+
+    fn resize_handles(panel: &mut UiBuilder) -> Entity {
+        let panel_id = panel.id().unwrap();
+        panel
+            .container(FloatingPanel::resize_handle_container(panel_id), |frame| {
+                frame.container(
+                    NodeBundle {
+                        style: Style {
+                            width: Val::Percent(100.),
+                            height: Val::Px(FloatingPanel::resize_zone_size()),
+                            ..default()
+                        },
+                        ..default()
+                    },
+                    |top_row| {
+                        top_row.spawn(FloatingPanel::resize_handle(
+                            panel_id,
+                            ResizeDirection::NorthWest,
+                        ));
+                        top_row.spawn(FloatingPanel::resize_handle(
+                            panel_id,
+                            ResizeDirection::North,
+                        ));
+                        top_row.spawn(FloatingPanel::resize_handle(
+                            panel_id,
+                            ResizeDirection::NorthEast,
+                        ));
+                    },
+                );
+                frame.container(
+                    NodeBundle {
+                        style: Style {
+                            width: Val::Percent(100.),
+                            height: Val::Percent(100.),
+                            justify_content: JustifyContent::SpaceBetween,
+                            ..default()
+                        },
+                        ..default()
+                    },
+                    |middle_row| {
+                        middle_row.spawn(FloatingPanel::resize_handle(
+                            panel_id,
+                            ResizeDirection::West,
+                        ));
+                        middle_row.spawn(FloatingPanel::resize_handle(
+                            panel_id,
+                            ResizeDirection::East,
+                        ));
+                    },
+                );
+                frame.container(
+                    NodeBundle {
+                        style: Style {
+                            width: Val::Percent(100.),
+                            height: Val::Px(FloatingPanel::resize_zone_size()),
+                            ..default()
+                        },
+                        ..default()
+                    },
+                    |bottom_row| {
+                        bottom_row.spawn(FloatingPanel::resize_handle(
+                            panel_id,
+                            ResizeDirection::SouthWest,
+                        ));
+                        bottom_row.spawn(FloatingPanel::resize_handle(
+                            panel_id,
+                            ResizeDirection::South,
+                        ));
+                        bottom_row.spawn(FloatingPanel::resize_handle(
+                            panel_id,
+                            ResizeDirection::SouthEast,
+                        ));
+                    },
+                );
+            })
+            .id()
     }
 }
 
@@ -759,26 +743,10 @@ impl<'w, 's> UiFloatingPanelExt<'w, 's> for UiBuilder<'w, 's, '_> {
         layout: FloatingPanelLayout,
         spawn_children: impl FnOnce(&mut UiBuilder),
     ) -> EntityCommands<'w, 's, 'a> {
-        let mut new_parent = Entity::PLACEHOLDER;
         let restrict_to = config.restrict_scroll;
 
-        if let Some(entity) = self.entity() {
-            self.commands().entity(entity).with_children(|parent| {
-                new_parent = parent
-                    .spawn(FloatingPanel::base_bundle(config, layout))
-                    .id();
-            });
-        } else {
-            new_parent = self
-                .commands()
-                .spawn(FloatingPanel::base_bundle(config, layout))
-                .id();
-        }
-
-        let mut new_entity = self.commands().entity(new_parent);
-        let mut new_builder = new_entity.ui_builder();
-        new_builder.scroll_view(restrict_to, spawn_children);
-
-        self.commands().entity(new_parent)
+        self.container(FloatingPanel::frame(config, layout), |container| {
+            container.scroll_view(restrict_to, spawn_children);
+        })
     }
 }

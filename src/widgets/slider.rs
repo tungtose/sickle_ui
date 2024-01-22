@@ -1,6 +1,4 @@
-use bevy::{
-    ecs::system::EntityCommands, input::mouse::MouseScrollUnit, prelude::*, ui::FocusPolicy,
-};
+use bevy::{ecs::system::EntityCommands, input::mouse::MouseScrollUnit, prelude::*};
 use sickle_math::{ease::Ease, lerp::Lerp};
 
 use crate::{
@@ -11,6 +9,8 @@ use crate::{
     ui_builder::UiBuilder,
     TrackedInteraction,
 };
+
+use super::prelude::{LabelConfig, UiContainerExt, UiLabelExt};
 
 pub struct InputSliderPlugin;
 
@@ -361,213 +361,109 @@ impl<'w, 's, 'a> Slider {
         self.config.min.lerp(self.config.max, self.ratio)
     }
 
-    fn spawn(parent: &'a mut ChildBuilder<'w, 's, '_>, config: Option<SliderConfig>) -> Entity {
-        let config = config.unwrap_or_default();
-        if config.axis == SliderAxis::Horizontal {
-            let mut input = parent.spawn(Slider::horizontal_bundle());
-            Slider::fill_horizontal(&mut input, config);
-            input.id()
-        } else {
-            let mut input = parent.spawn(Slider::vertical_bundle());
-            Slider::fill_vertical(&mut input, config);
-            input.id()
+    fn base_tween() -> AnimationConfig {
+        AnimationConfig {
+            duration: 0.1,
+            easing: Ease::OutExpo,
+            ..default()
         }
     }
 
-    fn parentless(commands: &'a mut Commands<'w, 's>, config: Option<SliderConfig>) -> Entity {
-        let config = config.unwrap_or_default();
-        if config.axis == SliderAxis::Horizontal {
-            let mut input = commands.spawn(Slider::horizontal_bundle());
-            Slider::fill_horizontal(&mut input, config);
-            input.id()
-        } else {
-            let mut input = commands.spawn(Slider::vertical_bundle());
-            Slider::fill_vertical(&mut input, config);
-            input.id()
+    fn horizontal_container() -> impl Bundle {
+        NodeBundle {
+            style: Style {
+                width: Val::Percent(100.),
+                height: Val::Px(20.),
+                justify_content: JustifyContent::Start,
+                align_items: AlignItems::Center,
+                margin: UiRect::all(Val::Px(5.)),
+                ..default()
+            },
+            ..default()
         }
     }
 
-    fn horizontal_bundle() -> impl Bundle {
+    fn vertical_container() -> impl Bundle {
+        NodeBundle {
+            style: Style {
+                height: Val::Percent(100.),
+                justify_content: JustifyContent::SpaceBetween,
+                align_items: AlignItems::Center,
+                margin: UiRect::all(Val::Px(5.)),
+                flex_direction: FlexDirection::Column,
+                ..default()
+            },
+            ..default()
+        }
+    }
+
+    fn horizontal_bar_container() -> impl Bundle {
         (
             NodeBundle {
                 style: Style {
                     width: Val::Percent(100.),
-                    height: Val::Px(20.),
-                    justify_content: JustifyContent::Start,
-                    align_items: AlignItems::Center,
-                    margin: UiRect::all(Val::Px(5.)),
                     ..default()
                 },
                 ..default()
             },
-            TrackedInteraction::default(),
-            InteractiveBackground {
-                highlight: Some(Color::rgba(0., 1., 1., 0.8)),
-                ..default()
-            },
-            AnimatedInteraction::<InteractiveBackground> {
-                tween: Slider::base_tween(),
-                ..default()
-            },
+            Interaction::default(),
+            Scrollable::default(),
         )
     }
 
-    fn vertical_bundle() -> impl Bundle {
+    fn horizontal_bar() -> impl Bundle {
+        NodeBundle {
+            style: Style {
+                width: Val::Percent(100.),
+                height: Val::Px(4.),
+                margin: UiRect::vertical(Val::Px(8.)),
+                border: UiRect::px(1., 1., 0., 1.),
+                ..default()
+            },
+            background_color: Color::DARK_GRAY.into(),
+            border_color: Color::GRAY.into(),
+            ..default()
+        }
+    }
+
+    fn horizontal_readout_container() -> impl Bundle {
+        NodeBundle {
+            style: Style {
+                width: Val::Px(50.),
+                overflow: Overflow::clip(),
+                ..default()
+            },
+            ..default()
+        }
+    }
+
+    fn vertical_bar_container() -> impl Bundle {
         (
             NodeBundle {
                 style: Style {
                     height: Val::Percent(100.),
-                    justify_content: JustifyContent::SpaceBetween,
-                    align_items: AlignItems::Center,
-                    margin: UiRect::all(Val::Px(5.)),
                     flex_direction: FlexDirection::Column,
                     ..default()
                 },
                 ..default()
             },
-            TrackedInteraction::default(),
-            InteractiveBackground {
-                highlight: Some(Color::rgba(0., 1., 1., 0.8)),
-                ..default()
-            },
-            AnimatedInteraction::<InteractiveBackground> {
-                tween: Slider::base_tween(),
-                ..default()
-            },
+            Interaction::default(),
+            Scrollable::default(),
         )
     }
 
-    fn fill_horizontal(input: &mut EntityCommands<'w, 's, 'a>, config: SliderConfig) {
-        let input_id = input.id();
-        let mut drag_handle: Entity = Entity::PLACEHOLDER;
-        let mut slider_bar: Entity = Entity::PLACEHOLDER;
-        let mut readout_target: Option<Entity> = None;
-        input.with_children(|parent| {
-            if let Some(label) = config.label.clone() {
-                Slider::add_label(parent, label, SliderAxis::Horizontal);
-            }
-
-            slider_bar = parent
-                .spawn((
-                    NodeBundle {
-                        style: Style {
-                            width: Val::Percent(100.),
-                            ..default()
-                        },
-                        ..default()
-                    },
-                    SliderBar { slider: input_id },
-                    Interaction::default(),
-                    Scrollable::default(),
-                ))
-                .with_children(|parent| {
-                    parent
-                        .spawn((NodeBundle {
-                            style: Style {
-                                width: Val::Percent(100.),
-                                height: Val::Px(4.),
-                                margin: UiRect::vertical(Val::Px(8.)),
-                                border: UiRect::px(1., 1., 0., 1.),
-                                ..default()
-                            },
-                            background_color: Color::DARK_GRAY.into(),
-                            border_color: Color::GRAY.into(),
-                            ..default()
-                        },))
-                        .with_children(|parent| {
-                            drag_handle = parent
-                                .spawn(Slider::handle_bundle(input_id, SliderAxis::Horizontal))
-                                .id();
-                        });
-                })
-                .id();
-
-            if config.show_current {
-                readout_target = Slider::add_readout_target(parent, SliderAxis::Horizontal).into();
-            }
-        });
-
-        let initial_ratio = config.initial_value / (config.max - config.min);
-
-        input.insert(Slider {
-            ratio: initial_ratio,
-            config,
-            slider_bar,
-            drag_handle,
-            readout_target,
-            base_ratio: None,
-        });
-    }
-
-    fn fill_vertical(input: &mut EntityCommands<'w, 's, 'a>, config: SliderConfig) {
-        let input_id = input.id();
-        let mut drag_handle: Entity = Entity::PLACEHOLDER;
-        let mut slider_bar: Entity = Entity::PLACEHOLDER;
-        let mut current_value_node: Option<Entity> = None;
-        input.with_children(|parent| {
-            if config.show_current {
-                current_value_node =
-                    Slider::add_readout_target(parent, SliderAxis::Vertical).into();
-            }
-
-            slider_bar = parent
-                .spawn((
-                    NodeBundle {
-                        style: Style {
-                            height: Val::Percent(100.),
-                            flex_direction: FlexDirection::Column,
-                            ..default()
-                        },
-                        ..default()
-                    },
-                    SliderBar { slider: input_id },
-                    Interaction::default(),
-                    Scrollable::default(),
-                ))
-                .with_children(|parent| {
-                    parent
-                        .spawn((NodeBundle {
-                            style: Style {
-                                width: Val::Px(4.),
-                                height: Val::Percent(100.),
-                                flex_direction: FlexDirection::Column,
-                                margin: UiRect::horizontal(Val::Px(8.)),
-                                border: UiRect::px(1., 1., 0., 1.),
-                                ..default()
-                            },
-                            background_color: Color::DARK_GRAY.into(),
-                            border_color: Color::GRAY.into(),
-                            ..default()
-                        },))
-                        .with_children(|parent| {
-                            drag_handle = parent
-                                .spawn(Slider::handle_bundle(input_id, SliderAxis::Vertical))
-                                .id();
-                        });
-                })
-                .id();
-
-            if let Some(label) = config.label.clone() {
-                Slider::add_label(parent, label, SliderAxis::Vertical);
-            }
-        });
-
-        let initial_ratio = config.initial_value / (config.max - config.min);
-
-        input.insert(Slider {
-            ratio: initial_ratio,
-            config,
-            slider_bar,
-            drag_handle,
-            readout_target: current_value_node,
-            base_ratio: None,
-        });
-    }
-
-    fn base_tween() -> AnimationConfig {
-        AnimationConfig {
-            duration: 0.1,
-            easing: Ease::OutExpo,
+    fn vertical_bar() -> impl Bundle {
+        NodeBundle {
+            style: Style {
+                width: Val::Px(4.),
+                height: Val::Percent(100.),
+                flex_direction: FlexDirection::Column,
+                margin: UiRect::horizontal(Val::Px(8.)),
+                border: UiRect::px(1., 1., 0., 1.),
+                ..default()
+            },
+            background_color: Color::DARK_GRAY.into(),
+            border_color: Color::GRAY.into(),
             ..default()
         }
     }
@@ -605,76 +501,109 @@ impl<'w, 's, 'a> Slider {
             Scrollable::default(),
         )
     }
-
-    fn add_readout_target(parent: &'a mut ChildBuilder<'w, 's, '_>, axis: SliderAxis) -> Entity {
-        let margin = match axis {
-            SliderAxis::Horizontal => UiRect::left(Val::Px(5.)),
-            SliderAxis::Vertical => UiRect::px(5., 5., 5., 0.),
-        };
-        let min_width = match axis {
-            SliderAxis::Horizontal => Val::Px(50.),
-            SliderAxis::Vertical => Val::Auto,
-        };
-
-        parent
-            .spawn(TextBundle {
-                style: Style {
-                    min_width,
-                    margin,
-                    ..default()
-                },
-                ..default()
-            })
-            .id()
-    }
-
-    fn add_label(
-        parent: &'a mut ChildBuilder<'w, 's, '_>,
-        label: String,
-        axis: SliderAxis,
-    ) -> Entity {
-        let margin = match axis {
-            SliderAxis::Horizontal => UiRect::px(5., 10., 0., 0.),
-            SliderAxis::Vertical => UiRect::px(5., 5., 0., 5.),
-        };
-
-        parent
-            .spawn(TextBundle {
-                style: Style {
-                    margin,
-                    ..default()
-                },
-                text: Text::from_section(
-                    label,
-                    TextStyle {
-                        color: Color::BLACK,
-                        font_size: 14.,
-                        ..default()
-                    },
-                ),
-                focus_policy: FocusPolicy::Pass,
-                ..default()
-            })
-            .id()
-    }
 }
 
 pub trait UiSliderExt<'w, 's> {
-    fn slider<'a>(&'a mut self, config: Option<SliderConfig>) -> EntityCommands<'w, 's, 'a>;
+    fn slider<'a>(&'a mut self, config: SliderConfig) -> EntityCommands<'w, 's, 'a>;
 }
 
 impl<'w, 's> UiSliderExt<'w, 's> for UiBuilder<'w, 's, '_> {
-    fn slider<'a>(&'a mut self, config: Option<SliderConfig>) -> EntityCommands<'w, 's, 'a> {
-        let mut slider = Entity::PLACEHOLDER;
+    fn slider<'a>(&'a mut self, config: SliderConfig) -> EntityCommands<'w, 's, 'a> {
+        let mut drag_handle: Entity = Entity::PLACEHOLDER;
+        let mut slider_bar: Entity = Entity::PLACEHOLDER;
+        let mut readout_target: Option<Entity> = None;
 
-        if let Some(entity) = self.entity() {
-            self.commands().entity(entity).with_children(|parent| {
-                slider = Slider::spawn(parent, config);
-            });
-        } else {
-            slider = Slider::parentless(self.commands(), config);
-        }
+        let mut input = match config.axis {
+            SliderAxis::Horizontal => self.container(Slider::horizontal_container(), |slider| {
+                let input_id = slider.id().unwrap();
 
-        self.commands().entity(slider)
+                if let Some(label) = config.label.clone() {
+                    slider.label(LabelConfig {
+                        label,
+                        margin: UiRect::px(5., 10., 0., 0.),
+                        ..default()
+                    });
+                }
+
+                slider_bar = slider
+                    .container(
+                        (
+                            Slider::horizontal_bar_container(),
+                            SliderBar { slider: input_id },
+                        ),
+                        |bar_container| {
+                            bar_container.container(Slider::horizontal_bar(), |bar| {
+                                drag_handle = bar
+                                    .spawn(Slider::handle_bundle(input_id, SliderAxis::Horizontal))
+                                    .id();
+                            });
+                        },
+                    )
+                    .id();
+
+                if config.show_current {
+                    slider.container(
+                        Slider::horizontal_readout_container(),
+                        |readout_container| {
+                            readout_target = readout_container
+                                .label(LabelConfig {
+                                    margin: UiRect::left(Val::Px(5.)),
+                                    ..default()
+                                })
+                                .id()
+                                .into();
+                        },
+                    );
+                }
+            }),
+            SliderAxis::Vertical => self.container(Slider::vertical_container(), |slider| {
+                let input_id = slider.id().unwrap();
+
+                if config.show_current {
+                    readout_target = slider
+                        .label(LabelConfig {
+                            margin: UiRect::px(5., 5., 5., 0.),
+                            ..default()
+                        })
+                        .id()
+                        .into();
+                }
+
+                slider_bar = slider
+                    .container(
+                        (
+                            Slider::vertical_bar_container(),
+                            SliderBar { slider: input_id },
+                        ),
+                        |bar_container| {
+                            bar_container.container(Slider::vertical_bar(), |bar| {
+                                drag_handle = bar
+                                    .spawn(Slider::handle_bundle(input_id, SliderAxis::Vertical))
+                                    .id();
+                            });
+                        },
+                    )
+                    .id();
+
+                if let Some(label) = config.label.clone() {
+                    slider.label(LabelConfig {
+                        label,
+                        margin: UiRect::px(5., 5., 0., 5.),
+                        ..default()
+                    });
+                }
+            }),
+        };
+
+        input.insert(Slider {
+            ratio: config.initial_value / (config.max - config.min),
+            config,
+            slider_bar,
+            drag_handle,
+            readout_target,
+            ..default()
+        });
+
+        input
     }
 }

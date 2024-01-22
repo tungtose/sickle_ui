@@ -1,6 +1,10 @@
-use bevy::ecs::{
-    entity::Entity,
-    system::{Commands, EntityCommands},
+use bevy::{
+    ecs::{
+        bundle::Bundle,
+        entity::Entity,
+        system::{Commands, EntityCommands},
+    },
+    hierarchy::BuildChildren,
 };
 
 pub struct UiBuilder<'w, 's, 'a> {
@@ -9,7 +13,7 @@ pub struct UiBuilder<'w, 's, 'a> {
 }
 
 impl<'w, 's> UiBuilder<'w, 's, '_> {
-    pub fn entity(&self) -> Option<Entity> {
+    pub fn id(&self) -> Option<Entity> {
         self.entity
     }
 
@@ -23,6 +27,20 @@ impl<'w, 's> UiBuilder<'w, 's, '_> {
         } else {
             Err("No entity set for UiBuilder")
         }
+    }
+
+    pub fn spawn<'a>(&'a mut self, bundle: impl Bundle) -> EntityCommands<'w, 's, 'a> {
+        let mut new_entity = Entity::PLACEHOLDER;
+
+        if let Some(entity) = self.id() {
+            self.commands().entity(entity).with_children(|parent| {
+                new_entity = parent.spawn(bundle).id();
+            });
+        } else {
+            new_entity = self.commands().spawn(bundle).id();
+        }
+
+        self.commands().entity(new_entity)
     }
 }
 
@@ -48,32 +66,3 @@ impl<'w, 's, 'a> UiBuilderExt<'w, 's, 'a> for Commands<'w, 's> {
         }
     }
 }
-
-// TODO: Replace strings with impl Into::<String>
-
-/*
-
-pub struct MenuConfig{
-    pub name: String,
-    pub alt_code: Option<KeyCode>,
-}
-
-pub struct MenuItemConfig{
-    pub name: String,
-    pub icon: Option<Handle<Image>>,
-    pub alt_code: Option<KeyCode>,
-    pub shortcut: Option<Vec<KeyCode>>,
-}
-
-commands.ui_builder().menu(MenuConfig{...}, |menu|{
-    menu.menu_item(MenuItemConfig{...}).insert(MyMenu::ItemOne);
-    menu.menu_item(MenuItemConfig{...}).insert(MyMenu::ItemTwo);
-    menu.menu_item(MenuItemConfig{...}).insert(MyMenu::ItemThree);
-    menu.sub_menu(MenuConfig{...}, |sub_menu|{
-        sub_menu.menu_item(MenuItemConfig{...}).insert(MyMenu::ItemOne);
-        sub_menu.menu_item(MenuItemConfig{...}).insert(MyMenu::ItemTwo);
-        sub_menu.menu_item(MenuItemConfig{...}).insert(MyMenu::ItemThree);
-    });
-})
-
-*/
