@@ -26,7 +26,7 @@ pub mod prelude {
         dropdown::UiDropdownExt,
         floating_panel::{FloatingPanelConfig, FloatingPanelLayout, UiFloatingPanelExt},
         label::{LabelConfig, UiLabelExt},
-        menu::{MenuConfig, MenuItemConfig, UiMenuExt},
+        menu::{MenuConfig, MenuItemConfig, UiMenuExt, UiMenuItemExt, UiMenuItemSeparatorExt},
         radio_group::UiRadioGroupExt,
         row::{RowConfig, UiRowExt},
         scroll_view::UiScrollViewExt,

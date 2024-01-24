@@ -7,6 +7,7 @@ pub struct LabelConfig {
     pub label: String,
     pub color: Color,
     pub margin: UiRect,
+    pub wrap: FlexWrap,
 }
 
 impl Default for LabelConfig {
@@ -15,6 +16,7 @@ impl Default for LabelConfig {
             label: String::from("Label"),
             color: Color::BLACK,
             margin: Default::default(),
+            wrap: FlexWrap::NoWrap,
         }
     }
 }
@@ -28,19 +30,26 @@ impl LabelConfig {
     }
 
     fn frame(&self) -> impl Bundle {
+        let mut section = Text::from_section(
+            self.label.clone(),
+            TextStyle {
+                color: self.color,
+                ..default()
+            },
+        );
+
+        if self.wrap == FlexWrap::NoWrap {
+            section = section.with_no_wrap();
+        }
+
         TextBundle {
             style: Style {
                 align_self: AlignSelf::Center,
                 margin: self.margin,
+                flex_wrap: self.wrap,
                 ..default()
             },
-            text: Text::from_section(
-                self.label.clone(),
-                TextStyle {
-                    color: self.color,
-                    ..default()
-                },
-            ),
+            text: section,
             focus_policy: FocusPolicy::Pass,
             ..default()
         }
