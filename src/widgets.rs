@@ -10,6 +10,7 @@ pub mod radio_group;
 pub mod row;
 pub mod scroll_view;
 pub mod slider;
+pub mod toggle_menu_item;
 
 use bevy::prelude::*;
 
@@ -17,6 +18,7 @@ use self::{
     checkbox::CheckboxPlugin, dropdown::DropdownPlugin, floating_panel::FloatingPanelPlugin,
     menu::MenuPlugin, menu_item::MenuItemPlugin, radio_group::RadioGroupPlugin,
     scroll_view::ScrollViewPlugin, slider::InputSliderPlugin,
+    toggle_menu_item::ToggleMenuItemPlugin,
 };
 
 pub mod prelude {
@@ -33,6 +35,7 @@ pub mod prelude {
         row::{RowConfig, UiRowExt},
         scroll_view::{ScrollThrough, UiScrollViewExt},
         slider::{SliderConfig, UiSliderExt},
+        toggle_menu_item::{ToggleMenuItem, ToggleMenuItemConfig, UiToggleMenuItemExt},
     };
 }
 
@@ -44,11 +47,12 @@ impl Plugin for WidgetsPlugin {
             CheckboxPlugin,
             DropdownPlugin,
             FloatingPanelPlugin,
+            MenuPlugin,
+            MenuItemPlugin,
             InputSliderPlugin,
             RadioGroupPlugin,
             ScrollViewPlugin,
-            MenuPlugin,
-            MenuItemPlugin,
+            ToggleMenuItemPlugin,
         ));
     }
 }

@@ -41,7 +41,7 @@ impl Draggable {
     fn clear(&mut self) {
         self.origin = None;
         self.position = None;
-        self.diff = Some(Vec2::default());
+        self.diff = Vec2::default().into();
     }
 }
 
@@ -120,12 +120,9 @@ fn update_drag_progress(
             }
 
             let position: Option<Vec2> = match draggable.source {
-                DragSource::Mouse => match window.cursor_position() {
-                    Some(pos) => Some(pos),
-                    None => None,
-                },
+                DragSource::Mouse => window.cursor_position(),
                 DragSource::Touch(id) => match r_touches.get_pressed(id) {
-                    Some(touch) => Some(touch.position()),
+                    Some(touch) => touch.position().into(),
                     None => None,
                 },
             };
@@ -140,7 +137,7 @@ fn update_drag_progress(
                     }
 
                     draggable.position = new_position.into();
-                    draggable.diff = Some(new_position - current_position);
+                    draggable.diff = (new_position - current_position).into();
                 }
             }
         }
@@ -167,7 +164,7 @@ fn update_drag_state(
             draggable.source = drag_source;
             draggable.origin = position;
             draggable.position = position;
-            draggable.diff = Some(Vec2::default());
+            draggable.diff = Vec2::default().into();
         } else if *flux_interaction == FluxInteraction::Released
             || *flux_interaction == FluxInteraction::PressCanceled
         {

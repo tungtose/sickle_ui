@@ -8,6 +8,7 @@ pub struct LabelConfig {
     pub color: Color,
     pub margin: UiRect,
     pub wrap: FlexWrap,
+    pub flex_grow: f32,
 }
 
 impl Default for LabelConfig {
@@ -17,6 +18,7 @@ impl Default for LabelConfig {
             color: Color::BLACK,
             margin: Default::default(),
             wrap: FlexWrap::NoWrap,
+            flex_grow: 0.,
         }
     }
 }
@@ -47,6 +49,7 @@ impl LabelConfig {
                 align_self: AlignSelf::Center,
                 margin: self.margin,
                 flex_wrap: self.wrap,
+                flex_grow: self.flex_grow,
                 ..default()
             },
             text: section,

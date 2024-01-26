@@ -91,7 +91,7 @@ fn update_slider_on_drag(
         }
 
         if draggable.state == DragState::DragStart {
-            slider.base_ratio = Some(slider.ratio);
+            slider.base_ratio = slider.ratio.into();
         }
 
         let Ok(slider_bar) = q_node.get(slider.slider_bar) else {
@@ -284,7 +284,7 @@ impl SliderConfig {
 
     fn into_label(label: Option<impl Into<String>>) -> Option<String> {
         if let Some(label) = label {
-            Some(label.into())
+            label.into().into()
         } else {
             None
         }
@@ -489,7 +489,7 @@ impl<'w, 's, 'a> Slider {
             },
             TrackedInteraction::default(),
             InteractiveBackground {
-                highlight: Some(Color::rgba(0., 1., 1., 0.8)),
+                highlight: Color::rgba(0., 1., 1., 0.8).into(),
                 ..default()
             },
             AnimatedInteraction::<InteractiveBackground> {

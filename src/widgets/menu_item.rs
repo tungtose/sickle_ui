@@ -3,6 +3,7 @@ use sickle_math::ease::Ease;
 
 use crate::{
     animated_interaction::{AnimatedInteraction, AnimationConfig},
+    input_extension::{ShortcutTextExt, SymmetricKeysExt},
     interactions::InteractiveBackground,
     ui_builder::*,
     FluxInteraction, FluxInteractionUpdate, TrackedInteraction,
@@ -21,6 +22,7 @@ impl Plugin for MenuItemPlugin {
                     update_menu_item_on_change,
                     update_menu_item_on_pressed,
                     update_menu_item_on_key_press,
+                    update_menu_item_on_config_change,
                 )
                     .chain()
                     .in_set(MenuItemUpdate),
@@ -62,21 +64,7 @@ fn update_menu_item_on_key_press(
                         .iter()
                         .take(shortcut.len() - 1)
                         .map(|c| c.clone())
-                        .all(|keycode| match keycode {
-                            KeyCode::AltLeft | KeyCode::AltRight => {
-                                r_keys.any_pressed([KeyCode::AltLeft, KeyCode::AltRight])
-                            }
-                            KeyCode::ControlLeft | KeyCode::ControlRight => {
-                                r_keys.any_pressed([KeyCode::ControlLeft, KeyCode::ControlRight])
-                            }
-                            KeyCode::ShiftLeft | KeyCode::ShiftRight => {
-                                r_keys.any_pressed([KeyCode::ShiftLeft, KeyCode::ShiftRight])
-                            }
-                            KeyCode::SuperLeft | KeyCode::SuperRight => {
-                                r_keys.any_pressed([KeyCode::SuperLeft, KeyCode::SuperRight])
-                            }
-                            _ => r_keys.pressed(keycode),
-                        })
+                        .all(|keycode| r_keys.symmetry_pressed(keycode))
                     {
                         item.interacted = true;
                     }
@@ -96,6 +84,58 @@ fn update_menu_item_on_change(mut q_menu_items: Query<&mut MenuItem, Changed<Men
     }
 }
 
+fn update_menu_item_on_config_change(
+    q_menu_items: Query<(Entity, &MenuItemConfig), Changed<MenuItemConfig>>,
+    mut commands: Commands,
+) {
+    for (entity, config) in &q_menu_items {
+        let mut entity_commands = commands.entity(entity);
+        let mut button = entity_commands.despawn_descendants().ui_builder();
+
+        let name = config.name.clone();
+        let shortcut_text: Option<String> = match &config.shortcut {
+            Some(vec) => vec.shortcut_text().into(),
+            None => None,
+        };
+        let leading = config.leading_icon.clone();
+        let trailing = config.trailing_icon.clone();
+
+        if let Some(leading) = leading {
+            button.spawn(MenuItem::icon(leading));
+        } else {
+            button.spawn(MenuItem::icon_spacer());
+        }
+
+        if let Some(shortcut_text) = shortcut_text {
+            button.label(LabelConfig {
+                label: name,
+                margin: UiRect::horizontal(Val::Px(5.)),
+                ..default()
+            });
+            button.container(MenuItem::shortcut(), |shortcut| {
+                shortcut.label(LabelConfig {
+                    label: shortcut_text,
+                    margin: UiRect::horizontal(Val::Px(5.)),
+                    ..default()
+                });
+            });
+        } else {
+            button.label(LabelConfig {
+                label: name,
+                margin: UiRect::horizontal(Val::Px(5.)),
+                flex_grow: 1.,
+                ..default()
+            });
+        }
+
+        if let Some(trailing) = trailing {
+            button.spawn(MenuItem::icon(trailing));
+        } else {
+            button.spawn(MenuItem::icon_spacer());
+        }
+    }
+}
+
 #[derive(Component, Debug, Default, Reflect)]
 #[reflect(Component)]
 pub struct MenuItem {
@@ -106,7 +146,8 @@ pub struct MenuItem {
 #[reflect(Component)]
 pub struct MenuItemConfig {
     pub name: String,
-    pub icon: Option<Handle<Image>>,
+    pub leading_icon: Option<Handle<Image>>,
+    pub trailing_icon: Option<Handle<Image>>,
     pub alt_code: Option<KeyCode>,
     pub shortcut: Option<Vec<KeyCode>>,
 }
@@ -138,7 +179,7 @@ impl MenuItem {
             },
             TrackedInteraction::default(),
             InteractiveBackground {
-                highlight: Some(Color::rgba(9., 8., 7., 0.5)),
+                highlight: Color::rgba(9., 8., 7., 0.5).into(),
                 ..default()
             },
             AnimatedInteraction::<InteractiveBackground> {
@@ -182,66 +223,6 @@ impl MenuItem {
             ..default()
         }
     }
-
-    fn shortcut_text(keycodes: Vec<KeyCode>) -> String {
-        keycodes
-            .iter()
-            .map(MenuItem::keycode_text)
-            .collect::<Vec<String>>()
-            .join("+")
-    }
-
-    fn keycode_text(keycode: &KeyCode) -> String {
-        let formatted = format!("{:?}", keycode);
-        let formatted_str = formatted.as_str();
-
-        let renamed = match keycode {
-            KeyCode::Key1 => "1",
-            KeyCode::Key2 => "2",
-            KeyCode::Key3 => "3",
-            KeyCode::Key4 => "4",
-            KeyCode::Key5 => "5",
-            KeyCode::Key6 => "6",
-            KeyCode::Key7 => "7",
-            KeyCode::Key8 => "8",
-            KeyCode::Key9 => "9",
-            KeyCode::Key0 => "0",
-            KeyCode::Escape => "ESC",
-            KeyCode::Insert => "Ins",
-            KeyCode::Delete => "Del",
-            KeyCode::Apostrophe => "'",
-            KeyCode::Asterisk => "*",
-            KeyCode::Plus => "+",
-            KeyCode::At => "@",
-            KeyCode::Backslash => "\\",
-            KeyCode::Colon => ":",
-            KeyCode::Comma => ",",
-            KeyCode::NumpadDecimal => ".",
-            KeyCode::NumpadDivide => "/",
-            KeyCode::Equals => "=",
-            KeyCode::Grave => "`",
-            KeyCode::AltLeft => "Alt",
-            KeyCode::BracketLeft => "[",
-            KeyCode::ControlLeft => "Ctrl",
-            KeyCode::ShiftLeft => "Shift",
-            KeyCode::Minus => "-",
-            KeyCode::NumpadMultiply => "*",
-            KeyCode::NumpadComma => ",",
-            KeyCode::NumpadEquals => "=",
-            KeyCode::Period => ",",
-            KeyCode::AltRight => "Alt",
-            KeyCode::BracketRight => "]",
-            KeyCode::ControlRight => "Ctrl",
-            KeyCode::ShiftRight => "Shift",
-            KeyCode::Semicolon => ";",
-            KeyCode::Slash => "/",
-            KeyCode::NumpadSubtract => "-",
-            KeyCode::Underline => "_",
-            _ => formatted_str,
-        };
-
-        renamed.to_string()
-    }
 }
 
 pub trait UiMenuItemExt<'w, 's> {
@@ -250,40 +231,6 @@ pub trait UiMenuItemExt<'w, 's> {
 
 impl<'w, 's> UiMenuItemExt<'w, 's> for UiBuilder<'w, 's, '_> {
     fn menu_item<'a>(&'a mut self, config: MenuItemConfig) -> EntityCommands<'w, 's, 'a> {
-        let name = config.name.clone();
-        let shortcut_text: Option<String> = if let Some(keycodes) = config.shortcut.clone() {
-            Some(MenuItem::shortcut_text(keycodes))
-        } else {
-            None
-        };
-        let icon = config.icon.clone();
-
-        self.container((MenuItem::button(), config), |button| {
-            if let Some(icon) = icon {
-                button.spawn(MenuItem::icon(icon));
-            } else {
-                button.spawn(MenuItem::icon_spacer());
-            }
-
-            button.label(LabelConfig {
-                label: name,
-                margin: UiRect::horizontal(Val::Px(5.)),
-                ..default()
-            });
-
-            if let Some(shortcut_text) = shortcut_text {
-                button.container(MenuItem::shortcut(), |shortcut| {
-                    shortcut.label(LabelConfig {
-                        label: shortcut_text,
-                        margin: UiRect::horizontal(Val::Px(5.)),
-                        ..default()
-                    });
-                });
-            } else {
-                button.spawn(MenuItem::shortcut());
-            }
-
-            button.spawn(MenuItem::icon_spacer());
-        })
+        self.spawn((MenuItem::button(), config))
     }
 }

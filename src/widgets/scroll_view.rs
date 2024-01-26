@@ -527,7 +527,7 @@ impl<'w, 's> ScrollView {
             },
             TrackedInteraction::default(),
             InteractiveBackground {
-                highlight: Some(Color::rgba(0., 1., 1., 0.8)),
+                highlight: Color::rgba(0., 1., 1., 0.8).into(),
                 ..default()
             },
             AnimatedInteraction::<InteractiveBackground> {

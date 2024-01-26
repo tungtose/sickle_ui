@@ -215,7 +215,7 @@ impl<'w, 's, 'a> Dropdown {
             },
             TrackedInteraction::default(),
             InteractiveBackground {
-                highlight: Some(Color::rgba(0., 1., 1., 0.3)),
+                highlight: Color::rgba(0., 1., 1., 0.3).into(),
                 ..default()
             },
             AnimatedInteraction::<InteractiveBackground> {
@@ -240,7 +240,7 @@ impl<'w, 's, 'a> Dropdown {
             },
             TrackedInteraction::default(),
             InteractiveBackground {
-                highlight: Some(Color::rgba(0., 1., 1., 0.3)),
+                highlight: Color::rgba(0., 1., 1., 0.3).into(),
                 ..default()
             },
             AnimatedInteraction::<InteractiveBackground> {

@@ -19,7 +19,11 @@ impl Plugin for MenuPlugin {
         app.configure_sets(Update, MenuUpdate.after(FluxInteractionUpdate))
             .add_systems(
                 Update,
-                (handle_click_or_touch, update_menu_container_visibility)
+                (
+                    handle_click_or_touch,
+                    handle_item_interaction,
+                    update_menu_container_visibility,
+                )
                     .chain()
                     .in_set(MenuUpdate),
             );
@@ -116,6 +120,18 @@ fn handle_click_or_touch(
     }
 }
 
+fn handle_item_interaction(
+    q_menu_items: Query<&MenuItem, Changed<MenuItem>>,
+    mut q_menus: Query<&mut Menu>,
+) {
+    let any_interacted = q_menu_items.iter().any(|item| item.interacted());
+    if any_interacted {
+        for mut menu in &mut q_menus {
+            menu.is_open = false;
+        }
+    }
+}
+
 fn update_menu_container_visibility(
     mut q_menus: Query<(Ref<Menu>, &mut BorderColor)>,
     mut q_style: Query<&mut Style>,
@@ -187,7 +203,7 @@ impl Menu {
             },
             TrackedInteraction::default(),
             InteractiveBackground {
-                highlight: Some(Color::rgba(9., 8., 7., 0.5)),
+                highlight: Color::rgba(9., 8., 7., 0.5).into(),
                 ..default()
             },
             AnimatedInteraction::<InteractiveBackground> {

@@ -3,10 +3,11 @@ use bevy::prelude::*;
 pub mod animated_interaction;
 pub mod drag_interaction;
 pub mod flux_interaction;
+pub mod input_extension;
 pub mod interactions;
 pub mod scroll_interaction;
-pub mod widgets;
 pub mod ui_builder;
+pub mod widgets;
 
 use drag_interaction::DragInteractionPlugin;
 pub use flux_interaction::*;

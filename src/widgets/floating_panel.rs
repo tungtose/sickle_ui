@@ -54,7 +54,7 @@ fn index_floating_panel(mut q_panels: Query<&mut FloatingPanel>) {
     let mut offset = 1;
     for mut panel in &mut q_panels.iter_mut() {
         if panel.z_index.is_none() {
-            panel.z_index = Some(MIN_FLOATING_PANEL_Z_INDEX + max + offset);
+            panel.z_index = (MIN_FLOATING_PANEL_Z_INDEX + max + offset).into();
             offset += 1;
         }
     }
@@ -152,28 +152,28 @@ fn update_cursor_on_resize_handles(
         match *flux {
             FluxInteraction::PointerEnter => {
                 if !*locked {
-                    new_cursor = Some(handle.direction.cursor())
+                    new_cursor = handle.direction.cursor().into()
                 }
             }
             FluxInteraction::Pressed => {
-                new_cursor = Some(handle.direction.cursor());
+                new_cursor = handle.direction.cursor().into();
                 *locked = true;
             }
             FluxInteraction::Released => {
                 *locked = false;
                 if new_cursor.is_none() {
-                    new_cursor = Some(CursorIcon::Default);
+                    new_cursor = CursorIcon::Default.into();
                 }
             }
             FluxInteraction::PressCanceled => {
                 *locked = false;
                 if new_cursor.is_none() {
-                    new_cursor = Some(CursorIcon::Default);
+                    new_cursor = CursorIcon::Default.into();
                 }
             }
             FluxInteraction::PointerLeave => {
                 if !*locked && new_cursor.is_none() {
-                    new_cursor = Some(CursorIcon::Default);
+                    new_cursor = CursorIcon::Default.into();
                 }
             }
             _ => (),
@@ -340,7 +340,7 @@ fn update_panel_on_title_drag(
 
     for (i, (entity, _)) in panel_indices.iter().enumerate() {
         if let Some((_, mut panel)) = q_panels.iter_mut().find(|(e, _)| e == entity) {
-            panel.z_index = Some(MIN_FLOATING_PANEL_Z_INDEX + i + 1);
+            panel.z_index = (MIN_FLOATING_PANEL_Z_INDEX + i + 1).into();
         };
     }
 }
@@ -613,7 +613,7 @@ impl<'w, 's, 'a> FloatingPanel {
             Interaction::default(),
             TrackedInteraction::default(),
             InteractiveBackground {
-                highlight: Some(Color::rgb(0., 0.5, 1.)),
+                highlight: Color::rgb(0., 0.5, 1.).into(),
                 ..default()
             },
             AnimatedInteraction::<InteractiveBackground> {

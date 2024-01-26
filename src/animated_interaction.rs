@@ -62,7 +62,7 @@ impl<T: Component> Default for AnimatedInteraction<T> {
             hover: Default::default(),
             press: AnimationConfig {
                 duration: 0.05,
-                out_duration: Some(0.),
+                out_duration: (0.).into(),
                 ..default()
             }
             .into(),

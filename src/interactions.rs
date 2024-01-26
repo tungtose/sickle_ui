@@ -166,7 +166,7 @@ where
                 return None;
             };
 
-            (Some(transient_state.transition_base()), pressed_value)
+            (transient_state.transition_base().into(), pressed_value)
         }
         FluxInteraction::Released => {
             let end_value = interaction_config.highlight().unwrap_or(original_value);
@@ -179,14 +179,14 @@ where
                 return None;
             };
 
-            (Some(original_value), highlight_value)
+            (original_value.into(), highlight_value)
         }
         FluxInteraction::PointerLeave => {
             let Some(highlight_color) = interaction_config.highlight() else {
                 return None;
             };
 
-            (Some(highlight_color), original_value)
+            (highlight_color.into(), original_value)
         }
         _ => (None, original_value),
     };
@@ -201,5 +201,5 @@ where
         end_value
     };
 
-    Some(new_value)
+    new_value.into()
 }

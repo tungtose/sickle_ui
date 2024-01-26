@@ -35,7 +35,8 @@ fn update_scrollables(
             -mouse_wheel_event.y
         };
 
-        if mouse_wheel_event.x > 0. || r_keys.any_pressed([KeyCode::ShiftLeft, KeyCode::ShiftRight]) {
+        if mouse_wheel_event.x > 0. || r_keys.any_pressed([KeyCode::ShiftLeft, KeyCode::ShiftRight])
+        {
             axis = ScrollAxis::Horizontal;
         }
 
@@ -51,7 +52,7 @@ fn update_scrollables(
             continue;
         }
 
-        scrollable.axis = Some(axis);
+        scrollable.axis = axis.into();
         scrollable.diff = offset.into();
         scrollable.unit = unit;
 
@@ -90,6 +91,6 @@ impl Scrollable {
             return None;
         };
 
-        Some((axis, self.diff, self.unit))
+        (axis, self.diff, self.unit).into()
     }
 }
