@@ -8,7 +8,7 @@ use crate::{
     FluxInteraction, FluxInteractionUpdate, TrackedInteraction,
 };
 
-use super::prelude::{LabelConfig, UiContainerExt, UiLabelExt};
+use super::prelude::{LabelConfig, MenuItem, UiContainerExt, UiLabelExt};
 
 const MENU_CONTAINER_Z_INDEX: i32 = 100000;
 
@@ -16,20 +16,23 @@ pub struct MenuPlugin;
 
 impl Plugin for MenuPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(
-            Update,
-            (
-                handle_click_or_touch.after(FluxInteractionUpdate),
-                update_menu_container_visibility,
-            )
-                .chain(),
-        );
+        app.configure_sets(Update, MenuUpdate.after(FluxInteractionUpdate))
+            .add_systems(
+                Update,
+                (handle_click_or_touch, update_menu_container_visibility)
+                    .chain()
+                    .in_set(MenuUpdate),
+            );
     }
 }
+
+#[derive(SystemSet, Clone, Eq, Debug, Hash, PartialEq)]
+pub struct MenuUpdate;
 
 fn handle_click_or_touch(
     r_mouse: Res<Input<MouseButton>>,
     r_touches: Res<Touches>,
+    q_menu_items: Query<(&MenuItem, Ref<FluxInteraction>)>,
     mut q_menus: Query<(Entity, &mut Menu, Ref<FluxInteraction>)>,
 ) {
     if r_mouse.any_just_pressed([MouseButton::Left, MouseButton::Middle, MouseButton::Right])
@@ -38,6 +41,26 @@ fn handle_click_or_touch(
         let any_pressed = q_menus
             .iter()
             .any(|(_, _, f)| *f == FluxInteraction::Pressed);
+        if !any_pressed {
+            for (_, interaction) in &q_menu_items {
+                if interaction.is_changed() && *interaction == FluxInteraction::Pressed {
+                    return;
+                }
+            }
+
+            for (_, mut menu, _) in &mut q_menus {
+                menu.is_open = false;
+            }
+            return;
+        }
+    }
+
+    if r_mouse.any_just_released([MouseButton::Left, MouseButton::Middle, MouseButton::Right])
+        || r_touches.any_just_released()
+    {
+        let any_pressed = q_menus
+            .iter()
+            .any(|(_, _, f)| *f == FluxInteraction::Released);
         if !any_pressed {
             for (_, mut menu, _) in &mut q_menus {
                 menu.is_open = false;
@@ -116,6 +139,14 @@ fn update_menu_container_visibility(
     }
 }
 
+#[derive(Component, Debug, Default, Reflect)]
+#[reflect(Component)]
+pub struct MenuConfig {
+    pub name: String,
+    pub alt_code: Option<KeyCode>,
+    //pub icon: Option<Handle<Image>>,
+}
+
 #[derive(Component, Debug, Reflect)]
 #[reflect(Component)]
 pub struct Menu {
@@ -130,31 +161,6 @@ impl Default for Menu {
             is_open: false,
         }
     }
-}
-
-#[derive(Component, Debug, Default, Reflect)]
-#[reflect(Component)]
-pub struct MenuItem;
-
-#[derive(Component, Debug, Default, Reflect)]
-#[reflect(Component)]
-pub struct MenuItemSeparator;
-
-#[derive(Component, Debug, Default, Reflect)]
-#[reflect(Component)]
-pub struct MenuConfig {
-    pub name: String,
-    pub alt_code: Option<KeyCode>,
-    //pub icon: Option<Handle<Image>>,
-}
-
-#[derive(Component, Debug, Default, Reflect)]
-#[reflect(Component)]
-pub struct MenuItemConfig {
-    pub name: String,
-    pub icon: Option<Handle<Image>>,
-    pub alt_code: Option<KeyCode>,
-    pub shortcut: Option<Vec<KeyCode>>,
 }
 
 impl Menu {
@@ -213,149 +219,6 @@ impl Menu {
     }
 }
 
-impl MenuItem {
-    fn base_tween() -> AnimationConfig {
-        AnimationConfig {
-            duration: 0.1,
-            easing: Ease::OutExpo,
-            ..default()
-        }
-    }
-
-    fn button() -> impl Bundle {
-        (
-            ButtonBundle {
-                style: Style {
-                    padding: UiRect::all(Val::Px(5.)),
-                    justify_content: JustifyContent::End,
-                    align_items: AlignItems::Center,
-                    ..default()
-                },
-                background_color: Color::NONE.into(),
-                ..default()
-            },
-            TrackedInteraction::default(),
-            InteractiveBackground {
-                highlight: Some(Color::rgba(9., 8., 7., 0.5)),
-                ..default()
-            },
-            AnimatedInteraction::<InteractiveBackground> {
-                tween: MenuItem::base_tween(),
-                ..default()
-            },
-        )
-    }
-
-    fn shortcut() -> impl Bundle {
-        NodeBundle {
-            style: Style {
-                margin: UiRect::left(Val::Px(20.)),
-                justify_content: JustifyContent::End,
-                flex_wrap: FlexWrap::NoWrap,
-                flex_grow: 2.,
-                ..default()
-            },
-            ..default()
-        }
-    }
-
-    fn icon_spacer() -> impl Bundle {
-        NodeBundle {
-            style: Style {
-                width: Val::Px(12.),
-                ..default()
-            },
-            ..default()
-        }
-    }
-
-    fn icon(texture: Handle<Image>) -> impl Bundle {
-        ImageBundle {
-            style: Style {
-                width: Val::Px(12.),
-                ..default()
-            },
-            image: UiImage::new(texture),
-            ..default()
-        }
-    }
-
-    fn shortcut_text(keycodes: Vec<KeyCode>) -> String {
-        keycodes
-            .iter()
-            .map(MenuItem::keycode_text)
-            .collect::<Vec<String>>()
-            .join("+")
-    }
-
-    fn keycode_text(keycode: &KeyCode) -> String {
-        let formatted = format!("{:?}", keycode);
-        let formatted_str = formatted.as_str();
-
-        let renamed = match keycode {
-            KeyCode::Key1 => "1",
-            KeyCode::Key2 => "2",
-            KeyCode::Key3 => "3",
-            KeyCode::Key4 => "4",
-            KeyCode::Key5 => "5",
-            KeyCode::Key6 => "6",
-            KeyCode::Key7 => "7",
-            KeyCode::Key8 => "8",
-            KeyCode::Key9 => "9",
-            KeyCode::Key0 => "0",
-            KeyCode::Escape => "ESC",
-            KeyCode::Insert => "Ins",
-            KeyCode::Delete => "Del",
-            KeyCode::Apostrophe => "'",
-            KeyCode::Asterisk => "*",
-            KeyCode::Plus => "+",
-            KeyCode::At => "@",
-            KeyCode::Backslash => "\\",
-            KeyCode::Colon => ":",
-            KeyCode::Comma => ",",
-            KeyCode::NumpadDecimal => ".",
-            KeyCode::NumpadDivide => "/",
-            KeyCode::Equals => "=",
-            KeyCode::Grave => "`",
-            KeyCode::AltLeft => "Alt",
-            KeyCode::BracketLeft => "[",
-            KeyCode::ControlLeft => "Ctrl",
-            KeyCode::ShiftLeft => "Shift",
-            KeyCode::Minus => "-",
-            KeyCode::NumpadMultiply => "*",
-            KeyCode::NumpadComma => ",",
-            KeyCode::NumpadEquals => "=",
-            KeyCode::Period => ",",
-            KeyCode::AltRight => "Alt",
-            KeyCode::BracketRight => "]",
-            KeyCode::ControlRight => "Ctrl",
-            KeyCode::ShiftRight => "Shift",
-            KeyCode::Semicolon => ";",
-            KeyCode::Slash => "/",
-            KeyCode::NumpadSubtract => "-",
-            KeyCode::Underline => "_",
-            _ => formatted_str,
-        };
-
-        renamed.to_string()
-    }
-}
-
-impl MenuItemSeparator {
-    fn separator() -> impl Bundle {
-        NodeBundle {
-            style: Style {
-                min_width: Val::Px(100.),
-                height: Val::Px(1.),
-                margin: UiRect::px(5., 5., 5., 5.),
-                ..default()
-            },
-            background_color: Color::GRAY.into(),
-            ..default()
-        }
-    }
-}
-
 pub trait UiMenuExt<'w, 's> {
     fn menu<'a>(
         &'a mut self,
@@ -391,47 +254,22 @@ impl<'w, 's> UiMenuExt<'w, 's> for UiBuilder<'w, 's, '_> {
     }
 }
 
-pub trait UiMenuItemExt<'w, 's> {
-    fn menu_item<'a>(&'a mut self, config: MenuItemConfig) -> EntityCommands<'w, 's, 'a>;
-}
+#[derive(Component, Debug, Default, Reflect)]
+#[reflect(Component)]
+pub struct MenuItemSeparator;
 
-impl<'w, 's> UiMenuItemExt<'w, 's> for UiBuilder<'w, 's, '_> {
-    fn menu_item<'a>(&'a mut self, config: MenuItemConfig) -> EntityCommands<'w, 's, 'a> {
-        let name = config.name.clone();
-        let shortcut_text: Option<String> = if let Some(keycodes) = config.shortcut.clone() {
-            Some(MenuItem::shortcut_text(keycodes))
-        } else {
-            None
-        };
-        let icon = config.icon.clone();
-
-        self.container((MenuItem::button(), config), |button| {
-            if let Some(icon) = icon {
-                button.spawn(MenuItem::icon(icon));
-            } else {
-                button.spawn(MenuItem::icon_spacer());
-            }
-
-            button.label(LabelConfig {
-                label: name,
-                margin: UiRect::horizontal(Val::Px(5.)),
+impl MenuItemSeparator {
+    fn separator() -> impl Bundle {
+        NodeBundle {
+            style: Style {
+                min_width: Val::Px(100.),
+                height: Val::Px(1.),
+                margin: UiRect::px(5., 5., 5., 5.),
                 ..default()
-            });
-
-            if let Some(shortcut_text) = shortcut_text {
-                button.container(MenuItem::shortcut(), |shortcut| {
-                    shortcut.label(LabelConfig {
-                        label: shortcut_text,
-                        margin: UiRect::horizontal(Val::Px(5.)),
-                        ..default()
-                    });
-                });
-            } else {
-                button.spawn(MenuItem::shortcut());
-            }
-
-            button.spawn(MenuItem::icon_spacer());
-        })
+            },
+            background_color: Color::GRAY.into(),
+            ..default()
+        }
     }
 }
 

@@ -5,6 +5,7 @@ pub mod dropdown;
 pub mod floating_panel;
 pub mod label;
 pub mod menu;
+pub mod menu_item;
 pub mod radio_group;
 pub mod row;
 pub mod scroll_view;
@@ -14,22 +15,23 @@ use bevy::prelude::*;
 
 use self::{
     checkbox::CheckboxPlugin, dropdown::DropdownPlugin, floating_panel::FloatingPanelPlugin,
-    menu::MenuPlugin, radio_group::RadioGroupPlugin, scroll_view::ScrollViewPlugin,
-    slider::InputSliderPlugin,
+    menu::MenuPlugin, menu_item::MenuItemPlugin, radio_group::RadioGroupPlugin,
+    scroll_view::ScrollViewPlugin, slider::InputSliderPlugin,
 };
 
 pub mod prelude {
     pub use super::{
-        checkbox::UiCheckboxExt,
+        checkbox::{Checkbox, UiCheckboxExt},
         column::{ColumnConfig, UiColumnExt},
         container::UiContainerExt,
         dropdown::UiDropdownExt,
         floating_panel::{FloatingPanelConfig, FloatingPanelLayout, UiFloatingPanelExt},
         label::{LabelConfig, UiLabelExt},
-        menu::{MenuConfig, MenuItemConfig, UiMenuExt, UiMenuItemExt, UiMenuItemSeparatorExt},
-        radio_group::UiRadioGroupExt,
+        menu::{MenuConfig, MenuItemSeparator, UiMenuExt, UiMenuItemSeparatorExt},
+        menu_item::{MenuItem, MenuItemConfig, MenuItemUpdate, UiMenuItemExt},
+        radio_group::{RadioGroup, UiRadioGroupExt},
         row::{RowConfig, UiRowExt},
-        scroll_view::UiScrollViewExt,
+        scroll_view::{ScrollThrough, UiScrollViewExt},
         slider::{SliderConfig, UiSliderExt},
     };
 }
@@ -46,6 +48,7 @@ impl Plugin for WidgetsPlugin {
             RadioGroupPlugin,
             ScrollViewPlugin,
             MenuPlugin,
+            MenuItemPlugin,
         ));
     }
 }
