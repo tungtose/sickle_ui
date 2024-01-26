@@ -272,6 +272,35 @@ impl<'w, 's> UiMenuExt<'w, 's> for UiBuilder<'w, 's, '_> {
 
 #[derive(Component, Debug, Default, Reflect)]
 #[reflect(Component)]
+pub struct MenuSeparator;
+
+impl MenuSeparator {
+    fn separator() -> impl Bundle {
+        NodeBundle {
+            style: Style {
+                height: Val::Px(12.),
+                width: Val::Px(1.),
+                margin: UiRect::horizontal(Val::Px(5.)),
+                ..default()
+            },
+            background_color: Color::GRAY.into(),
+            ..default()
+        }
+    }
+}
+
+pub trait UiMenuSeparatorExt<'w, 's> {
+    fn menu_separator<'a>(&'a mut self) -> EntityCommands<'w, 's, 'a>;
+}
+
+impl<'w, 's> UiMenuSeparatorExt<'w, 's> for UiBuilder<'w, 's, '_> {
+    fn menu_separator<'a>(&'a mut self) -> EntityCommands<'w, 's, 'a> {
+        self.spawn(MenuSeparator::separator())
+    }
+}
+
+#[derive(Component, Debug, Default, Reflect)]
+#[reflect(Component)]
 pub struct MenuItemSeparator;
 
 impl MenuItemSeparator {

@@ -63,7 +63,7 @@ impl Default for Checkbox {
 }
 
 impl<'w, 's, 'a> Checkbox {
-    pub fn value(&self) -> bool {
+    pub fn checked(&self) -> bool {
         self.checked
     }
 

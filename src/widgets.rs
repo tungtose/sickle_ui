@@ -29,7 +29,10 @@ pub mod prelude {
         dropdown::UiDropdownExt,
         floating_panel::{FloatingPanelConfig, FloatingPanelLayout, UiFloatingPanelExt},
         label::{LabelConfig, UiLabelExt},
-        menu::{MenuConfig, MenuItemSeparator, UiMenuExt, UiMenuItemSeparatorExt},
+        menu::{
+            MenuConfig, MenuItemSeparator, MenuSeparator, UiMenuExt, UiMenuItemSeparatorExt,
+            UiMenuSeparatorExt,
+        },
         menu_item::{MenuItem, MenuItemConfig, MenuItemUpdate, UiMenuItemExt},
         radio_group::{RadioGroup, UiRadioGroupExt},
         row::{RowConfig, UiRowExt},
