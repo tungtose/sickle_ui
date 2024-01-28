@@ -33,7 +33,7 @@ fn update_toggle_menu_checkmark(
 ) {
     for (toggle, mut config) in &mut q_menu_items {
         if toggle.checked() {
-            config.leading_icon = asset_server.load("sickle://icons/details_menu.png").into();
+            config.leading_icon = asset_server.load("sickle://icons/checkmark.png").into();
         } else {
             config.leading_icon = None;
         }

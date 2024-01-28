@@ -101,9 +101,9 @@ fn update_menu_item_on_config_change(
         let trailing = config.trailing_icon.clone();
 
         if let Some(leading) = leading {
-            button.spawn(MenuItem::icon(leading));
+            button.spawn(MenuItem::leading_icon(leading));
         } else {
-            button.spawn(MenuItem::icon_spacer());
+            button.spawn(MenuItem::leading_icon_spacer());
         }
 
         if let Some(shortcut_text) = shortcut_text {
@@ -129,9 +129,9 @@ fn update_menu_item_on_config_change(
         }
 
         if let Some(trailing) = trailing {
-            button.spawn(MenuItem::icon(trailing));
+            button.spawn(MenuItem::trailing_icon(trailing));
         } else {
-            button.spawn(MenuItem::icon_spacer());
+            button.spawn(MenuItem::trailing_icon_spacer());
         }
     }
 }
@@ -150,6 +150,7 @@ pub struct MenuItemConfig {
     pub trailing_icon: Option<Handle<Image>>,
     pub alt_code: Option<KeyCode>,
     pub shortcut: Option<Vec<KeyCode>>,
+    pub is_submenu: bool,
 }
 
 impl MenuItem {
@@ -186,14 +187,14 @@ impl MenuItem {
                 tween: MenuItem::base_tween(),
                 ..default()
             },
-            MenuItem { interacted: false },
+            MenuItem::default(),
         )
     }
 
     fn shortcut() -> impl Bundle {
         NodeBundle {
             style: Style {
-                margin: UiRect::left(Val::Px(20.)),
+                margin: UiRect::left(Val::Px(50.)),
                 justify_content: JustifyContent::End,
                 flex_wrap: FlexWrap::NoWrap,
                 flex_grow: 2.,
@@ -203,20 +204,47 @@ impl MenuItem {
         }
     }
 
-    fn icon_spacer() -> impl Bundle {
+    fn leading_icon_spacer() -> impl Bundle {
         NodeBundle {
             style: Style {
                 width: Val::Px(12.),
+                margin: UiRect::right(Val::Px(5.)),
                 ..default()
             },
             ..default()
         }
     }
 
-    fn icon(texture: Handle<Image>) -> impl Bundle {
+    fn leading_icon(texture: Handle<Image>) -> impl Bundle {
         ImageBundle {
             style: Style {
                 width: Val::Px(12.),
+                aspect_ratio: (1.).into(),
+                margin: UiRect::right(Val::Px(5.)),
+                ..default()
+            },
+            image: UiImage::new(texture),
+            ..default()
+        }
+    }
+
+    fn trailing_icon_spacer() -> impl Bundle {
+        NodeBundle {
+            style: Style {
+                width: Val::Px(12.),
+                margin: UiRect::left(Val::Px(5.)),
+                ..default()
+            },
+            ..default()
+        }
+    }
+
+    fn trailing_icon(texture: Handle<Image>) -> impl Bundle {
+        ImageBundle {
+            style: Style {
+                width: Val::Px(12.),
+                aspect_ratio: (1.).into(),
+                margin: UiRect::left(Val::Px(5.)),
                 ..default()
             },
             image: UiImage::new(texture),

@@ -7,6 +7,7 @@ pub mod input_extension;
 pub mod interactions;
 pub mod scroll_interaction;
 pub mod ui_builder;
+pub mod ui_commands;
 pub mod widgets;
 
 use drag_interaction::DragInteractionPlugin;

@@ -5,6 +5,7 @@ use crate::{
     animated_interaction::{AnimatedInteraction, AnimationConfig},
     interactions::InteractiveBackground,
     ui_builder::UiBuilder,
+    ui_commands::{SetEntityDisplayExt, SetImageExt},
     FluxInteraction, TrackedInteraction,
 };
 
@@ -12,6 +13,8 @@ use super::{
     label::LabelConfig,
     prelude::{UiContainerExt, UiLabelExt},
 };
+
+const CHECK_MARK: &'static str = "sickle://icons/checkmark.png";
 
 pub struct CheckboxPlugin;
 
@@ -31,18 +34,14 @@ fn toggle_checkbox(
     }
 }
 
-fn update_checkbox(
-    q_checkboxes: Query<&Checkbox, Changed<Checkbox>>,
-    mut style: Query<&mut Style>,
-) {
+fn update_checkbox(q_checkboxes: Query<&Checkbox, Changed<Checkbox>>, mut commands: Commands) {
     for checkbox in &q_checkboxes {
-        if let Ok(mut target) = style.get_mut(checkbox.check_node) {
-            target.display = if checkbox.checked {
-                Display::Flex
-            } else {
-                Display::None
-            };
-        }
+        commands
+            .entity(checkbox.check_node)
+            .set_display(match checkbox.checked {
+                true => Display::Flex,
+                false => Display::None,
+            });
     }
 }
 
@@ -116,7 +115,7 @@ impl<'w, 's, 'a> Checkbox {
     }
 
     fn checkmark() -> impl Bundle {
-        NodeBundle {
+        ImageBundle {
             style: Style {
                 display: Display::None,
                 width: Val::Px(10.),
@@ -124,7 +123,6 @@ impl<'w, 's, 'a> Checkbox {
                 margin: UiRect::all(Val::Px(2.)),
                 ..default()
             },
-            background_color: Color::DARK_GRAY.into(),
             focus_policy: FocusPolicy::Pass,
             ..default()
         }
@@ -141,7 +139,9 @@ impl<'w, 's> UiCheckboxExt<'w, 's> for UiBuilder<'w, 's, '_> {
 
         let mut input = self.container(Checkbox::checkbox_container(), |container| {
             container.container(Checkbox::checkmark_background(), |checkmark_bg| {
-                check_node = checkmark_bg.container(Checkbox::checkmark(), |_| {}).id();
+                let mut check_mark = checkmark_bg.container(Checkbox::checkmark(), |_| {});
+                check_node = check_mark.id();
+                check_mark.set_image(CHECK_MARK);
             });
 
             if let Some(label) = label {
