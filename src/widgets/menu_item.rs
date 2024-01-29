@@ -6,10 +6,11 @@ use crate::{
     input_extension::{ShortcutTextExt, SymmetricKeysExt},
     interactions::InteractiveBackground,
     ui_builder::*,
+    ui_commands::{SetBackgroundColorExt, SetImageExt},
     FluxInteraction, FluxInteractionUpdate, TrackedInteraction,
 };
 
-use super::prelude::{LabelConfig, UiContainerExt, UiLabelExt};
+use super::prelude::{LabelConfig, SetLabelTextExt, UiContainerExt, UiLabelExt};
 
 pub struct MenuItemPlugin;
 
@@ -85,13 +86,10 @@ fn update_menu_item_on_change(mut q_menu_items: Query<&mut MenuItem, Changed<Men
 }
 
 fn update_menu_item_on_config_change(
-    q_menu_items: Query<(Entity, &MenuItemConfig), Changed<MenuItemConfig>>,
+    q_menu_items: Query<(&MenuItem, &MenuItemConfig), Changed<MenuItemConfig>>,
     mut commands: Commands,
 ) {
-    for (entity, config) in &q_menu_items {
-        let mut entity_commands = commands.entity(entity);
-        let mut button = entity_commands.despawn_descendants().ui_builder();
-
+    for (menu_item, config) in &q_menu_items {
         let name = config.name.clone();
         let shortcut_text: Option<String> = match &config.shortcut {
             Some(vec) => vec.shortcut_text().into(),
@@ -101,53 +99,71 @@ fn update_menu_item_on_config_change(
         let trailing = config.trailing_icon.clone();
 
         if let Some(leading) = leading {
-            button.spawn(MenuItem::leading_icon(leading));
+            commands
+                .entity(menu_item.leading)
+                .try_insert(UiImage::default())
+                .set_image(leading)
+                .set_background_color(Color::WHITE);
         } else {
-            button.spawn(MenuItem::leading_icon_spacer());
+            commands
+                .entity(menu_item.leading)
+                .remove::<UiImage>()
+                .set_background_color(Color::NONE);
         }
 
+        commands.entity(menu_item.label).set_label_text(name);
+
         if let Some(shortcut_text) = shortcut_text {
-            button.label(LabelConfig {
-                label: name,
-                margin: UiRect::horizontal(Val::Px(5.)),
-                ..default()
-            });
-            button.container(MenuItem::shortcut(), |shortcut| {
-                shortcut.label(LabelConfig {
-                    label: shortcut_text,
-                    margin: UiRect::horizontal(Val::Px(5.)),
-                    ..default()
-                });
-            });
+            commands
+                .entity(menu_item.shortcut)
+                .set_label_text(shortcut_text);
         } else {
-            button.label(LabelConfig {
-                label: name,
-                margin: UiRect::horizontal(Val::Px(5.)),
-                flex_grow: 1.,
-                ..default()
-            });
+            commands.entity(menu_item.shortcut).set_label_text("");
         }
 
         if let Some(trailing) = trailing {
-            button.spawn(MenuItem::trailing_icon(trailing));
+            commands
+                .entity(menu_item.trailing)
+                .try_insert(UiImage::default())
+                .set_image(trailing)
+                .set_background_color(Color::WHITE);
         } else {
-            button.spawn(MenuItem::trailing_icon_spacer());
+            commands
+                .entity(menu_item.trailing)
+                .remove::<UiImage>()
+                .set_background_color(Color::NONE);
+        }
+    }
+}
+
+#[derive(Component, Debug, Reflect)]
+#[reflect(Component)]
+pub struct MenuItem {
+    interacted: bool,
+    leading: Entity,
+    label: Entity,
+    shortcut: Entity,
+    trailing: Entity,
+}
+
+impl Default for MenuItem {
+    fn default() -> Self {
+        Self {
+            interacted: Default::default(),
+            leading: Entity::PLACEHOLDER,
+            label: Entity::PLACEHOLDER,
+            shortcut: Entity::PLACEHOLDER,
+            trailing: Entity::PLACEHOLDER,
         }
     }
 }
 
 #[derive(Component, Debug, Default, Reflect)]
 #[reflect(Component)]
-pub struct MenuItem {
-    interacted: bool,
-}
-
-#[derive(Component, Debug, Default, Reflect)]
-#[reflect(Component)]
 pub struct MenuItemConfig {
     pub name: String,
-    pub leading_icon: Option<Handle<Image>>,
-    pub trailing_icon: Option<Handle<Image>>,
+    pub leading_icon: Option<String>,
+    pub trailing_icon: Option<String>,
     pub alt_code: Option<KeyCode>,
     pub shortcut: Option<Vec<KeyCode>>,
     pub is_submenu: bool,
@@ -187,7 +203,6 @@ impl MenuItem {
                 tween: MenuItem::base_tween(),
                 ..default()
             },
-            MenuItem::default(),
         )
     }
 
@@ -204,42 +219,18 @@ impl MenuItem {
         }
     }
 
-    fn leading_icon_spacer() -> impl Bundle {
-        NodeBundle {
-            style: Style {
-                width: Val::Px(12.),
-                margin: UiRect::right(Val::Px(5.)),
-                ..default()
-            },
-            ..default()
-        }
-    }
-
-    fn leading_icon(texture: Handle<Image>) -> impl Bundle {
+    fn leading_icon() -> impl Bundle {
         ImageBundle {
             style: Style {
                 width: Val::Px(12.),
                 aspect_ratio: (1.).into(),
-                margin: UiRect::right(Val::Px(5.)),
-                ..default()
-            },
-            image: UiImage::new(texture),
-            ..default()
-        }
-    }
-
-    fn trailing_icon_spacer() -> impl Bundle {
-        NodeBundle {
-            style: Style {
-                width: Val::Px(12.),
-                margin: UiRect::left(Val::Px(5.)),
                 ..default()
             },
             ..default()
         }
     }
 
-    fn trailing_icon(texture: Handle<Image>) -> impl Bundle {
+    fn trailing_icon() -> impl Bundle {
         ImageBundle {
             style: Style {
                 width: Val::Px(12.),
@@ -247,7 +238,6 @@ impl MenuItem {
                 margin: UiRect::left(Val::Px(5.)),
                 ..default()
             },
-            image: UiImage::new(texture),
             ..default()
         }
     }
@@ -259,6 +249,40 @@ pub trait UiMenuItemExt<'w, 's> {
 
 impl<'w, 's> UiMenuItemExt<'w, 's> for UiBuilder<'w, 's, '_> {
     fn menu_item<'a>(&'a mut self, config: MenuItemConfig) -> EntityCommands<'w, 's, 'a> {
-        self.spawn((MenuItem::button(), config))
+        let mut leading = Entity::PLACEHOLDER;
+        let mut label = Entity::PLACEHOLDER;
+        let mut shortcut = Entity::PLACEHOLDER;
+        let mut trailing = Entity::PLACEHOLDER;
+
+        let mut item = self.container((MenuItem::button(), config), |menu_item| {
+            leading = menu_item.spawn(MenuItem::leading_icon()).id();
+            label = menu_item
+                .label(LabelConfig {
+                    label: "".into(),
+                    margin: UiRect::horizontal(Val::Px(5.)),
+                    ..default()
+                })
+                .id();
+            menu_item.container(MenuItem::shortcut(), |shortcut_container| {
+                shortcut = shortcut_container
+                    .label(LabelConfig {
+                        label: "".into(),
+                        margin: UiRect::horizontal(Val::Px(5.)),
+                        ..default()
+                    })
+                    .id();
+            });
+
+            trailing = menu_item.spawn(MenuItem::trailing_icon()).id();
+        });
+
+        item.insert(MenuItem {
+            leading,
+            label,
+            shortcut,
+            trailing,
+            ..default()
+        });
+        item
     }
 }

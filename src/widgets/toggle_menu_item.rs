@@ -28,12 +28,11 @@ fn update_toggle_menu_item_value(
 }
 
 fn update_toggle_menu_checkmark(
-    asset_server: Res<AssetServer>,
     mut q_menu_items: Query<(&ToggleMenuItem, &mut MenuItemConfig), Changed<ToggleMenuItem>>,
 ) {
     for (toggle, mut config) in &mut q_menu_items {
         if toggle.checked() {
-            config.leading_icon = asset_server.load("sickle://icons/checkmark.png").into();
+            config.leading_icon = "sickle://icons/checkmark.png".to_string().into();
         } else {
             config.leading_icon = None;
         }

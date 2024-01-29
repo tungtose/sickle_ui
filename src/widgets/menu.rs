@@ -5,6 +5,7 @@ use crate::{
     animated_interaction::{AnimatedInteraction, AnimationConfig},
     interactions::InteractiveBackground,
     ui_builder::*,
+    ui_commands::{SetBorderColorExt, SetEntityDisplayExt},
     FluxInteraction, FluxInteractionUpdate, TrackedInteraction,
 };
 
@@ -133,25 +134,23 @@ fn handle_item_interaction(
 }
 
 fn update_menu_container_visibility(
-    mut q_menus: Query<(Ref<Menu>, &mut BorderColor)>,
-    mut q_style: Query<&mut Style>,
+    q_menus: Query<(Entity, &Menu), Changed<Menu>>,
+    mut commands: Commands,
 ) {
-    for (menu, mut border_color) in &mut q_menus {
-        if !menu.is_changed() {
-            continue;
-        }
+    for (entity, menu) in &q_menus {
+        commands
+            .entity(menu.container)
+            .set_display(match menu.is_open {
+                true => Display::Flex,
+                false => Display::None,
+            });
 
-        let Ok(mut container_style) = q_style.get_mut(menu.container) else {
-            continue;
-        };
-
-        if menu.is_open {
-            container_style.display = Display::Flex;
-            border_color.0 = Color::WHITE.into();
-        } else if container_style.display != Display::None {
-            container_style.display = Display::None;
-            border_color.0 = Color::NONE.into();
-        }
+        commands
+            .entity(entity)
+            .set_border_color(match menu.is_open {
+                true => Color::WHITE,
+                false => Color::NONE,
+            });
     }
 }
 
@@ -160,7 +159,6 @@ fn update_menu_container_visibility(
 pub struct MenuConfig {
     pub name: String,
     pub alt_code: Option<KeyCode>,
-    //pub icon: Option<Handle<Image>>,
 }
 
 #[derive(Component, Debug, Reflect)]

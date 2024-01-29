@@ -1,12 +1,17 @@
 use bevy::{ecs::system::EntityCommands, prelude::*};
 
 use crate::{
-    ui_builder::UiBuilder, ui_commands::SetEntityDisplayExt, FluxInteraction, FluxInteractionUpdate,
+    ui_builder::{UiBuilder, UiBuilderExt},
+    ui_commands::SetEntityDisplayExt,
+    FluxInteraction, FluxInteractionUpdate, TrackedInteraction,
 };
 
-use super::prelude::{MenuItemConfig, UiContainerExt, UiMenuItemExt};
+use super::{
+    menu::MenuUpdate,
+    prelude::{MenuItemConfig, UiContainerExt, UiMenuItemExt},
+};
 
-const MENU_CONTAINER_Z_INDEX: i32 = 100000;
+const MENU_CONTAINER_Z_INDEX: i32 = 100001;
 
 pub struct SubmenuPlugin;
 
@@ -14,13 +19,16 @@ impl Plugin for SubmenuPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(
             Update,
-            update_submenu_visiblity.after(FluxInteractionUpdate),
+            update_submenu_visiblity
+                .after(FluxInteractionUpdate)
+                .before(MenuUpdate),
         );
     }
 }
 
 fn update_submenu_visiblity(
     q_submenus: Query<(Entity, &Submenu, &FluxInteraction), Changed<FluxInteraction>>,
+    q_containers: Query<&FluxInteraction>,
     mut commands: Commands,
 ) {
     let mut open: Option<Entity> = None;
@@ -36,27 +44,42 @@ fn update_submenu_visiblity(
         for (entity, submenu, _) in &q_submenus {
             commands
                 .entity(submenu.container)
-                .set_display(if entity == open {
-                    Display::Flex
-                } else {
-                    Display::None
+                .set_display(match entity == open {
+                    true => Display::Flex,
+                    false => Display::None,
                 });
         }
     } else {
         for (_, submenu, _) in &q_submenus {
-            commands
-                .entity(submenu.container)
-                .set_display(Display::None);
+            let Ok(container_interaction) = q_containers.get(submenu.container) else {
+                continue;
+            };
+
+            if *container_interaction == FluxInteraction::PointerEnter
+                || *container_interaction == FluxInteraction::Pressed
+            {
+                commands
+                    .entity(submenu.container)
+                    .set_display(Display::Flex);
+            } else {
+                commands
+                    .entity(submenu.container)
+                    .set_display(Display::None);
+            }
         }
     }
 }
 
 #[derive(Component, Clone, Debug, Default, Reflect)]
 #[reflect(Component)]
+pub struct SubmenuContainer;
+
+#[derive(Component, Clone, Debug, Default, Reflect)]
+#[reflect(Component)]
 pub struct SubmenuConfig {
     pub name: String,
     pub alt_code: Option<KeyCode>,
-    pub leading_icon: Option<Handle<Image>>,
+    pub leading_icon: Option<String>,
 }
 
 impl Into<MenuItemConfig> for SubmenuConfig {
@@ -65,6 +88,7 @@ impl Into<MenuItemConfig> for SubmenuConfig {
             name: self.name,
             alt_code: self.alt_code,
             leading_icon: self.leading_icon,
+            trailing_icon: "sickle://icons/submenu.png".to_string().into(),
             ..default()
         }
     }
@@ -85,35 +109,30 @@ impl Default for Submenu {
 }
 
 impl Submenu {
-    fn wrapper() -> impl Bundle {
+    fn menu_container() -> impl Bundle {
         (
             NodeBundle {
-                focus_policy: bevy::ui::FocusPolicy::Block,
+                style: Style {
+                    left: Val::Percent(100.),
+                    position_type: PositionType::Absolute,
+                    border: UiRect::px(1., 1., 1., 1.),
+                    padding: UiRect::px(5., 5., 5., 10.),
+                    margin: UiRect::px(-5., 0., -5., 0.),
+                    flex_direction: FlexDirection::Column,
+                    align_self: AlignSelf::FlexStart,
+                    align_items: AlignItems::Stretch,
+                    display: Display::None,
+                    ..default()
+                },
+                z_index: ZIndex::Global(MENU_CONTAINER_Z_INDEX),
+                background_color: Color::rgb(0.7, 0.6, 0.5).into(),
+                border_color: Color::WHITE.into(),
                 ..default()
             },
             Interaction::default(),
-            FluxInteraction::default(),
+            TrackedInteraction::default(),
+            SubmenuContainer,
         )
-    }
-
-    fn menu_container() -> impl Bundle {
-        NodeBundle {
-            style: Style {
-                left: Val::Percent(100.),
-                position_type: PositionType::Absolute,
-                border: UiRect::px(1., 1., 0., 1.),
-                padding: UiRect::px(5., 5., 5., 10.),
-                flex_direction: FlexDirection::Column,
-                align_self: AlignSelf::End,
-                align_items: AlignItems::Stretch,
-                display: Display::None,
-                ..default()
-            },
-            z_index: ZIndex::Global(MENU_CONTAINER_Z_INDEX),
-            background_color: Color::rgb(0.7, 0.6, 0.5).into(),
-            border_color: Color::WHITE.into(),
-            ..default()
-        }
     }
 }
 
@@ -131,16 +150,18 @@ impl<'w, 's> UiSubmenuExt<'w, 's> for UiBuilder<'w, 's, '_> {
         config: SubmenuConfig,
         spawn_items: impl FnOnce(&mut UiBuilder),
     ) -> EntityCommands<'w, 's, 'a> {
-        let mut container = Entity::PLACEHOLDER;
-        let mut wrapper = self.container(Submenu::wrapper(), |wrapper| {
-            wrapper.menu_item(config.clone().into());
-            container = wrapper
-                .container(Submenu::menu_container(), spawn_items)
-                .id();
-        });
+        let menu_id = self.menu_item(config.clone().into()).id();
+        let container = self
+            .commands()
+            .entity(menu_id)
+            .ui_builder()
+            .container(Submenu::menu_container(), spawn_items)
+            .id();
 
-        wrapper.insert((Submenu { container }, config));
+        self.commands()
+            .entity(menu_id)
+            .insert((Submenu { container }, config));
 
-        wrapper
+        self.commands().entity(menu_id)
     }
 }

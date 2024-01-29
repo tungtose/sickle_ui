@@ -89,10 +89,20 @@ impl Command for UpdateLabelText {
         let mut q_text = world.query::<&mut Text>();
         let mut q_config = world.query::<&LabelConfig>();
         let Ok(config) = q_config.get(world, self.entity) else {
+            warn!(
+                "Failed to set label text on entity {:?}: No LabelConfig component found!",
+                self.entity
+            );
+
             return;
         };
         let style = config.text_style();
         let Ok(mut text) = q_text.get_mut(world, self.entity) else {
+            warn!(
+                "Failed to set label text on entity {:?}: No Text component found!",
+                self.entity
+            );
+
             return;
         };
 
