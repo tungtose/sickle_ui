@@ -12,6 +12,7 @@ use super::{
 };
 
 const MENU_CONTAINER_Z_INDEX: i32 = 100001;
+const MENU_CONTAINER_FADE_TIMEOUT: f32 = 1.;
 
 pub struct SubmenuPlugin;
 
@@ -66,7 +67,7 @@ fn open_submenu_on_hover(
 
             container.is_open = true;
             state.is_locked = true;
-            state.timeout = 1.;
+            state.timeout = MENU_CONTAINER_FADE_TIMEOUT;
         } else if *interaction == FluxInteraction::PointerLeave {
             let Ok((_, mut state)) = q_containers.get_mut(submenu.container) else {
                 warn!("Submenu {:?} is missing its container", entity);
@@ -229,6 +230,7 @@ impl SubmenuContainer {
                 z_index: ZIndex::Global(MENU_CONTAINER_Z_INDEX),
                 background_color: Color::rgb(0.7, 0.6, 0.5).into(),
                 border_color: Color::WHITE.into(),
+                focus_policy: bevy::ui::FocusPolicy::Block,
                 ..default()
             },
             Interaction::default(),

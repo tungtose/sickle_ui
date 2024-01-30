@@ -228,6 +228,7 @@ impl Menu {
             z_index: ZIndex::Global(MENU_CONTAINER_Z_INDEX),
             background_color: Color::rgb(0.7, 0.6, 0.5).into(),
             border_color: Color::WHITE.into(),
+            focus_policy: bevy::ui::FocusPolicy::Block,
             ..default()
         }
     }
