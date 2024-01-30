@@ -192,6 +192,7 @@ impl MenuItem {
                     ..default()
                 },
                 background_color: Color::NONE.into(),
+                focus_policy: bevy::ui::FocusPolicy::Pass,
                 ..default()
             },
             TrackedInteraction::default(),
