@@ -1,6 +1,7 @@
 pub mod checkbox;
 pub mod column;
 pub mod container;
+pub mod context_menu;
 pub mod dropdown;
 pub mod floating_panel;
 pub mod label;
@@ -16,10 +17,10 @@ pub mod toggle_menu_item;
 use bevy::prelude::*;
 
 use self::{
-    checkbox::CheckboxPlugin, dropdown::DropdownPlugin, floating_panel::FloatingPanelPlugin,
-    menu::MenuPlugin, menu_item::MenuItemPlugin, radio_group::RadioGroupPlugin,
-    scroll_view::ScrollViewPlugin, slider::InputSliderPlugin, submenu::SubmenuPlugin,
-    toggle_menu_item::ToggleMenuItemPlugin,
+    checkbox::CheckboxPlugin, context_menu::ContextMenuPlugin, dropdown::DropdownPlugin,
+    floating_panel::FloatingPanelPlugin, menu::MenuPlugin, menu_item::MenuItemPlugin,
+    radio_group::RadioGroupPlugin, scroll_view::ScrollViewPlugin, slider::InputSliderPlugin,
+    submenu::SubmenuPlugin, toggle_menu_item::ToggleMenuItemPlugin,
 };
 
 pub mod prelude {
@@ -27,6 +28,7 @@ pub mod prelude {
         checkbox::{Checkbox, UiCheckboxExt},
         column::{ColumnConfig, UiColumnExt},
         container::UiContainerExt,
+        context_menu::{ContextMenuGenerator, GenerateContextMenu, ReflectContextMenuGenerator},
         dropdown::UiDropdownExt,
         floating_panel::{FloatingPanelConfig, FloatingPanelLayout, UiFloatingPanelExt},
         label::{LabelConfig, SetLabelTextExt, UiLabelExt},
@@ -50,6 +52,7 @@ impl Plugin for WidgetsPlugin {
     fn build(&self, app: &mut App) {
         app.add_plugins((
             CheckboxPlugin,
+            ContextMenuPlugin,
             DropdownPlugin,
             FloatingPanelPlugin,
             MenuPlugin,

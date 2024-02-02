@@ -10,24 +10,36 @@ use crate::{
     FluxInteraction, FluxInteractionUpdate, TrackedInteraction,
 };
 
-use super::prelude::{LabelConfig, SetLabelTextExt, UiContainerExt, UiLabelExt};
+use super::{
+    context_menu::ContextMenuUpdate,
+    menu::MenuUpdate,
+    prelude::{LabelConfig, SetLabelTextExt, UiContainerExt, UiLabelExt},
+    submenu::SubmenuUpdate,
+};
 
 pub struct MenuItemPlugin;
 
 impl Plugin for MenuItemPlugin {
     fn build(&self, app: &mut App) {
-        app.configure_sets(Update, MenuItemUpdate.after(FluxInteractionUpdate))
-            .add_systems(
-                Update,
-                (
-                    update_menu_item_on_change,
-                    update_menu_item_on_pressed,
-                    update_menu_item_on_key_press,
-                    update_menu_item_on_config_change,
-                )
-                    .chain()
-                    .in_set(MenuItemUpdate),
-            );
+        app.configure_sets(
+            Update,
+            MenuItemUpdate
+                .after(FluxInteractionUpdate)
+                .before(MenuUpdate)
+                .before(SubmenuUpdate)
+                .before(ContextMenuUpdate),
+        )
+        .add_systems(
+            Update,
+            (
+                update_menu_item_on_change,
+                update_menu_item_on_pressed,
+                update_menu_item_on_key_press,
+                update_menu_item_on_config_change,
+            )
+                .chain()
+                .in_set(MenuItemUpdate),
+        );
     }
 }
 

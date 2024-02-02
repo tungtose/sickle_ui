@@ -7,6 +7,7 @@ use crate::{
 };
 
 use super::{
+    context_menu::ContextMenuUpdate,
     menu::{Menu, MenuUpdate},
     prelude::{MenuItemConfig, UiContainerExt, UiMenuItemExt},
 };
@@ -18,7 +19,14 @@ pub struct SubmenuPlugin;
 
 impl Plugin for SubmenuPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(
+        app.configure_sets(
+            Update,
+            SubmenuUpdate
+                .after(FluxInteractionUpdate)
+                .before(MenuUpdate)
+                .before(ContextMenuUpdate),
+        )
+        .add_systems(
             Update,
             (
                 update_submenu_timeout,
@@ -28,11 +36,13 @@ impl Plugin for SubmenuPlugin {
                 update_submenu_container_visibility,
             )
                 .chain()
-                .after(FluxInteractionUpdate)
-                .before(MenuUpdate),
+                .in_set(SubmenuUpdate),
         );
     }
 }
+
+#[derive(SystemSet, Clone, Eq, Debug, Hash, PartialEq)]
+pub struct SubmenuUpdate;
 
 fn update_submenu_timeout(
     r_time: Res<Time>,

@@ -51,6 +51,7 @@ pub struct ToggleMenuItemConfig {
     pub name: String,
     pub alt_code: Option<KeyCode>,
     pub shortcut: Option<Vec<KeyCode>>,
+    pub initially_checked: bool,
 }
 
 impl ToggleMenuItem {
@@ -83,7 +84,12 @@ impl<'w, 's> UiToggleMenuItemExt<'w, 's> for UiBuilder<'w, 's, '_> {
         config: ToggleMenuItemConfig,
     ) -> EntityCommands<'w, 's, 'a> {
         let mut item = self.menu_item(config.clone().into());
-        item.insert((ToggleMenuItem::default(), config));
+        item.insert((
+            ToggleMenuItem {
+                checked: config.initially_checked,
+            },
+            config,
+        ));
 
         item
     }

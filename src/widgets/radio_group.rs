@@ -7,26 +7,43 @@ use crate::{
     animated_interaction::{AnimatedInteraction, AnimationConfig},
     interactions::InteractiveBackground,
     ui_builder::UiBuilder,
-    FluxInteraction, TrackedInteraction,
+    FluxInteraction, FluxInteractionUpdate, TrackedInteraction,
 };
 
-use super::prelude::{LabelConfig, UiContainerExt, UiLabelExt};
+use super::{
+    context_menu::ContextMenuUpdate,
+    menu::MenuUpdate,
+    prelude::{LabelConfig, UiContainerExt, UiLabelExt},
+    submenu::SubmenuUpdate,
+};
 
 pub struct RadioGroupPlugin;
 
 impl Plugin for RadioGroupPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(
+        app.configure_sets(
+            Update,
+            RadioGroupUpdate
+                .after(FluxInteractionUpdate)
+                .before(MenuUpdate)
+                .before(SubmenuUpdate)
+                .before(ContextMenuUpdate),
+        )
+        .add_systems(
             Update,
             (
                 toggle_radio_button,
                 update_radio_group_buttons,
                 update_radio_button,
             )
-                .chain(),
+                .chain()
+                .in_set(RadioGroupUpdate),
         );
     }
 }
+
+#[derive(SystemSet, Clone, Eq, Debug, Hash, PartialEq)]
+pub struct RadioGroupUpdate;
 
 fn toggle_radio_button(
     mut q_radio_buttons: Query<(&mut RadioButton, &FluxInteraction), Changed<FluxInteraction>>,
@@ -34,7 +51,7 @@ fn toggle_radio_button(
     mut q_group: Query<&mut RadioGroup>,
 ) {
     for (mut radio_button, interaction) in &mut q_radio_buttons {
-        if *interaction == FluxInteraction::Released {
+        if *interaction == FluxInteraction::Pressed {
             let mut changed = false;
 
             if radio_button.checked
@@ -102,18 +119,12 @@ fn update_radio_button(
 #[derive(Component, Debug, Reflect)]
 #[reflect(Component)]
 pub struct RadioGroup {
-    selected: Option<usize>,
+    pub selected: Option<usize>,
 }
 
 impl Default for RadioGroup {
     fn default() -> Self {
         Self { selected: None }
-    }
-}
-
-impl<'w, 's, 'a> RadioGroup {
-    pub fn value(&self) -> Option<usize> {
-        self.selected
     }
 }
 
