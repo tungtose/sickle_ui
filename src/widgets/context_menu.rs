@@ -2,7 +2,6 @@ use bevy::{ecs::system::CommandQueue, prelude::*, window::PrimaryWindow};
 
 use crate::{
     ui_builder::{UiBuilder, UiBuilderExt},
-    ui_commands::SetEntityDisplayExt,
     FluxInteractionUpdate,
 };
 
@@ -16,11 +15,11 @@ impl Plugin for ContextMenuPlugin {
             .add_systems(
                 Update,
                 (
+                    update_context_menu_vertical_position,
                     handle_click_or_touch,
                     delete_closed_context_menu,
                     generate_context_menu,
                     position_added_context_menu,
-                    update_context_menu_vertical_position,
                 )
                     .chain()
                     .in_set(ContextMenuUpdate),
@@ -208,7 +207,6 @@ fn position_added_context_menu(
     q_window: Query<&Window, With<PrimaryWindow>>,
     //r_touches: Res<Touches>,
     mut q_style: Query<&mut Style>,
-    mut commands: Commands,
 ) {
     let Ok(window) = q_window.get_single() else {
         return;
@@ -231,12 +229,14 @@ fn position_added_context_menu(
 
         style.top = Val::Px(position.y);
         style.left = Val::Px(position.x);
-        commands.entity(entity).set_display(Display::Flex);
     }
 }
 
 fn update_context_menu_vertical_position(
-    mut q_node_style: Query<(&Node, &Transform, &mut Style), (With<ContextMenu>, Changed<Node>)>,
+    mut q_node_style: Query<
+        (&Node, &Transform, &mut Style, &mut Visibility),
+        (With<ContextMenu>, Changed<Node>),
+    >,
     q_window: Query<&Window, With<PrimaryWindow>>,
 ) {
     let Ok(window) = q_window.get_single() else {
@@ -244,8 +244,9 @@ fn update_context_menu_vertical_position(
     };
 
     let resolution = Vec2::new(window.resolution.width(), window.resolution.height());
-    for (node, transform, mut style) in &mut q_node_style {
+    for (node, transform, mut style, mut visibility) in &mut q_node_style {
         let size = node.size();
+
         let position = transform.translation.truncate() - (size / 2.);
 
         if position.x + size.x > resolution.x {
@@ -254,6 +255,8 @@ fn update_context_menu_vertical_position(
         if position.y + size.y > resolution.y {
             style.top = Val::Px(0f32.max(position.y - size.y));
         }
+
+        *visibility = Visibility::Visible;
     }
 }
 
@@ -312,17 +315,18 @@ impl ContextMenu {
         (
             NodeBundle {
                 style: Style {
+                    max_height: Val::Percent(100.),
                     position_type: PositionType::Absolute,
                     border: UiRect::px(1., 1., 1., 1.),
                     padding: UiRect::px(5., 5., 5., 10.),
                     flex_direction: FlexDirection::Column,
-                    display: Display::None,
                     ..default()
                 },
                 z_index: ZIndex::Global(MENU_CONTAINER_Z_INDEX),
                 background_color: Color::rgb(0.7, 0.6, 0.5).into(),
                 border_color: Color::WHITE.into(),
                 focus_policy: bevy::ui::FocusPolicy::Block,
+                visibility: Visibility::Hidden,
                 ..default()
             },
             Interaction::default(),
