@@ -8,14 +8,18 @@ pub struct ToggleMenuItemPlugin;
 
 impl Plugin for ToggleMenuItemPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(
-            Update,
-            (update_toggle_menu_item_value, update_toggle_menu_checkmark)
-                .chain()
-                .after(MenuItemUpdate),
-        );
+        app.configure_sets(Update, ToggleMenuItemUpdate.after(MenuItemUpdate))
+            .add_systems(
+                Update,
+                (update_toggle_menu_item_value, update_toggle_menu_checkmark)
+                    .chain()
+                    .in_set(ToggleMenuItemUpdate),
+            );
     }
 }
+
+#[derive(SystemSet, Clone, Eq, Debug, Hash, PartialEq)]
+pub struct ToggleMenuItemUpdate;
 
 fn update_toggle_menu_item_value(
     mut q_menu_items: Query<(&mut ToggleMenuItem, &MenuItem), Changed<MenuItem>>,
@@ -31,7 +35,7 @@ fn update_toggle_menu_checkmark(
     mut q_menu_items: Query<(&ToggleMenuItem, &mut MenuItemConfig), Changed<ToggleMenuItem>>,
 ) {
     for (toggle, mut config) in &mut q_menu_items {
-        if toggle.checked() {
+        if toggle.checked {
             config.leading_icon = "sickle://icons/checkmark.png".to_string().into();
         } else {
             config.leading_icon = None;
@@ -42,7 +46,7 @@ fn update_toggle_menu_checkmark(
 #[derive(Component, Debug, Default, Reflect)]
 #[reflect(Component)]
 pub struct ToggleMenuItem {
-    checked: bool,
+    pub checked: bool,
 }
 
 #[derive(Component, Clone, Debug, Default, Reflect)]
@@ -52,12 +56,6 @@ pub struct ToggleMenuItemConfig {
     pub alt_code: Option<KeyCode>,
     pub shortcut: Option<Vec<KeyCode>>,
     pub initially_checked: bool,
-}
-
-impl ToggleMenuItem {
-    pub fn checked(&self) -> bool {
-        self.checked
-    }
 }
 
 impl Into<MenuItemConfig> for ToggleMenuItemConfig {

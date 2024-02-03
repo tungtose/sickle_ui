@@ -23,16 +23,20 @@ impl Plugin for ContextMenuPlugin {
                 )
                     .chain()
                     .in_set(ContextMenuUpdate),
-            );
+            )
+            .add_systems(PostUpdate, delete_orphaned_contex_menus);
     }
 }
 
 // TODO: Handle long press on touch
 fn handle_click_or_touch(
     r_mouse: Res<Input<MouseButton>>,
+    r_context_menu: Query<&Interaction, (With<ContextMenu>, Changed<Interaction>)>,
     mut q_interacted: Query<(Entity, &Interaction, &mut GenerateContextMenu)>,
     mut commands: Commands,
 ) {
+    let mut close_all = false;
+
     if r_mouse.just_pressed(MouseButton::Right) {
         let mut open: Option<Entity> = None;
         for (entity, interaction, _) in &q_interacted {
@@ -56,14 +60,24 @@ fn handle_click_or_touch(
                 }
             }
         } else {
-            info!("No context menu");
-            for (_, _, mut gen_menu) in &mut q_interacted {
-                if gen_menu.is_open {
-                    gen_menu.is_open = false;
-                }
-            }
+            close_all = true;
         }
     } else if r_mouse.any_just_pressed([MouseButton::Left, MouseButton::Middle]) {
+        let mut on_context_menu = false;
+        for interaction in &r_context_menu {
+            if *interaction == Interaction::Pressed {
+                on_context_menu = true;
+                break;
+            }
+        }
+        if !on_context_menu {
+            close_all = true;
+        }
+    } else if r_mouse.any_just_released([MouseButton::Left, MouseButton::Middle]) {
+        close_all = true;
+    }
+
+    if close_all {
         for (_, _, mut gen_menu) in &mut q_interacted {
             if gen_menu.is_open {
                 gen_menu.is_open = false;
@@ -216,6 +230,17 @@ fn position_added_context_menu(
     }
 }
 
+fn delete_orphaned_contex_menus(
+    q_context_menus: Query<(Entity, &ContextMenu)>,
+    mut commands: Commands,
+) {
+    for (entity, context_menu) in &q_context_menus {
+        if commands.get_entity(context_menu.context).is_none() {
+            commands.entity(entity).despawn_recursive();
+        }
+    }
+}
+
 #[derive(SystemSet, Clone, Eq, Debug, Hash, PartialEq)]
 pub struct ContextMenuUpdate;
 
@@ -257,20 +282,23 @@ impl ContextMenu {
     }
 
     fn frame() -> impl Bundle {
-        NodeBundle {
-            style: Style {
-                position_type: PositionType::Absolute,
-                border: UiRect::px(1., 1., 1., 1.),
-                padding: UiRect::px(5., 5., 5., 10.),
-                flex_direction: FlexDirection::Column,
-                display: Display::None,
+        (
+            NodeBundle {
+                style: Style {
+                    position_type: PositionType::Absolute,
+                    border: UiRect::px(1., 1., 1., 1.),
+                    padding: UiRect::px(5., 5., 5., 10.),
+                    flex_direction: FlexDirection::Column,
+                    display: Display::None,
+                    ..default()
+                },
+                z_index: ZIndex::Global(MENU_CONTAINER_Z_INDEX),
+                background_color: Color::rgb(0.7, 0.6, 0.5).into(),
+                border_color: Color::WHITE.into(),
+                focus_policy: bevy::ui::FocusPolicy::Block,
                 ..default()
             },
-            z_index: ZIndex::Global(MENU_CONTAINER_Z_INDEX),
-            background_color: Color::rgb(0.7, 0.6, 0.5).into(),
-            border_color: Color::WHITE.into(),
-            focus_policy: bevy::ui::FocusPolicy::Block,
-            ..default()
-        }
+            Interaction::default(),
+        )
     }
 }

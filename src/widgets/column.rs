@@ -8,6 +8,7 @@ use super::prelude::UiContainerExt;
 pub struct ColumnConfig {
     pub width: Val,
     pub background_color: Color,
+    pub border_color: Color,
 }
 
 impl ColumnConfig {
@@ -20,6 +21,7 @@ impl ColumnConfig {
                 ..default()
             },
             background_color: self.background_color.into(),
+            border_color: self.border_color.into(),
             ..default()
         }
     }

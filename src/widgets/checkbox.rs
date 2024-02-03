@@ -48,7 +48,7 @@ fn update_checkbox(q_checkboxes: Query<&Checkbox, Changed<Checkbox>>, mut comman
 #[derive(Component, Debug, Reflect)]
 #[reflect(Component)]
 pub struct Checkbox {
-    checked: bool,
+    pub checked: bool,
     check_node: Entity,
 }
 
@@ -62,10 +62,6 @@ impl Default for Checkbox {
 }
 
 impl<'w, 's, 'a> Checkbox {
-    pub fn checked(&self) -> bool {
-        self.checked
-    }
-
     fn base_tween() -> AnimationConfig {
         AnimationConfig {
             duration: 0.1,
