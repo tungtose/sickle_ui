@@ -20,6 +20,7 @@ impl Plugin for ContextMenuPlugin {
                     delete_closed_context_menu,
                     generate_context_menu,
                     position_added_context_menu,
+                    update_context_menu_vertical_position,
                 )
                     .chain()
                     .in_set(ContextMenuUpdate),
@@ -209,7 +210,11 @@ fn position_added_context_menu(
     mut q_style: Query<&mut Style>,
     mut commands: Commands,
 ) {
-    let position = q_window.single().cursor_position();
+    let Ok(window) = q_window.get_single() else {
+        return;
+    };
+
+    let position = window.cursor_position();
     // if position.is_none() {
     //     position = r_touches.first_pressed_position();
     // }
@@ -227,6 +232,28 @@ fn position_added_context_menu(
         style.top = Val::Px(position.y);
         style.left = Val::Px(position.x);
         commands.entity(entity).set_display(Display::Flex);
+    }
+}
+
+fn update_context_menu_vertical_position(
+    mut q_node_style: Query<(&Node, &Transform, &mut Style), (With<ContextMenu>, Changed<Node>)>,
+    q_window: Query<&Window, With<PrimaryWindow>>,
+) {
+    let Ok(window) = q_window.get_single() else {
+        return;
+    };
+
+    let resolution = Vec2::new(window.resolution.width(), window.resolution.height());
+    for (node, transform, mut style) in &mut q_node_style {
+        let size = node.size();
+        let position = transform.translation.truncate() - (size / 2.);
+
+        if position.x + size.x > resolution.x {
+            style.left = Val::Px(0f32.max(position.x - size.x));
+        }
+        if position.y + size.y > resolution.y {
+            style.top = Val::Px(0f32.max(position.y - size.y));
+        }
     }
 }
 
