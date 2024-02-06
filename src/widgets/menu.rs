@@ -212,25 +212,28 @@ impl Menu {
     }
 
     fn container() -> impl Bundle {
-        NodeBundle {
-            style: Style {
-                top: Val::Px(22.),
-                left: Val::Px(-1.),
-                position_type: PositionType::Absolute,
-                border: UiRect::px(1., 1., 0., 1.),
-                padding: UiRect::px(5., 5., 5., 10.),
-                flex_direction: FlexDirection::Column,
-                align_self: AlignSelf::End,
-                align_items: AlignItems::Stretch,
-                display: Display::None,
+        (
+            NodeBundle {
+                style: Style {
+                    top: Val::Px(22.),
+                    left: Val::Px(-1.),
+                    position_type: PositionType::Absolute,
+                    border: UiRect::px(1., 1., 0., 1.),
+                    padding: UiRect::px(5., 5., 5., 10.),
+                    flex_direction: FlexDirection::Column,
+                    align_self: AlignSelf::End,
+                    align_items: AlignItems::Stretch,
+                    display: Display::None,
+                    ..default()
+                },
+                z_index: ZIndex::Global(MENU_CONTAINER_Z_INDEX),
+                background_color: Color::rgb(0.7, 0.6, 0.5).into(),
+                border_color: Color::WHITE.into(),
+                focus_policy: bevy::ui::FocusPolicy::Block,
                 ..default()
             },
-            z_index: ZIndex::Global(MENU_CONTAINER_Z_INDEX),
-            background_color: Color::rgb(0.7, 0.6, 0.5).into(),
-            border_color: Color::WHITE.into(),
-            focus_policy: bevy::ui::FocusPolicy::Block,
-            ..default()
-        }
+            Interaction::default(),
+        )
     }
 }
 

@@ -24,7 +24,7 @@ impl Plugin for ContextMenuPlugin {
                     .chain()
                     .in_set(ContextMenuUpdate),
             )
-            .add_systems(PostUpdate, delete_orphaned_contex_menus);
+            .add_systems(PostUpdate, delete_orphaned_context_menus);
     }
 }
 
@@ -260,7 +260,7 @@ fn update_context_menu_vertical_position(
     }
 }
 
-fn delete_orphaned_contex_menus(
+fn delete_orphaned_context_menus(
     q_context_menus: Query<(Entity, &ContextMenu)>,
     mut commands: Commands,
 ) {

@@ -2,8 +2,8 @@ use bevy::{ecs::system::EntityCommands, prelude::*};
 
 use crate::{
     ui_builder::{UiBuilder, UiBuilderExt},
-    ui_commands::SetEntityDisplayExt,
-    FluxInteraction, FluxInteractionUpdate, TrackedInteraction,
+    ui_commands::{SetBackgroundColorExt, SetEntityDisplayExt},
+    FluxInteraction, FluxInteractionStopwatch, FluxInteractionUpdate, TrackedInteraction,
 };
 
 use super::{
@@ -14,6 +14,7 @@ use super::{
 
 const MENU_CONTAINER_Z_INDEX: i32 = 100001;
 const MENU_CONTAINER_FADE_TIMEOUT: f32 = 1.;
+const MENU_CONTAINER_SWITCH_TIMEOUT: f32 = 0.3;
 
 pub struct SubmenuPlugin;
 
@@ -29,11 +30,14 @@ impl Plugin for SubmenuPlugin {
         .add_systems(
             Update,
             (
+                unlock_submenu_container_on_menu_interaction,
                 update_submenu_timeout,
                 open_submenu_on_hover,
                 close_submenus_on_menu_change,
                 update_open_submenu_containers,
                 update_submenu_container_visibility,
+                update_submenu_state,
+                update_submenu_style,
             )
                 .chain()
                 .in_set(SubmenuUpdate),
@@ -43,6 +47,27 @@ impl Plugin for SubmenuPlugin {
 
 #[derive(SystemSet, Clone, Eq, Debug, Hash, PartialEq)]
 pub struct SubmenuUpdate;
+
+fn unlock_submenu_container_on_menu_interaction(
+    q_external_interaction: Query<Ref<Interaction>>,
+    mut q_containers: Query<(&SubmenuContainer, &mut SubmenuContainerState)>,
+) {
+    for (container, mut state) in &mut q_containers {
+        if !container.is_open || !state.is_locked {
+            continue;
+        }
+
+        if let Some(external_container) = container.external_container {
+            let Ok(interaction) = q_external_interaction.get(external_container) else {
+                continue;
+            };
+
+            if interaction.is_changed() {
+                state.is_locked = false;
+            }
+        }
+    }
+}
 
 fn update_submenu_timeout(
     r_time: Res<Time>,
@@ -55,6 +80,7 @@ fn update_submenu_timeout(
     for (mut container, mut state, interaction) in &mut q_submenus {
         if *interaction == FluxInteraction::PointerEnter {
             state.is_locked = true;
+            state.timeout = MENU_CONTAINER_FADE_TIMEOUT;
         } else if !state.is_locked && state.timeout > 0. {
             state.timeout -= r_time.delta_seconds();
             if container.is_open && state.timeout < 0. {
@@ -65,26 +91,48 @@ fn update_submenu_timeout(
 }
 
 fn open_submenu_on_hover(
-    q_submenus: Query<(Entity, &Submenu, &FluxInteraction), Changed<FluxInteraction>>,
-    mut q_containers: Query<(&mut SubmenuContainer, &mut SubmenuContainerState)>,
+    q_submenus: Query<(
+        Entity,
+        &Submenu,
+        &FluxInteraction,
+        &FluxInteractionStopwatch,
+    )>,
+    mut q_containers: Query<(Entity, &mut SubmenuContainer, &mut SubmenuContainerState)>,
 ) {
-    for (entity, submenu, interaction) in &q_submenus {
+    let mut opened: Option<(Entity, Option<Entity>)> = None;
+    for (entity, submenu, interaction, stopwatch) in &q_submenus {
         if *interaction == FluxInteraction::PointerEnter {
-            let Ok((mut container, mut state)) = q_containers.get_mut(submenu.container) else {
+            let Ok((entity, mut container, mut state)) = q_containers.get_mut(submenu.container)
+            else {
                 warn!("Submenu {:?} is missing its container", entity);
                 continue;
             };
 
-            container.is_open = true;
-            state.is_locked = true;
-            state.timeout = MENU_CONTAINER_FADE_TIMEOUT;
-        } else if *interaction == FluxInteraction::PointerLeave {
-            let Ok((_, mut state)) = q_containers.get_mut(submenu.container) else {
-                warn!("Submenu {:?} is missing its container", entity);
+            if container.is_open {
                 continue;
-            };
+            }
 
-            state.is_locked = false;
+            // Open submenu once hovered enough
+            if stopwatch.0.elapsed_secs() > MENU_CONTAINER_SWITCH_TIMEOUT {
+                container.is_open = true;
+                state.is_locked = true;
+                state.timeout = MENU_CONTAINER_FADE_TIMEOUT;
+
+                opened = (entity, container.external_container).into();
+            }
+        }
+    }
+
+    // Force close open siblings after submenu is hovered enough
+    if let Some((opened_container, external_container)) = opened {
+        for (entity, mut container, mut state) in &mut q_containers {
+            if container.is_open
+                && container.external_container == external_container
+                && entity != opened_container
+            {
+                container.is_open = false;
+                state.is_locked = false;
+            }
         }
     }
 }
@@ -135,11 +183,11 @@ fn update_open_submenu_containers(world: &mut World) {
     }
 
     for entity in sibling_containers.iter() {
-        close_containers_of(world, Some(*entity));
+        close_containers_of(world, *entity);
     }
 
     for entity in containers_closed.iter() {
-        close_containers_of(world, Some(*entity));
+        close_containers_of(world, *entity);
     }
 }
 
@@ -156,20 +204,43 @@ fn update_submenu_container_visibility(
     }
 }
 
-fn close_containers_of(world: &mut World, external: Option<Entity>) {
+fn update_submenu_state(
+    mut q_submenus: Query<&mut Submenu>,
+    q_submenu_containers: Query<&SubmenuContainer, Changed<SubmenuContainer>>,
+) {
+    for mut submenu in &mut q_submenus {
+        if let Ok(container) = q_submenu_containers.get(submenu.container) {
+            if submenu.is_open != container.is_open {
+                submenu.is_open = container.is_open;
+            }
+        }
+    }
+}
+
+fn update_submenu_style(q_submenus: Query<(Entity, Ref<Submenu>)>, mut commands: Commands) {
+    for (entity, submenu) in &q_submenus {
+        if submenu.is_open {
+            commands.entity(entity).set_background_color(Color::BISQUE);
+        } else if submenu.is_changed() {
+            commands.entity(entity).set_background_color(Color::NONE);
+        }
+    }
+}
+
+fn close_containers_of(world: &mut World, external: Entity) {
     let mut q_all_containers = world.query::<(Entity, &mut SubmenuContainer)>();
     let mut containers_closed: Vec<Entity> =
         Vec::with_capacity(q_all_containers.iter(&world).count());
 
     for (entity, mut container) in q_all_containers.iter_mut(world) {
-        if container.external_container == external && container.is_open {
+        if container.external_container == external.into() && container.is_open {
             container.is_open = false;
             containers_closed.push(entity);
         }
     }
 
     for entity in containers_closed.iter() {
-        close_containers_of(world, Some(*entity));
+        close_containers_of(world, *entity);
     }
 }
 
@@ -210,13 +281,19 @@ impl Into<MenuItemConfig> for SubmenuConfig {
 #[derive(Component, Debug, Reflect)]
 #[reflect(Component)]
 pub struct Submenu {
+    is_open: bool,
+    is_focused: bool,
     container: Entity,
+    external_container: Option<Entity>,
 }
 
 impl Default for Submenu {
     fn default() -> Self {
         Self {
+            is_open: false,
+            is_focused: false,
             container: Entity::PLACEHOLDER,
+            external_container: None,
         }
     }
 }
@@ -283,9 +360,14 @@ impl<'w, 's> UiSubmenuExt<'w, 's> for UiBuilder<'w, 's, '_> {
             )
             .id();
 
-        self.commands()
-            .entity(menu_id)
-            .insert((Submenu { container }, config));
+        self.commands().entity(menu_id).insert((
+            Submenu {
+                container,
+                external_container,
+                ..default()
+            },
+            config,
+        ));
 
         self.commands().entity(menu_id)
     }

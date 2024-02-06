@@ -21,6 +21,7 @@ impl Plugin for FluxInteractionPlugin {
     }
 }
 
+// TODO: calculate value based on theme tween lengths and submenu timings
 #[derive(Resource, Clone, Debug, Reflect)]
 pub struct FluxInteractionConfig {
     pub max_interaction_duration: f32,
