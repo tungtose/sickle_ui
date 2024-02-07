@@ -5,6 +5,8 @@ use crate::{
     FluxInteractionUpdate,
 };
 
+use super::prelude::UiMenuItemSeparatorExt;
+
 const MENU_CONTAINER_Z_INDEX: i32 = 100002;
 
 pub struct ContextMenuPlugin;
@@ -120,7 +122,7 @@ fn generate_context_menu<'w, 's, 'a>(world: &mut World) {
 
     let entity_ref = world.entity(entity);
     let type_registry = world.resource::<AppTypeRegistry>().read();
-    let generators: Vec<&dyn ContextMenuGenerator> = world
+    let mut generators: Vec<&dyn ContextMenuGenerator> = world
         .entity(entity)
         .archetype()
         .components()
@@ -179,6 +181,8 @@ fn generate_context_menu<'w, 's, 'a>(world: &mut World) {
         return;
     }
 
+    generators.sort_by_key(|g| g.placement_index());
+
     let mut queue = CommandQueue::default();
     let mut commands = Commands::new(&mut queue, world);
 
@@ -187,7 +191,16 @@ fn generate_context_menu<'w, 's, 'a>(world: &mut World) {
         .spawn((ContextMenu::frame(), ContextMenu { context: entity }))
         .id();
 
+    let mut last_index = 0;
     for generator in generators {
+        if generator.placement_index() > last_index + 1 {
+            commands
+                .entity(container_id)
+                .ui_builder()
+                .menu_item_separator();
+        }
+        last_index = generator.placement_index();
+
         generator.build_context_menu(entity, &mut commands.entity(container_id).ui_builder());
     }
 
@@ -277,6 +290,7 @@ pub struct ContextMenuUpdate;
 #[reflect_trait]
 pub trait ContextMenuGenerator {
     fn build_context_menu(&self, context: Entity, container: &mut UiBuilder);
+    fn placement_index(&self) -> usize;
 }
 
 #[derive(Component, Debug, Default, Reflect)]
