@@ -9,6 +9,7 @@ use super::prelude::UiMenuItemSeparatorExt;
 
 const MENU_CONTAINER_Z_INDEX: i32 = 100002;
 
+// TODO: Implement scroll container and up/down arrows when content larger than screen
 pub struct ContextMenuPlugin;
 
 impl Plugin for ContextMenuPlugin {
@@ -33,7 +34,7 @@ impl Plugin for ContextMenuPlugin {
 // TODO: Handle long press on touch
 fn handle_click_or_touch(
     r_mouse: Res<Input<MouseButton>>,
-    r_context_menu: Query<&Interaction, (With<ContextMenu>, Changed<Interaction>)>,
+    q_context_menu: Query<&Interaction, (With<ContextMenu>, Changed<Interaction>)>,
     mut q_interacted: Query<(Entity, &Interaction, &mut GenerateContextMenu)>,
     mut commands: Commands,
 ) {
@@ -66,7 +67,7 @@ fn handle_click_or_touch(
         }
     } else if r_mouse.any_just_pressed([MouseButton::Left, MouseButton::Middle]) {
         let mut on_context_menu = false;
-        for interaction in &r_context_menu {
+        for interaction in &q_context_menu {
             if *interaction == Interaction::Pressed {
                 on_context_menu = true;
                 break;

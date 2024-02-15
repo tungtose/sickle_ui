@@ -16,6 +16,9 @@ const MENU_CONTAINER_Z_INDEX: i32 = 100001;
 const MENU_CONTAINER_FADE_TIMEOUT: f32 = 1.;
 const MENU_CONTAINER_SWITCH_TIMEOUT: f32 = 0.3;
 
+// TODO: Add vertically scrollable container and height constraint
+// TODO: Best effort position submenu within window bounds
+// TODO: Unparent container
 pub struct SubmenuPlugin;
 
 impl Plugin for SubmenuPlugin {

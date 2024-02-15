@@ -1,27 +1,30 @@
 use bevy::{ecs::system::EntityCommands, prelude::*};
 
-use crate::ui_builder::*;
+use crate::{
+    ui_builder::*,
+    ui_commands::{SetBackgroundColorExt, SetEntityWidthExt},
+};
 
 use super::prelude::UiContainerExt;
+
+#[derive(Component, Debug, Default, Reflect)]
+#[reflect(Component)]
+pub struct Column;
 
 #[derive(Debug, Default)]
 pub struct ColumnConfig {
     pub width: Val,
     pub background_color: Color,
-    pub border_color: Color,
 }
 
-impl ColumnConfig {
-    fn frame(&self) -> impl Bundle {
+impl Column {
+    fn frame() -> impl Bundle {
         NodeBundle {
             style: Style {
-                width: self.width,
                 height: Val::Percent(100.),
                 flex_direction: FlexDirection::Column,
                 ..default()
             },
-            background_color: self.background_color.into(),
-            border_color: self.border_color.into(),
             ..default()
         }
     }
@@ -41,6 +44,15 @@ impl<'w, 's> UiColumnExt<'w, 's> for UiBuilder<'w, 's, '_> {
         config: ColumnConfig,
         spawn_children: impl FnOnce(&mut UiBuilder),
     ) -> EntityCommands<'w, 's, 'a> {
-        self.container(config.frame(), spawn_children)
+        let column = self
+            .container((Column::frame(), Column), spawn_children)
+            .id();
+
+        self.commands()
+            .entity(column)
+            .set_width(config.width)
+            .set_background_color(config.background_color);
+
+        self.commands().entity(column)
     }
 }

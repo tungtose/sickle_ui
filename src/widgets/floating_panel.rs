@@ -1,25 +1,22 @@
-use bevy::{
-    ecs::system::EntityCommands,
-    prelude::*,
-    window::{PrimaryWindow, WindowResized},
-};
-use sickle_math::ease::Ease;
+use bevy::window::PrimaryWindow;
+use bevy::{ecs::system::EntityCommands, prelude::*, window::WindowResized};
 
 use super::prelude::{LabelConfig, UiContainerExt, UiLabelExt};
 use super::prelude::{SetLabelTextExt, UiScrollViewExt};
+use crate::resize_interaction::ResizeHandle;
 use crate::{
-    animated_interaction::{AnimatedInteraction, AnimationConfig},
     drag_interaction::{DragState, Draggable, DraggableUpdate},
-    interactions::InteractiveBackground,
+    resize_interaction::ResizeDirection,
     scroll_interaction::ScrollAxis,
     ui_builder::UiBuilder,
     ui_commands::SetEntityDisplayExt,
-    FluxInteraction, FluxInteractionUpdate, TrackedInteraction,
+    FluxInteractionUpdate, TrackedInteraction,
 };
 
 const MIN_PANEL_SIZE: Vec2 = Vec2 { x: 150., y: 100. };
 const MIN_FLOATING_PANEL_Z_INDEX: usize = 1000;
 const PRIORITY_FLOATING_PANEL_Z_INDEX: usize = 10000;
+const WINDOW_RESIZE_PADDING: f32 = 20.;
 
 pub struct FloatingPanelPlugin;
 
@@ -30,10 +27,9 @@ impl Plugin for FloatingPanelPlugin {
             (
                 index_floating_panel.run_if(panel_added),
                 process_panel_config_update.before(FluxInteractionUpdate),
-                update_cursor_on_resize_handles.after(FluxInteractionUpdate),
                 update_panel_size_on_resize.after(DraggableUpdate),
                 update_panel_on_title_drag.after(DraggableUpdate),
-                handle_window_resize,
+                handle_window_resize.run_if(window_resized),
                 update_panel_layout,
             )
                 .chain(),
@@ -102,62 +98,15 @@ fn process_panel_config_update(
     }
 }
 
-fn update_cursor_on_resize_handles(
-    q_flux: Query<(&FloatingPanelResizeHandle, &FluxInteraction), Changed<FluxInteraction>>,
-    mut q_window: Query<&mut Window, With<PrimaryWindow>>,
-    mut locked: Local<bool>,
-) {
-    let Ok(mut window) = q_window.get_single_mut() else {
-        return;
-    };
-
-    let mut new_cursor: Option<CursorIcon> = None;
-    for (handle, flux) in &q_flux {
-        match *flux {
-            FluxInteraction::PointerEnter => {
-                if !*locked {
-                    new_cursor = handle.direction.cursor().into()
-                }
-            }
-            FluxInteraction::Pressed => {
-                new_cursor = handle.direction.cursor().into();
-                *locked = true;
-            }
-            FluxInteraction::Released => {
-                *locked = false;
-                if new_cursor.is_none() {
-                    new_cursor = CursorIcon::Default.into();
-                }
-            }
-            FluxInteraction::PressCanceled => {
-                *locked = false;
-                if new_cursor.is_none() {
-                    new_cursor = CursorIcon::Default.into();
-                }
-            }
-            FluxInteraction::PointerLeave => {
-                if !*locked && new_cursor.is_none() {
-                    new_cursor = CursorIcon::Default.into();
-                }
-            }
-            _ => (),
-        }
-    }
-
-    if let Some(new_cursor) = new_cursor {
-        window.cursor.icon = new_cursor;
-    }
-}
-
 fn update_panel_size_on_resize(
-    q_draggable: Query<(&Draggable, &FloatingPanelResizeHandle), Changed<Draggable>>,
+    q_draggable: Query<(&Draggable, &ResizeHandle, &FloatingPanelResizeHandle), Changed<Draggable>>,
     mut q_panels: Query<&mut FloatingPanel>,
 ) {
     if let Some(_) = q_panels.iter().find(|p| p.priority) {
         return;
     }
 
-    for (draggable, handle) in &q_draggable {
+    for (draggable, handle, handle_ref) in &q_draggable {
         if draggable.state == DragState::Inactive
             || draggable.state == DragState::MaybeDragged
             || draggable.state == DragState::DragCanceled
@@ -165,32 +114,14 @@ fn update_panel_size_on_resize(
             continue;
         }
 
-        let Ok(mut panel) = q_panels.get_mut(handle.panel) else {
+        let Ok(mut panel) = q_panels.get_mut(handle_ref.panel) else {
             continue;
         };
         let Some(diff) = draggable.diff else {
             continue;
         };
 
-        let size_diff = match handle.direction {
-            ResizeDirection::North => Vec2 { x: 0., y: -diff.y },
-            ResizeDirection::NorthEast => Vec2 {
-                x: diff.x,
-                y: -diff.y,
-            },
-            ResizeDirection::East => Vec2 { x: diff.x, y: 0. },
-            ResizeDirection::SouthEast => diff,
-            ResizeDirection::South => Vec2 { x: 0., y: diff.y },
-            ResizeDirection::SouthWest => Vec2 {
-                x: -diff.x,
-                y: diff.y,
-            },
-            ResizeDirection::West => Vec2 { x: -diff.x, y: 0. },
-            ResizeDirection::NorthWest => Vec2 {
-                x: -diff.x,
-                y: -diff.y,
-            },
-        };
+        let size_diff = handle.direction().to_size_diff(diff);
 
         let old_size = panel.size;
         panel.size += size_diff;
@@ -203,7 +134,7 @@ fn update_panel_size_on_resize(
             }
         }
 
-        let pos_diff = match handle.direction {
+        let pos_diff = match handle.direction() {
             ResizeDirection::North => Vec2 {
                 x: 0.,
                 y: clip_position_change(diff.y, MIN_PANEL_SIZE.y, old_size.y, panel.size.y),
@@ -309,13 +240,36 @@ fn update_panel_on_title_drag(
     }
 }
 
+fn window_resized(e_resized: EventReader<WindowResized>) -> bool {
+    e_resized.len() > 0
+}
+
+// TODO: Use the panel's render window
 fn handle_window_resize(
-    events: EventReader<WindowResized>,
-    mut q_panels: Query<&mut FloatingPanel>,
+    q_window: Query<&Window, With<PrimaryWindow>>,
+    mut q_panels: Query<(&mut FloatingPanel, &Node, &GlobalTransform)>,
 ) {
-    if events.len() > 0 {
-        for mut panel in &mut q_panels {
-            panel.position = panel.position;
+    let Ok(window) = q_window.get_single() else {
+        return;
+    };
+
+    for (mut panel, node, transform) in &mut q_panels {
+        let position = transform.translation().truncate() - (node.size() / 2.);
+
+        if position.x > window.width() - WINDOW_RESIZE_PADDING {
+            panel.position.x = (panel.position.x - panel.size.x + WINDOW_RESIZE_PADDING).max(0.);
+            if position.y > window.height() - panel.size.y {
+                let overflow = position.y - (window.height() - panel.size.y);
+                panel.position.y = (panel.position.y - overflow).max(0.);
+            }
+        }
+        if position.y > window.height() - WINDOW_RESIZE_PADDING {
+            panel.position.y = (panel.position.y - panel.size.y + WINDOW_RESIZE_PADDING).max(0.);
+
+            if position.x > window.width() - panel.size.x {
+                let overflow = position.x - (window.width() - panel.size.x);
+                panel.position.x = (panel.position.x - overflow).max(0.);
+            }
         }
     }
 }
@@ -337,46 +291,16 @@ fn update_panel_layout(
     }
 }
 
-#[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Reflect)]
-pub enum ResizeDirection {
-    #[default]
-    North,
-    NorthEast,
-    East,
-    SouthEast,
-    South,
-    SouthWest,
-    West,
-    NorthWest,
-}
-
-impl ResizeDirection {
-    fn cursor(&self) -> CursorIcon {
-        match self {
-            ResizeDirection::North => CursorIcon::NResize,
-            ResizeDirection::NorthEast => CursorIcon::NeResize,
-            ResizeDirection::East => CursorIcon::EResize,
-            ResizeDirection::SouthEast => CursorIcon::SeResize,
-            ResizeDirection::South => CursorIcon::SResize,
-            ResizeDirection::SouthWest => CursorIcon::SwResize,
-            ResizeDirection::West => CursorIcon::WResize,
-            ResizeDirection::NorthWest => CursorIcon::NwResize,
-        }
-    }
-}
-
 #[derive(Component, Debug, Reflect)]
 #[reflect(Component)]
 pub struct FloatingPanelResizeHandle {
     panel: Entity,
-    direction: ResizeDirection,
 }
 
 impl Default for FloatingPanelResizeHandle {
     fn default() -> Self {
         Self {
             panel: Entity::PLACEHOLDER,
-            direction: Default::default(),
         }
     }
 }
@@ -473,20 +397,6 @@ impl Default for FloatingPanel {
 }
 
 impl<'w, 's, 'a> FloatingPanel {
-    fn base_tween() -> AnimationConfig {
-        AnimationConfig {
-            duration: 0.1,
-            easing: Ease::OutExpo,
-            ..default()
-        }
-    }
-    fn resize_zone_size() -> f32 {
-        4.
-    }
-    fn resize_zone_pullback() -> f32 {
-        2.
-    }
-
     fn frame() -> impl Bundle {
         NodeBundle {
             style: Style {
@@ -494,6 +404,7 @@ impl<'w, 's, 'a> FloatingPanel {
                 border: UiRect::all(Val::Px(2.)),
                 flex_direction: FlexDirection::Column,
                 align_items: AlignItems::Start,
+                overflow: Overflow::clip(),
                 ..default()
             },
             border_color: Color::BLACK.into(),
@@ -532,66 +443,32 @@ impl<'w, 's, 'a> FloatingPanel {
             Draggable::default(),
         )
     }
-
-    fn resize_handle_container() -> impl Bundle {
-        NodeBundle {
-            style: Style {
-                position_type: PositionType::Absolute,
-                width: Val::Percent(100.),
-                height: Val::Percent(100.),
-                margin: UiRect::all(Val::Px(-FloatingPanel::resize_zone_pullback())),
-                flex_direction: FlexDirection::Column,
-                ..default()
-            },
-            z_index: ZIndex::Local(10),
-            ..default()
-        }
-    }
-
-    fn resize_handle(panel: Entity, direction: ResizeDirection) -> impl Bundle {
-        let zone_size = FloatingPanel::resize_zone_size();
-
-        let (width, height) = match direction {
-            ResizeDirection::North => (Val::Percent(100.), Val::Px(zone_size)),
-            ResizeDirection::NorthEast => (Val::Px(zone_size), Val::Px(zone_size)),
-            ResizeDirection::East => (Val::Px(zone_size), Val::Percent(100.)),
-            ResizeDirection::SouthEast => (Val::Px(zone_size), Val::Px(zone_size)),
-            ResizeDirection::South => (Val::Percent(100.), Val::Px(zone_size)),
-            ResizeDirection::SouthWest => (Val::Px(zone_size), Val::Px(zone_size)),
-            ResizeDirection::West => (Val::Px(zone_size), Val::Percent(100.)),
-            ResizeDirection::NorthWest => (Val::Px(zone_size), Val::Px(zone_size)),
-        };
-        (
-            NodeBundle {
-                style: Style {
-                    width,
-                    height,
-                    ..default()
-                },
-                focus_policy: bevy::ui::FocusPolicy::Block,
-                ..default()
-            },
-            FloatingPanelResizeHandle { panel, direction },
-            Interaction::default(),
-            TrackedInteraction::default(),
-            InteractiveBackground {
-                highlight: Color::rgb(0., 0.5, 1.).into(),
-                ..default()
-            },
-            AnimatedInteraction::<InteractiveBackground> {
-                tween: FloatingPanel::base_tween(),
-                ..default()
-            },
-            Draggable::default(),
-        )
-    }
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct FloatingPanelLayout {
     pub size: Vec2,
     pub position: Option<Vec2>,
     pub hidden: bool,
+}
+
+impl Default for FloatingPanelLayout {
+    fn default() -> Self {
+        Self {
+            size: Vec2 { x: 300., y: 500. },
+            position: Default::default(),
+            hidden: Default::default(),
+        }
+    }
+}
+
+impl FloatingPanelLayout {
+    pub fn min() -> Self {
+        Self {
+            size: MIN_PANEL_SIZE,
+            ..default()
+        }
+    }
 }
 
 pub trait UiFloatingPanelExt<'w, 's> {
@@ -617,7 +494,7 @@ impl<'w, 's> UiFloatingPanelExt<'w, 's> for UiBuilder<'w, 's, '_> {
         let mut title = Entity::PLACEHOLDER;
         let mut drag_handle = Entity::PLACEHOLDER;
         let mut frame = self.container(FloatingPanel::frame(), |container| {
-            let panel_id = container.id().unwrap();
+            let panel = container.id().unwrap();
 
             let title_text = if let Some(text) = config.title.clone() {
                 text
@@ -628,31 +505,31 @@ impl<'w, 's> UiFloatingPanelExt<'w, 's> for UiBuilder<'w, 's, '_> {
             resize_handles = container
                 .container(
                     (
-                        FloatingPanel::resize_handle_container(),
-                        FloatingPanelResizeHandleContainer { panel: panel_id },
+                        ResizeHandle::resize_handle_container(),
+                        FloatingPanelResizeHandleContainer { panel },
                     ),
                     |resize_container| {
                         resize_container.container(
                             NodeBundle {
                                 style: Style {
                                     width: Val::Percent(100.),
-                                    height: Val::Px(FloatingPanel::resize_zone_size()),
+                                    height: Val::Px(ResizeHandle::resize_zone_size()),
                                     ..default()
                                 },
                                 ..default()
                             },
                             |top_row| {
-                                top_row.spawn(FloatingPanel::resize_handle(
-                                    panel_id,
-                                    ResizeDirection::NorthWest,
+                                top_row.spawn((
+                                    ResizeHandle::resize_handle(ResizeDirection::NorthWest),
+                                    FloatingPanelResizeHandle { panel },
                                 ));
-                                top_row.spawn(FloatingPanel::resize_handle(
-                                    panel_id,
-                                    ResizeDirection::North,
+                                top_row.spawn((
+                                    ResizeHandle::resize_handle(ResizeDirection::North),
+                                    FloatingPanelResizeHandle { panel },
                                 ));
-                                top_row.spawn(FloatingPanel::resize_handle(
-                                    panel_id,
-                                    ResizeDirection::NorthEast,
+                                top_row.spawn((
+                                    ResizeHandle::resize_handle(ResizeDirection::NorthEast),
+                                    FloatingPanelResizeHandle { panel },
                                 ));
                             },
                         );
@@ -667,13 +544,13 @@ impl<'w, 's> UiFloatingPanelExt<'w, 's> for UiBuilder<'w, 's, '_> {
                                 ..default()
                             },
                             |middle_row| {
-                                middle_row.spawn(FloatingPanel::resize_handle(
-                                    panel_id,
-                                    ResizeDirection::West,
+                                middle_row.spawn((
+                                    ResizeHandle::resize_handle(ResizeDirection::West),
+                                    FloatingPanelResizeHandle { panel },
                                 ));
-                                middle_row.spawn(FloatingPanel::resize_handle(
-                                    panel_id,
-                                    ResizeDirection::East,
+                                middle_row.spawn((
+                                    ResizeHandle::resize_handle(ResizeDirection::East),
+                                    FloatingPanelResizeHandle { panel },
                                 ));
                             },
                         );
@@ -681,23 +558,23 @@ impl<'w, 's> UiFloatingPanelExt<'w, 's> for UiBuilder<'w, 's, '_> {
                             NodeBundle {
                                 style: Style {
                                     width: Val::Percent(100.),
-                                    height: Val::Px(FloatingPanel::resize_zone_size()),
+                                    height: Val::Px(ResizeHandle::resize_zone_size()),
                                     ..default()
                                 },
                                 ..default()
                             },
                             |bottom_row| {
-                                bottom_row.spawn(FloatingPanel::resize_handle(
-                                    panel_id,
-                                    ResizeDirection::SouthWest,
+                                bottom_row.spawn((
+                                    ResizeHandle::resize_handle(ResizeDirection::SouthWest),
+                                    FloatingPanelResizeHandle { panel },
                                 ));
-                                bottom_row.spawn(FloatingPanel::resize_handle(
-                                    panel_id,
-                                    ResizeDirection::South,
+                                bottom_row.spawn((
+                                    ResizeHandle::resize_handle(ResizeDirection::South),
+                                    FloatingPanelResizeHandle { panel },
                                 ));
-                                bottom_row.spawn(FloatingPanel::resize_handle(
-                                    panel_id,
-                                    ResizeDirection::SouthEast,
+                                bottom_row.spawn((
+                                    ResizeHandle::resize_handle(ResizeDirection::SouthEast),
+                                    FloatingPanelResizeHandle { panel },
                                 ));
                             },
                         );
@@ -713,7 +590,7 @@ impl<'w, 's> UiFloatingPanelExt<'w, 's> for UiBuilder<'w, 's, '_> {
                 .container(
                     (
                         FloatingPanel::title_container(),
-                        FloatingPanelTitle { panel: panel_id },
+                        FloatingPanelTitle { panel },
                     ),
                     |container| {
                         title = container
@@ -735,7 +612,7 @@ impl<'w, 's> UiFloatingPanelExt<'w, 's> for UiBuilder<'w, 's, '_> {
             drag_handle = container
                 .spawn((
                     FloatingPanel::drag_handle(),
-                    FloatingPanelDragHandle { panel: panel_id },
+                    FloatingPanelDragHandle { panel },
                 ))
                 .set_display(match config.title.is_some() {
                     true => Display::None,
@@ -756,7 +633,7 @@ impl<'w, 's> UiFloatingPanelExt<'w, 's> for UiBuilder<'w, 's, '_> {
         frame.insert((
             config,
             FloatingPanel {
-                size: layout.size,
+                size: layout.size.max(MIN_PANEL_SIZE),
                 position: layout.position.unwrap_or_default(),
                 z_index: None,
                 priority: false,

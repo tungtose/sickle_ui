@@ -1,8 +1,15 @@
 use bevy::{ecs::system::EntityCommands, prelude::*};
 
-use crate::ui_builder::*;
+use crate::{
+    ui_builder::*,
+    ui_commands::{SetBackgroundColorExt, SetEntityHeightExt},
+};
 
 use super::prelude::UiContainerExt;
+
+#[derive(Component, Debug, Default, Reflect)]
+#[reflect(Component)]
+pub struct Row;
 
 #[derive(Debug, Default)]
 pub struct RowConfig {
@@ -10,16 +17,14 @@ pub struct RowConfig {
     pub background_color: Color,
 }
 
-impl RowConfig {
-    fn frame(&self) -> impl Bundle {
+impl Row {
+    fn frame() -> impl Bundle {
         NodeBundle {
             style: Style {
                 width: Val::Percent(100.),
-                height: self.height,
                 align_items: AlignItems::Center,
                 ..default()
             },
-            background_color: self.background_color.into(),
             ..default()
         }
     }
@@ -39,6 +44,13 @@ impl<'w, 's> UiRowExt<'w, 's> for UiBuilder<'w, 's, '_> {
         config: RowConfig,
         spawn_children: impl FnOnce(&mut UiBuilder),
     ) -> EntityCommands<'w, 's, 'a> {
-        self.container(config.frame(), spawn_children)
+        let row = self.container((Row::frame(), Row), spawn_children).id();
+
+        self.commands()
+            .entity(row)
+            .set_height(config.height)
+            .set_background_color(config.background_color);
+
+        self.commands().entity(row)
     }
 }

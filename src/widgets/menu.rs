@@ -13,6 +13,7 @@ use super::prelude::{LabelConfig, MenuItem, UiContainerExt, UiLabelExt};
 
 const MENU_CONTAINER_Z_INDEX: i32 = 100000;
 
+// TODO: Implement scrolling and up/down arrows when menu too large (>70%?)
 pub struct MenuPlugin;
 
 impl Plugin for MenuPlugin {

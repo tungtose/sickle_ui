@@ -55,6 +55,7 @@ pub enum FluxInteraction {
     Pressed,
     Released,
     PressCanceled,
+    Disabled,
 }
 
 #[derive(Component, Clone, Debug, Default)]
