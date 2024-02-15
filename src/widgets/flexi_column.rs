@@ -278,9 +278,9 @@ fn update_flexi_column_on_resize(
 }
 
 fn update_flexi_column_width(
-    mut q_columns: Query<(&FlexiColumn, &mut Style), Changed<FlexiColumn>>,
+    mut q_flexi_columns: Query<(&FlexiColumn, &mut Style), Changed<FlexiColumn>>,
 ) {
-    for (config, mut style) in &mut q_columns {
+    for (config, mut style) in &mut q_flexi_columns {
         style.width = Val::Percent(config.width_percent);
     }
 }
@@ -449,7 +449,7 @@ impl FlexiColumn {
             style: Style {
                 height: Val::Percent(100.),
                 flex_direction: FlexDirection::Column,
-                border: UiRect::all(Val::Px(2.)),
+                border: UiRect::horizontal(Val::Px(2.)),
                 ..default()
             },
             border_color: Color::BLACK.into(),
