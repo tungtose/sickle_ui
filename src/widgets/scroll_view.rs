@@ -456,6 +456,8 @@ impl<'w, 's> ScrollView {
                 style: Style {
                     width,
                     height,
+                    min_width: Val::Percent(100.),
+                    min_height: Val::Percent(100.),
                     justify_self: JustifySelf::Start,
                     align_self: AlignSelf::Start,
                     flex_direction: FlexDirection::Column,

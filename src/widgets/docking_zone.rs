@@ -17,15 +17,24 @@ impl Plugin for DockingZonePlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(
             PreUpdate,
-            update_docking_zone_resize_handles.run_if(did_add_or_remove_docking_zone),
+            (
+                preset_docking_zone_flex_layout,
+                preset_docking_zone_children_size,
+                preset_docking_zone_resize_handles,
+                preset_docking_zone_border_and_size,
+            )
+                .chain()
+                .in_set(DockingZonePreUpdate)
+                .run_if(did_add_or_remove_docking_zone),
         )
         .add_systems(
             Update,
             (
                 update_docking_zone_on_resize.after(DraggableUpdate),
-                update_docking_zone_size,
+                update_docking_zone_style,
             )
-                .chain(),
+                .chain()
+                .run_if(should_update_docking_zone_style),
         )
         .add_systems(
             PostUpdate,
@@ -36,6 +45,9 @@ impl Plugin for DockingZonePlugin {
     }
 }
 
+#[derive(SystemSet, Clone, Eq, Debug, Hash, PartialEq)]
+pub struct DockingZonePreUpdate;
+
 fn did_add_or_remove_docking_zone(
     q_added_zones: Query<Entity, Added<DockingZone>>,
     mut q_removed_zones: RemovedComponents<DockingZone>,
@@ -43,9 +55,108 @@ fn did_add_or_remove_docking_zone(
     q_added_zones.iter().count() > 0 || q_removed_zones.read().count() > 0
 }
 
-fn _update_docking_zone_flex_layout() {}
+fn preset_docking_zone_flex_layout(
+    q_docking_zones: Query<(Entity, &Parent), With<DockingZone>>,
+    mut q_docking_zone: Query<&mut DockingZone>,
+    q_children: Query<&Children>,
+    q_style: Query<&Style>,
+) {
+    let static_zones: Vec<(Entity, Entity)> = q_docking_zones
+        .iter()
+        .filter(|(_, parent)| q_docking_zone.get(parent.get()).is_err())
+        .map(|(e, p)| (e, p.get()))
+        .collect();
 
-fn update_docking_zone_resize_handles(
+    for (docking_zone, parent) in static_zones {
+        let Ok(parent_style) = q_style.get(parent) else {
+            warn!("No Style found for docking zone parent {:?}!", parent);
+            continue;
+        };
+
+        let parent_flex_direction = parent_style.flex_direction;
+        preset_drop_zone_flex_direction(
+            docking_zone,
+            &mut q_docking_zone,
+            &q_children,
+            parent_flex_direction,
+        );
+    }
+}
+
+fn preset_drop_zone_flex_direction(
+    docking_zone: Entity,
+    q_docking_zone: &mut Query<&mut DockingZone>,
+    q_children: &Query<&Children>,
+    parent_flex_direction: FlexDirection,
+) {
+    let mut zone = q_docking_zone.get_mut(docking_zone).unwrap();
+
+    zone.flex_direction = match parent_flex_direction {
+        FlexDirection::Row => FlexDirection::Column,
+        FlexDirection::Column => FlexDirection::Row,
+        FlexDirection::RowReverse => FlexDirection::Column,
+        FlexDirection::ColumnReverse => FlexDirection::Row,
+    };
+
+    let zone_direction = zone.flex_direction;
+    if let Ok(children) = q_children.get(docking_zone) {
+        for child in children {
+            if q_docking_zone.get(*child).is_ok() {
+                preset_drop_zone_flex_direction(*child, q_docking_zone, q_children, zone_direction);
+            }
+        }
+    }
+}
+
+fn preset_docking_zone_children_size(
+    q_docking_zones: Query<Entity, With<DockingZone>>,
+    mut q_docking_zone: Query<&mut DockingZone>,
+    q_parents: Query<&Parent>,
+) {
+    for mut zone in &mut q_docking_zone {
+        zone.children_size = 0.;
+    }
+
+    for entity in &q_docking_zones {
+        let zone = q_docking_zone.get(entity).unwrap();
+        let zone_size = zone.min_size;
+        let direction = zone.flex_direction;
+
+        for parent in q_parents.iter_ancestors(entity) {
+            let Ok(mut parent_zone) = q_docking_zone.get_mut(parent) else {
+                continue;
+            };
+
+            if parent_zone.flex_direction == direction {
+                parent_zone.children_size += zone_size;
+            }
+        }
+    }
+
+    for mut zone in &mut q_docking_zone {
+        zone.children_size = zone.children_size.max(zone.min_size);
+    }
+}
+
+fn preset_docking_zone_border_and_size(mut q_docking_zones: Query<(&DockingZone, &mut Style)>) {
+    for (zone, mut style) in &mut q_docking_zones {
+        match zone.flex_direction {
+            FlexDirection::Row => {
+                style.border = UiRect::vertical(Val::Px(2.));
+                style.width = Val::Percent(100.);
+                style.height = Val::Percent(zone.size_percent);
+            }
+            FlexDirection::Column => {
+                style.border = UiRect::horizontal(Val::Px(2.));
+                style.width = Val::Percent(zone.size_percent);
+                style.height = Val::Percent(100.);
+            }
+            _ => (),
+        }
+    }
+}
+
+fn preset_docking_zone_resize_handles(
     q_docking_zone_parents: Query<&Parent, With<DockingZone>>,
     q_children: Query<&Children>,
     q_docking_zones: Query<&DockingZone>,
@@ -53,17 +164,20 @@ fn update_docking_zone_resize_handles(
     mut q_resize_handle: Query<&mut DockingZoneResizeHandle>,
     mut commands: Commands,
 ) {
-    let parents: Vec<Entity> = q_docking_zone_parents.iter().fold(
-        Vec::with_capacity(q_docking_zone_parents.iter().count()),
-        |mut acc, parent| {
-            let entity = parent.get();
-            if !acc.contains(&entity) {
-                acc.push(entity);
-            }
+    let zone_count = q_docking_zone_parents.iter().count();
+    let mut handle_visibility: Vec<(Entity, bool)> = Vec::with_capacity(zone_count * 4);
+    let mut handle_neighbours: Vec<(Entity, Option<Entity>)> = Vec::with_capacity(zone_count * 4);
+    let parents: Vec<Entity> =
+        q_docking_zone_parents
+            .iter()
+            .fold(Vec::with_capacity(zone_count), |mut acc, parent| {
+                let entity = parent.get();
+                if !acc.contains(&entity) {
+                    acc.push(entity);
+                }
 
-            acc
-        },
-    );
+                acc
+            });
 
     for parent in parents {
         let children: Vec<Entity> = q_children.get(parent).unwrap().iter().map(|e| *e).collect();
@@ -73,43 +187,48 @@ fn update_docking_zone_resize_handles(
             let Ok(zone) = q_docking_zones.get(children[0]) else {
                 return;
             };
-            commands
-                .entity(zone.left_handle)
-                .style()
-                .visibility(Visibility::Hidden);
-            commands
-                .entity(zone.right_handle)
-                .style()
-                .visibility(Visibility::Hidden);
+            handle_visibility.push((zone.top_handle, false));
+            handle_visibility.push((zone.right_handle, false));
+            handle_visibility.push((zone.bottom_handle, false));
+            handle_visibility.push((zone.left_handle, false));
         } else {
             let mut zone_children: Vec<Entity> = Vec::with_capacity(child_count);
             let mut prev_is_zone = true;
 
             for i in 0..child_count {
+                let Ok(style) = q_style.get(children[i]) else {
+                    warn!(
+                        "Missing Style detected on Node {:?} during docking zone handle update.",
+                        children[i]
+                    );
+                    continue;
+                };
+
                 let Ok(zone) = q_docking_zones.get(children[i]) else {
-                    if let Ok(style) = q_style.get(children[i]) {
-                        if style.position_type == PositionType::Relative {
-                            prev_is_zone = false;
-                        }
+                    if style.position_type == PositionType::Relative {
+                        prev_is_zone = false;
                     }
                     continue;
                 };
 
-                commands
-                    .entity(zone.left_handle)
-                    .style()
-                    .visibility(match prev_is_zone {
-                        true => Visibility::Hidden,
-                        false => Visibility::Visible,
-                    });
-
-                commands
-                    .entity(zone.right_handle)
-                    .style()
-                    .visibility(match i == child_count - 1 {
-                        true => Visibility::Hidden,
-                        false => Visibility::Visible,
-                    });
+                match zone.flex_direction {
+                    FlexDirection::Row => {
+                        handle_visibility.push((zone.top_handle, !prev_is_zone));
+                        handle_visibility.push((zone.bottom_handle, i != child_count - 1));
+                        handle_visibility.push((zone.right_handle, false));
+                        handle_visibility.push((zone.left_handle, false));
+                    }
+                    FlexDirection::Column => {
+                        handle_visibility.push((zone.left_handle, !prev_is_zone));
+                        handle_visibility.push((zone.right_handle, i != child_count - 1));
+                        handle_visibility.push((zone.top_handle, false));
+                        handle_visibility.push((zone.bottom_handle, false));
+                    }
+                    _ => warn!(
+                        "Invalid flex_direction detected on docking zone {:?}",
+                        children[i]
+                    ),
+                }
 
                 prev_is_zone = true;
                 zone_children.push(children[i]);
@@ -117,33 +236,61 @@ fn update_docking_zone_resize_handles(
 
             for i in 0..zone_children.len() {
                 let zone = q_docking_zones.get(zone_children[i]).unwrap();
-                let left_handle = zone.left_handle;
-                let right_handle = zone.right_handle;
-
-                let mut left_handle = q_resize_handle.get_mut(left_handle).unwrap();
-                left_handle.neighbour = if i > 0 {
-                    zone_children[i - 1].into()
-                } else {
-                    None
+                let Some((prev_handle, next_handle)) = (match zone.flex_direction {
+                    FlexDirection::Row => (zone.top_handle, zone.bottom_handle).into(),
+                    FlexDirection::Column => (zone.left_handle, zone.right_handle).into(),
+                    _ => None,
+                }) else {
+                    warn!(
+                        "Invalid flex_direction detected on docking zone {:?}",
+                        zone_children[i]
+                    );
+                    continue;
                 };
-                left_handle.docking_zone = zone_children[i].into();
 
-                let mut right_handle = q_resize_handle.get_mut(right_handle).unwrap();
-                right_handle.docking_zone = zone_children[i].into();
-                right_handle.neighbour = if i < zone_children.len() - 1 {
-                    zone_children[i + 1].into()
-                } else {
-                    None
-                };
+                if i == 0 {
+                    handle_visibility.push((prev_handle, false));
+                }
+
+                if i == zone_children.len() - 1 {
+                    handle_visibility.push((next_handle, false));
+                }
+
+                handle_neighbours.push((
+                    prev_handle,
+                    match i > 0 {
+                        true => zone_children[i - 1].into(),
+                        false => None,
+                    },
+                ));
+
+                handle_neighbours.push((
+                    next_handle,
+                    match i < zone_children.len() - 1 {
+                        true => zone_children[i + 1].into(),
+                        false => None,
+                    },
+                ));
             }
         }
     }
+
+    for (handle, visible) in handle_visibility {
+        commands.entity(handle).style().visibility(match visible {
+            true => Visibility::Visible,
+            false => Visibility::Hidden,
+        });
+    }
+
+    for (handle, neighbour) in handle_neighbours {
+        let mut handle = q_resize_handle.get_mut(handle).unwrap();
+        handle.neighbour = neighbour;
+    }
 }
 
-// TODO: Consider children min_width for constraints
 fn update_docking_zone_on_resize(
     q_draggable: Query<(&Draggable, &ResizeHandle, &DockingZoneResizeHandle), Changed<Draggable>>,
-    mut q_flexi_columns: Query<(&mut DockingZone, &Parent)>,
+    mut q_docking_zone: Query<(&mut DockingZone, &Parent)>,
     q_node: Query<&Node>,
 ) {
     for (draggable, handle, handle_ref) in &q_draggable {
@@ -162,109 +309,132 @@ fn update_docking_zone_on_resize(
             continue;
         };
 
-        let size_diff = handle.direction().to_size_diff(diff).x;
-        if size_diff == 0. {
-            continue;
-        }
-
-        let current_column_id = handle_ref.docking_zone;
-        let neighbour_column_id = handle_ref.neighbour.unwrap();
-
-        let Ok((current_column, parent)) = q_flexi_columns.get(current_column_id) else {
+        let current_zone_id = handle_ref.docking_zone;
+        let neighbour_zone_id = handle_ref.neighbour.unwrap();
+        let Ok((current_zone, parent)) = q_docking_zone.get(current_zone_id) else {
             continue;
         };
-        let Ok((neighbour_column, other_parent)) = q_flexi_columns.get(neighbour_column_id) else {
+        let Ok((neighbour_zone, other_parent)) = q_docking_zone.get(neighbour_zone_id) else {
             continue;
         };
 
         if parent != other_parent {
             warn!(
-                "Failed to resize flexi column: Columns have different parents: {:?} <-> {:?}",
+                "Failed to resize docking zone: Neighbouring zones have different parents: {:?} <-> {:?}",
                 parent, other_parent
             );
             continue;
         }
 
+        let size_diff = match current_zone.flex_direction {
+            FlexDirection::Row => handle.direction().to_size_diff(diff).y,
+            FlexDirection::Column => handle.direction().to_size_diff(diff).x,
+            _ => 0.,
+        };
+        if size_diff == 0. {
+            continue;
+        }
+
         let Ok(node) = q_node.get(parent.get()) else {
             warn!(
-                "Cannot calculate FlexiColumn pixel width: Entity {:?} has parent without Node!",
-                current_column_id
+                "Cannot calculate docking zone pixel size: Entity {:?} has parent without Node!",
+                current_zone
             );
             continue;
         };
 
-        let total_width = node.size().x;
-
-        if total_width == 0. {
+        let total_size = match current_zone.flex_direction {
+            FlexDirection::Row => node.size().y,
+            FlexDirection::Column => node.size().x,
+            _ => 0.,
+        };
+        if total_size == 0. {
             continue;
         }
 
-        let current_min_width = current_column.min_size;
-        let current_width = (current_column.size_percent / 100.) * total_width;
-        let mut current_new_width = current_width;
-        let neighbour_min_width = neighbour_column.min_size;
-        let neighbour_width = (neighbour_column.size_percent / 100.) * total_width;
-        let mut neighbour_new_width = neighbour_width;
+        let current_min_size = current_zone.children_size;
+        let current_size = (current_zone.size_percent / 100.) * total_size;
+        let mut current_new_size = current_size;
+        let neighbour_min_size = neighbour_zone.children_size;
+        let neighbour_size = (neighbour_zone.size_percent / 100.) * total_size;
+        let mut neighbour_new_size = neighbour_size;
 
         if size_diff < 0. {
-            if current_width + size_diff >= current_min_width {
-                current_new_width += size_diff;
-                neighbour_new_width -= size_diff;
+            if current_size + size_diff >= current_min_size {
+                current_new_size += size_diff;
+                neighbour_new_size -= size_diff;
             } else {
-                current_new_width = current_min_width;
-                neighbour_new_width += current_width - current_min_width;
+                current_new_size = current_min_size;
+                neighbour_new_size += current_size - current_min_size;
             }
         } else if size_diff > 0. {
-            if neighbour_width - size_diff >= neighbour_min_width {
-                neighbour_new_width -= size_diff;
-                current_new_width += size_diff;
+            if neighbour_size - size_diff >= neighbour_min_size {
+                neighbour_new_size -= size_diff;
+                current_new_size += size_diff;
             } else {
-                neighbour_new_width = neighbour_min_width;
-                current_new_width += neighbour_width - neighbour_min_width;
+                neighbour_new_size = neighbour_min_size;
+                current_new_size += neighbour_size - neighbour_min_size;
             }
         }
 
-        q_flexi_columns
-            .get_mut(current_column_id)
+        q_docking_zone
+            .get_mut(current_zone_id)
             .unwrap()
             .0
-            .size_percent = (current_new_width / total_width) * 100.;
+            .size_percent = (current_new_size / total_size) * 100.;
 
-        q_flexi_columns
-            .get_mut(neighbour_column_id)
+        q_docking_zone
+            .get_mut(neighbour_zone_id)
             .unwrap()
             .0
-            .size_percent = (neighbour_new_width / total_width) * 100.;
+            .size_percent = (neighbour_new_size / total_size) * 100.;
     }
 }
 
-fn update_docking_zone_size(
-    mut q_flexi_columns: Query<(&DockingZone, &mut Style), Changed<DockingZone>>,
-) {
-    for (config, mut style) in &mut q_flexi_columns {
-        style.width = Val::Percent(config.size_percent);
-    }
-}
-
-fn should_fit_docking_zones(
+fn should_update_docking_zone_style(
     q_added_columns: Query<Entity, Added<DockingZone>>,
     mut q_removed_columns: RemovedComponents<DockingZone>,
     mut e_resize: EventReader<WindowResized>,
 ) -> bool {
-    q_added_columns.iter().count() > 0
+    !(q_added_columns.iter().count() > 0
         || q_removed_columns.read().count() > 0
-        || e_resize.read().count() > 0
+        || e_resize.read().count() > 0)
+}
+
+fn update_docking_zone_style(
+    mut q_docking_zones: Query<(&DockingZone, &mut Style), Changed<DockingZone>>,
+) {
+    for (zone, mut style) in &mut q_docking_zones {
+        style.flex_direction = zone.flex_direction;
+        match zone.flex_direction {
+            FlexDirection::Row => {
+                style.width = Val::Percent(100.);
+                style.height = Val::Percent(zone.size_percent);
+            }
+            FlexDirection::Column => {
+                style.width = Val::Percent(zone.size_percent);
+                style.height = Val::Percent(100.);
+            }
+            _ => (),
+        }
+    }
+}
+
+fn should_fit_docking_zones(
+    q_changed_nodes: Query<Entity, (With<DockingZone>, Changed<Node>)>,
+) -> bool {
+    q_changed_nodes.iter().count() > 0
 }
 
 fn fit_docking_zones_on_window_resize(
     q_children: Query<&Children>,
     q_node: Query<&Node>,
-    q_flexi_column_parents: Query<&Parent, With<DockingZone>>,
-    q_non_flexi: Query<(&Node, &Style), Without<DockingZone>>,
-    mut q_flexi_column: Query<(&mut DockingZone, &Node)>,
+    q_docking_zone_parents: Query<&Parent, With<DockingZone>>,
+    q_non_docking: Query<(&Node, &Style), Without<DockingZone>>,
+    mut q_docking_zone: Query<(&mut DockingZone, &Node)>,
 ) {
-    let parents: Vec<Entity> = q_flexi_column_parents.iter().fold(
-        Vec::with_capacity(q_flexi_column_parents.iter().count()),
+    let parents: Vec<Entity> = q_docking_zone_parents.iter().fold(
+        Vec::with_capacity(q_docking_zone_parents.iter().count()),
         |mut acc, parent| {
             let entity = parent.get();
             if !acc.contains(&entity) {
@@ -276,43 +446,79 @@ fn fit_docking_zones_on_window_resize(
     );
 
     for parent in parents {
-        let Ok(node) = q_node.get(parent) else {
-            warn!("Flexi column parent {:?} doesn't have a Node!", parent);
+        let Ok(parent_node) = q_node.get(parent) else {
+            warn!("Docking zone parent {:?} doesn't have a Node!", parent);
             continue;
         };
 
-        if node.size().x == 0. {
-            warn!("Flexi column parent {:?} doesn't have a size!", parent);
+        if parent_node.size() == Vec2::ZERO {
+            warn!("Docking zone parent {:?} doesn't have a size!", parent);
             continue;
         }
 
-        let mut non_flexi_width = 0.;
+        let mut non_docking_size = Vec2::ZERO;
         for child in q_children.get(parent).unwrap().iter() {
-            if let Ok((node, style)) = q_non_flexi.get(*child) {
+            if let Ok((node, style)) = q_non_docking.get(*child) {
                 if style.position_type == PositionType::Relative {
-                    non_flexi_width += node.size().x;
+                    non_docking_size += node.size();
                 }
             }
         }
 
-        let mut sum_flexi_width = 0.;
+        let mut sum_zone_size = Vec2::ZERO;
         for child in q_children.get(parent).unwrap().iter() {
-            if let Ok((_, node)) = q_flexi_column.get(*child) {
-                sum_flexi_width += node.size().x;
+            if let Ok((_, node)) = q_docking_zone.get(*child) {
+                sum_zone_size += node.size();
             };
         }
 
-        let total_width = node.size().x;
         for child in q_children.get(parent).unwrap().iter() {
-            let Ok((mut flexi_column, node)) = q_flexi_column.get_mut(*child) else {
-                return;
+            let Ok((mut docking_zone, zone_node)) = q_docking_zone.get_mut(*child) else {
+                continue;
             };
 
-            let flexi_width = total_width - non_flexi_width;
-            let multiplier = flexi_width / sum_flexi_width;
+            let total_size = match docking_zone.flex_direction {
+                FlexDirection::Row => parent_node.size().y,
+                FlexDirection::Column => parent_node.size().x,
+                _ => 0.,
+            };
+            let non_docking_size = match docking_zone.flex_direction {
+                FlexDirection::Row => non_docking_size.y,
+                FlexDirection::Column => non_docking_size.x,
+                _ => 0.,
+            };
+            let sum_zone_size = match docking_zone.flex_direction {
+                FlexDirection::Row => sum_zone_size.y,
+                FlexDirection::Column => sum_zone_size.x,
+                _ => 0.,
+            };
 
-            flexi_column.size_percent =
-                (node.size().x.max(flexi_column.min_size) / flexi_width) * 100. * multiplier;
+            let docking_size = total_size - non_docking_size;
+
+            if total_size == 0. || sum_zone_size == 0. || docking_size <= 0. {
+                continue;
+            }
+
+            let multiplier = docking_size / sum_zone_size;
+            let own_size = match docking_zone.flex_direction {
+                FlexDirection::Row => zone_node.size().y,
+                FlexDirection::Column => zone_node.size().x,
+                _ => 0.,
+            };
+
+            // info!(
+            //     "{:?} | own: {}, total_size: {}, docking: {}, mul: {}, {}% -> {}%",
+            //     child,
+            //     own_size,
+            //     total_size,
+            //     docking_size,
+            //     multiplier,
+            //     docking_zone.size_percent,
+            //     (own_size.max(docking_zone.children_size) / total_size) * 100. * multiplier
+            // );
+
+            docking_zone.size_percent =
+                (own_size.max(docking_zone.children_size) / total_size) * 100. * multiplier;
         }
     }
 }
@@ -339,6 +545,7 @@ pub struct DockingZone {
     size_percent: f32,
     min_size: f32,
     children_size: f32,
+    flex_direction: FlexDirection,
     top_handle: Entity,
     right_handle: Entity,
     bottom_handle: Entity,
@@ -351,6 +558,7 @@ impl Default for DockingZone {
             size_percent: Default::default(),
             min_size: MIN_DOCKING_ZONE_SIZE,
             children_size: Default::default(),
+            flex_direction: Default::default(),
             top_handle: Entity::PLACEHOLDER,
             right_handle: Entity::PLACEHOLDER,
             bottom_handle: Entity::PLACEHOLDER,
@@ -436,15 +644,15 @@ impl<'w, 's> UiDockingZoneExt<'w, 's> for UiBuilder<'w, 's, '_> {
         let docking_zone = root
             .ui_builder()
             .container(DockingZone::frame(), |container| {
+                let zone_id = container.id().unwrap();
                 let handle = DockingZoneResizeHandle {
-                    docking_zone: container.id().unwrap(),
+                    docking_zone: zone_id,
                     ..default()
                 };
 
-                container
-                    .container(DockingZone::container(), spawn_children)
-                    .style()
-                    .background_color(config.background_color);
+                let mut commands = container.commands().entity(zone_id);
+                let mut new_builder = commands.ui_builder();
+                spawn_children(&mut new_builder);
 
                 container.container(
                     ResizeHandle::resize_handle_container(),
@@ -484,6 +692,8 @@ impl<'w, 's> UiDockingZoneExt<'w, 's> for UiBuilder<'w, 's, '_> {
                 left_handle,
                 ..default()
             })
+            .style()
+            .background_color(config.background_color)
             .id();
 
         self.commands().entity(docking_zone)
