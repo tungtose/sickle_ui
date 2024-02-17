@@ -1,4 +1,4 @@
-use bevy::{ecs::system::EntityCommands, prelude::*, ui::UiSystem, window::WindowResized};
+use bevy::{ecs::system::EntityCommands, prelude::*, ui::UiSystem};
 
 use crate::{
     drag_interaction::{DragState, Draggable, DraggableUpdate},
@@ -21,7 +21,7 @@ impl Plugin for DockingZonePlugin {
                 preset_docking_zone_flex_layout,
                 preset_docking_zone_children_size,
                 preset_docking_zone_resize_handles,
-                preset_docking_zone_border_and_size,
+                preset_docking_zone_border,
             )
                 .chain()
                 .in_set(DockingZonePreUpdate)
@@ -33,8 +33,7 @@ impl Plugin for DockingZonePlugin {
                 update_docking_zone_on_resize.after(DraggableUpdate),
                 update_docking_zone_style,
             )
-                .chain()
-                .run_if(should_update_docking_zone_style),
+                .chain(),
         )
         .add_systems(
             PostUpdate,
@@ -138,18 +137,14 @@ fn preset_docking_zone_children_size(
     }
 }
 
-fn preset_docking_zone_border_and_size(mut q_docking_zones: Query<(&DockingZone, &mut Style)>) {
+fn preset_docking_zone_border(mut q_docking_zones: Query<(&DockingZone, &mut Style)>) {
     for (zone, mut style) in &mut q_docking_zones {
         match zone.flex_direction {
             FlexDirection::Row => {
                 style.border = UiRect::vertical(Val::Px(2.));
-                style.width = Val::Percent(100.);
-                style.height = Val::Percent(zone.size_percent);
             }
             FlexDirection::Column => {
                 style.border = UiRect::horizontal(Val::Px(2.));
-                style.width = Val::Percent(zone.size_percent);
-                style.height = Val::Percent(100.);
             }
             _ => (),
         }
@@ -389,16 +384,6 @@ fn update_docking_zone_on_resize(
             .0
             .size_percent = (neighbour_new_size / total_size) * 100.;
     }
-}
-
-fn should_update_docking_zone_style(
-    q_added_columns: Query<Entity, Added<DockingZone>>,
-    mut q_removed_columns: RemovedComponents<DockingZone>,
-    mut e_resize: EventReader<WindowResized>,
-) -> bool {
-    !(q_added_columns.iter().count() > 0
-        || q_removed_columns.read().count() > 0
-        || e_resize.read().count() > 0)
 }
 
 fn update_docking_zone_style(
