@@ -9,7 +9,7 @@ use crate::{
     drag_interaction::{DragState, Draggable, DraggableUpdate},
     resize_interaction::{ResizeDirection, ResizeHandle},
     ui_builder::*,
-    ui_commands::SetEntityVisiblityExt,
+    ui_style::{SetEntityVisiblityExt, UiStyleExt},
 };
 
 use super::prelude::{RowConfig, UiContainerExt, UiRowExt};
@@ -109,10 +109,12 @@ fn update_flexi_row_handles_on_collection(
 
         commands
             .entity(flexi.top_handle)
-            .set_visibility(Visibility::Hidden);
+            .style()
+            .visibility(Visibility::Hidden);
         commands
             .entity(flexi.bottom_handle)
-            .set_visibility(Visibility::Hidden);
+            .style()
+            .visibility(Visibility::Hidden);
     } else {
         let mut flexi_children: Vec<Entity> = Vec::with_capacity(child_count);
         let mut prev_is_flexi = true;
@@ -129,14 +131,16 @@ fn update_flexi_row_handles_on_collection(
 
             commands
                 .entity(flexi.top_handle)
-                .set_visibility(match prev_is_flexi {
+                .style()
+                .visibility(match prev_is_flexi {
                     true => Visibility::Hidden,
                     false => Visibility::Visible,
                 });
 
             commands
                 .entity(flexi.bottom_handle)
-                .set_visibility(match i == child_count - 1 {
+                .style()
+                .visibility(match i == child_count - 1 {
                     true => Visibility::Hidden,
                     false => Visibility::Visible,
                 });
@@ -169,6 +173,7 @@ fn update_flexi_row_handles_on_collection(
     }
 }
 
+// TODO: Consider children min_height for constraints
 fn update_flexi_row_on_resize(
     q_draggable: Query<(&Draggable, &ResizeHandle, &FlexiRowResizeHandle), Changed<Draggable>>,
     mut q_flexi_rows: Query<(&mut FlexiRow, Option<&Parent>)>,

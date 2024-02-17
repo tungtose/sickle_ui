@@ -2,7 +2,7 @@ use bevy::{ecs::system::EntityCommands, prelude::*};
 
 use crate::{
     ui_builder::*,
-    ui_commands::{SetBackgroundColorExt, SetEntityHeightExt},
+    ui_style::{SetEntityHeightExt, UiStyleExt},
 };
 
 use super::prelude::UiContainerExt;
@@ -48,8 +48,9 @@ impl<'w, 's> UiRowExt<'w, 's> for UiBuilder<'w, 's, '_> {
 
         self.commands()
             .entity(row)
-            .set_height(config.height)
-            .set_background_color(config.background_color);
+            .style().height(config.height)
+            //.set_background_color(config.background_color)
+            ;
 
         self.commands().entity(row)
     }

@@ -2,7 +2,7 @@ use bevy::{ecs::system::EntityCommands, prelude::*};
 
 use crate::{
     ui_builder::{UiBuilder, UiBuilderExt},
-    ui_commands::{SetBackgroundColorExt, SetEntityDisplayExt},
+    ui_style::{SetBackgroundColorExt, SetEntityDisplayExt, UiStyleExt},
     FluxInteraction, FluxInteractionStopwatch, FluxInteractionUpdate, TrackedInteraction,
 };
 
@@ -200,9 +200,9 @@ fn update_submenu_container_visibility(
 ) {
     for (entity, container) in &q_submenus {
         if container.is_open {
-            commands.entity(entity).set_display(Display::Flex);
+            commands.entity(entity).style().display(Display::Flex);
         } else {
-            commands.entity(entity).set_display(Display::None);
+            commands.entity(entity).style().display(Display::None);
         }
     }
 }
@@ -223,9 +223,15 @@ fn update_submenu_state(
 fn update_submenu_style(q_submenus: Query<(Entity, Ref<Submenu>)>, mut commands: Commands) {
     for (entity, submenu) in &q_submenus {
         if submenu.is_open {
-            commands.entity(entity).set_background_color(Color::BISQUE);
+            commands
+                .entity(entity)
+                .style()
+                .background_color(Color::BISQUE);
         } else if submenu.is_changed() {
-            commands.entity(entity).set_background_color(Color::NONE);
+            commands
+                .entity(entity)
+                .style()
+                .background_color(Color::NONE);
         }
     }
 }

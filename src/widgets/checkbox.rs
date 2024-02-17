@@ -5,7 +5,7 @@ use crate::{
     animated_interaction::{AnimatedInteraction, AnimationConfig},
     interactions::InteractiveBackground,
     ui_builder::UiBuilder,
-    ui_commands::{SetEntityDisplayExt, SetImageExt},
+    ui_style::{SetEntityDisplayExt, SetImageExt, UiStyleExt},
     FluxInteraction, TrackedInteraction,
 };
 
@@ -38,7 +38,8 @@ fn update_checkbox(q_checkboxes: Query<&Checkbox, Changed<Checkbox>>, mut comman
     for checkbox in &q_checkboxes {
         commands
             .entity(checkbox.check_node)
-            .set_display(match checkbox.checked {
+            .style()
+            .display(match checkbox.checked {
                 true => Display::Flex,
                 false => Display::None,
             });
@@ -137,7 +138,7 @@ impl<'w, 's> UiCheckboxExt<'w, 's> for UiBuilder<'w, 's, '_> {
             container.container(Checkbox::checkmark_background(), |checkmark_bg| {
                 let mut check_mark = checkmark_bg.container(Checkbox::checkmark(), |_| {});
                 check_node = check_mark.id();
-                check_mark.set_image(CHECK_MARK);
+                check_mark.style().image(CHECK_MARK);
             });
 
             if let Some(label) = label {

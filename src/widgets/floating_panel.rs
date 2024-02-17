@@ -4,12 +4,12 @@ use bevy::{ecs::system::EntityCommands, prelude::*, window::WindowResized};
 use super::prelude::{LabelConfig, UiContainerExt, UiLabelExt};
 use super::prelude::{SetLabelTextExt, UiScrollViewExt};
 use crate::resize_interaction::ResizeHandle;
+use crate::ui_style::{SetEntityDisplayExt, UiStyleExt};
 use crate::{
     drag_interaction::{DragState, Draggable, DraggableUpdate},
     resize_interaction::ResizeDirection,
     scroll_interaction::ScrollAxis,
     ui_builder::UiBuilder,
-    ui_commands::SetEntityDisplayExt,
     FluxInteractionUpdate, TrackedInteraction,
 };
 
@@ -64,7 +64,8 @@ fn process_panel_config_update(
     for (panel, config) in &q_panels {
         commands
             .entity(panel.title_container)
-            .set_display(match config.title.is_some() {
+            .style()
+            .display(match config.title.is_some() {
                 true => Display::Flex,
                 false => Display::None,
             });
@@ -83,7 +84,8 @@ fn process_panel_config_update(
         } else {
             commands
                 .entity(panel.drag_handle)
-                .set_display(match config.draggable {
+                .style()
+                .display(match config.draggable {
                     true => Display::Flex,
                     false => Display::None,
                 });
@@ -91,7 +93,8 @@ fn process_panel_config_update(
 
         commands
             .entity(panel.resize_handles)
-            .set_display(match config.resizable {
+            .style()
+            .display(match config.resizable {
                 true => Display::Flex,
                 false => Display::None,
             });
@@ -580,7 +583,8 @@ impl<'w, 's> UiFloatingPanelExt<'w, 's> for UiBuilder<'w, 's, '_> {
                         );
                     },
                 )
-                .set_display(match config.resizable {
+                .style()
+                .display(match config.resizable {
                     true => Display::Flex,
                     false => Display::None,
                 })
@@ -603,7 +607,8 @@ impl<'w, 's> UiFloatingPanelExt<'w, 's> for UiBuilder<'w, 's, '_> {
                             .id();
                     },
                 )
-                .set_display(match config.title.is_some() {
+                .style()
+                .display(match config.title.is_some() {
                     true => Display::Flex,
                     false => Display::None,
                 })
@@ -614,7 +619,8 @@ impl<'w, 's> UiFloatingPanelExt<'w, 's> for UiBuilder<'w, 's, '_> {
                     FloatingPanel::drag_handle(),
                     FloatingPanelDragHandle { panel },
                 ))
-                .set_display(match config.title.is_some() {
+                .style()
+                .display(match config.title.is_some() {
                     true => Display::None,
                     false => Display::Flex,
                 })
@@ -624,7 +630,8 @@ impl<'w, 's> UiFloatingPanelExt<'w, 's> for UiBuilder<'w, 's, '_> {
                 container
                     .entity_commands()
                     .unwrap()
-                    .set_display(Display::None);
+                    .style()
+                    .display(Display::None);
             }
 
             container.scroll_view(restrict_to, spawn_children);

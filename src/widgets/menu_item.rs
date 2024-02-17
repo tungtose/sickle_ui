@@ -6,7 +6,7 @@ use crate::{
     input_extension::{ShortcutTextExt, SymmetricKeysExt},
     interactions::InteractiveBackground,
     ui_builder::*,
-    ui_commands::{SetBackgroundColorExt, SetImageExt},
+    ui_style::{SetBackgroundColorExt, SetImageExt, UiStyleExt},
     FluxInteraction, FluxInteractionUpdate, TrackedInteraction,
 };
 
@@ -114,13 +114,15 @@ fn update_menu_item_on_config_change(
             commands
                 .entity(menu_item.leading)
                 .try_insert(UiImage::default())
-                .set_image(leading)
-                .set_background_color(Color::WHITE);
+                .style()
+                .image(leading)
+                .background_color(Color::WHITE);
         } else {
             commands
                 .entity(menu_item.leading)
                 .remove::<UiImage>()
-                .set_background_color(Color::NONE);
+                .style()
+                .background_color(Color::NONE);
         }
 
         commands.entity(menu_item.label).set_label_text(name);
@@ -137,13 +139,15 @@ fn update_menu_item_on_config_change(
             commands
                 .entity(menu_item.trailing)
                 .try_insert(UiImage::default())
-                .set_image(trailing)
-                .set_background_color(Color::WHITE);
+                .style()
+                .image(trailing)
+                .background_color(Color::WHITE);
         } else {
             commands
                 .entity(menu_item.trailing)
                 .remove::<UiImage>()
-                .set_background_color(Color::NONE);
+                .style()
+                .background_color(Color::NONE);
         }
     }
 }

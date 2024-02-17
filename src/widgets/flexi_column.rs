@@ -9,7 +9,7 @@ use crate::{
     drag_interaction::{DragState, Draggable, DraggableUpdate},
     resize_interaction::{ResizeDirection, ResizeHandle},
     ui_builder::*,
-    ui_commands::SetEntityVisiblityExt,
+    ui_style::{SetEntityVisiblityExt, UiStyleExt},
 };
 
 use super::prelude::{ColumnConfig, UiColumnExt, UiContainerExt};
@@ -109,10 +109,12 @@ fn update_flexi_column_handles_on_collection(
 
         commands
             .entity(flexi.left_handle)
-            .set_visibility(Visibility::Hidden);
+            .style()
+            .visibility(Visibility::Hidden);
         commands
             .entity(flexi.right_handle)
-            .set_visibility(Visibility::Hidden);
+            .style()
+            .visibility(Visibility::Hidden);
     } else {
         let mut flexi_children: Vec<Entity> = Vec::with_capacity(child_count);
         let mut prev_is_flexi = true;
@@ -129,14 +131,16 @@ fn update_flexi_column_handles_on_collection(
 
             commands
                 .entity(flexi.left_handle)
-                .set_visibility(match prev_is_flexi {
+                .style()
+                .visibility(match prev_is_flexi {
                     true => Visibility::Hidden,
                     false => Visibility::Visible,
                 });
 
             commands
                 .entity(flexi.right_handle)
-                .set_visibility(match i == child_count - 1 {
+                .style()
+                .visibility(match i == child_count - 1 {
                     true => Visibility::Hidden,
                     false => Visibility::Visible,
                 });
@@ -169,6 +173,7 @@ fn update_flexi_column_handles_on_collection(
     }
 }
 
+// TODO: Consider children min_width for constraints
 fn update_flexi_column_on_resize(
     q_draggable: Query<(&Draggable, &ResizeHandle, &FlexiColumnResizeHandle), Changed<Draggable>>,
     mut q_flexi_columns: Query<(&mut FlexiColumn, Option<&Parent>)>,
@@ -363,7 +368,7 @@ fn fit_flexi_columns_on_window_resize(
             return;
         };
 
-        let non_flexi_width = q_non_flexi_root.iter().fold(0., |acc, (node, style)| {
+        let _non_flexi_width = q_non_flexi_root.iter().fold(0., |acc, (node, style)| {
             if style.position_type == PositionType::Relative {
                 acc + node.size().x
             } else {
@@ -383,7 +388,7 @@ fn fit_flexi_columns_on_window_resize(
             update_flexi_column_width_percent(
                 entity,
                 total_width,
-                non_flexi_width,
+                0.,
                 sum_flexi_width,
                 &mut q_flexi_column,
             );
@@ -404,7 +409,10 @@ fn update_flexi_column_width_percent(
 
     let flexi_width = total_width - non_flexi_width;
     let multiplier = flexi_width / sum_flexi_width;
-
+    info!(
+        "total: {:?}, non flexi: {:?}, flexi width: {:?}, mul: {:?}",
+        total_width, non_flexi_width, flexi_width, multiplier
+    );
     flexi_column.width_percent =
         (node.size().x.max(flexi_column.min_width) / flexi_width) * 100. * multiplier;
 }
@@ -486,7 +494,25 @@ impl<'w, 's> UiFlexiColumnExt<'w, 's> for UiBuilder<'w, 's, '_> {
         let min_width = config.min_width.max(MIN_FLEXI_COLUMN_WIDTH);
         let mut left_handle = Entity::PLACEHOLDER;
         let mut right_handle = Entity::PLACEHOLDER;
-        let column = self
+
+        if self.id().is_none() {
+            warn!("Flexi column as root node is not supported! An additional static element has been injected.");
+        }
+
+        let mut root = match self.id().is_none() {
+            true => self.spawn(NodeBundle {
+                style: Style {
+                    width: Val::Percent(100.),
+                    height: Val::Percent(100.),
+                    ..default()
+                },
+                ..default()
+            }),
+            false => self.entity_commands().unwrap(),
+        };
+
+        let column = root
+            .ui_builder()
             .container(FlexiColumn::frame(), |container| {
                 container.column(config.into(), spawn_children);
                 container.container(

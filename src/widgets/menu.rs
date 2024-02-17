@@ -5,7 +5,7 @@ use crate::{
     animated_interaction::{AnimatedInteraction, AnimationConfig},
     interactions::InteractiveBackground,
     ui_builder::*,
-    ui_commands::{SetBorderColorExt, SetEntityDisplayExt},
+    ui_style::{SetBorderColorExt, SetEntityDisplayExt, UiStyleExt},
     FluxInteraction, FluxInteractionUpdate, TrackedInteraction,
 };
 
@@ -141,14 +141,16 @@ fn update_menu_container_visibility(
     for (entity, menu) in &q_menus {
         commands
             .entity(menu.container)
-            .set_display(match menu.is_open {
+            .style()
+            .display(match menu.is_open {
                 true => Display::Flex,
                 false => Display::None,
             });
 
         commands
             .entity(entity)
-            .set_border_color(match menu.is_open {
+            .style()
+            .border_color(match menu.is_open {
                 true => Color::WHITE,
                 false => Color::NONE,
             });
