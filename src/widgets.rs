@@ -4,8 +4,6 @@ pub mod container;
 pub mod context_menu;
 pub mod docking_zone;
 pub mod dropdown;
-pub mod flexi_column;
-pub mod flexi_row;
 pub mod floating_panel;
 pub mod label;
 pub mod menu;
@@ -23,10 +21,9 @@ use bevy::prelude::*;
 
 use self::{
     checkbox::CheckboxPlugin, context_menu::ContextMenuPlugin, docking_zone::DockingZonePlugin,
-    dropdown::DropdownPlugin, flexi_column::FlexiColumnPlugin, flexi_row::FlexiRowPlugin,
-    floating_panel::FloatingPanelPlugin, menu::MenuPlugin, menu_item::MenuItemPlugin,
-    radio_group::RadioGroupPlugin, scroll_view::ScrollViewPlugin, slider::InputSliderPlugin,
-    submenu::SubmenuPlugin, toggle_menu_item::ToggleMenuItemPlugin,
+    dropdown::DropdownPlugin, floating_panel::FloatingPanelPlugin, menu::MenuPlugin,
+    menu_item::MenuItemPlugin, radio_group::RadioGroupPlugin, scroll_view::ScrollViewPlugin,
+    slider::InputSliderPlugin, submenu::SubmenuPlugin, toggle_menu_item::ToggleMenuItemPlugin,
 };
 
 pub mod prelude {
@@ -37,8 +34,6 @@ pub mod prelude {
         context_menu::{ContextMenuGenerator, GenerateContextMenu, ReflectContextMenuGenerator},
         docking_zone::{DockingZoneConfig, UiDockingZoneExt},
         dropdown::UiDropdownExt,
-        flexi_column::{FlexiColumnConfig, UiFlexiColumnExt},
-        flexi_row::{FlexiRowConfig, UiFlexiRowExt},
         floating_panel::{FloatingPanelConfig, FloatingPanelLayout, UiFloatingPanelExt},
         label::{LabelConfig, SetLabelTextExt, UiLabelExt},
         menu::{
@@ -64,8 +59,6 @@ impl Plugin for WidgetsPlugin {
             ContextMenuPlugin,
             DockingZonePlugin,
             DropdownPlugin,
-            FlexiColumnPlugin,
-            FlexiRowPlugin,
             FloatingPanelPlugin,
             MenuPlugin,
             MenuItemPlugin,
