@@ -110,16 +110,18 @@ fn update_panel_size_on_resize(
     }
 
     for (draggable, handle, handle_ref) in &q_draggable {
+        let Ok(mut panel) = q_panels.get_mut(handle_ref.panel) else {
+            continue;
+        };
+
         if draggable.state == DragState::Inactive
             || draggable.state == DragState::MaybeDragged
             || draggable.state == DragState::DragCanceled
         {
+            panel.resizing = false;
             continue;
         }
 
-        let Ok(mut panel) = q_panels.get_mut(handle_ref.panel) else {
-            continue;
-        };
         let Some(diff) = draggable.diff else {
             continue;
         };
@@ -127,6 +129,7 @@ fn update_panel_size_on_resize(
         let size_diff = handle.direction().to_size_diff(diff);
 
         let old_size = panel.size;
+        panel.resizing = true;
         panel.size += size_diff;
         if draggable.state == DragState::DragEnd {
             if panel.size.x < MIN_PANEL_SIZE.x {
@@ -201,6 +204,8 @@ fn update_panel_on_title_drag(
     };
     let mut offset = 1;
 
+    let mut panel_updated = false;
+
     for (draggable, (panel_title, drag_handle)) in &q_draggable {
         if draggable.state == DragState::Inactive
             || draggable.state == DragState::MaybeDragged
@@ -225,9 +230,18 @@ fn update_panel_on_title_drag(
             continue;
         };
 
+        if panel.resizing {
+            continue;
+        }
+
         panel.z_index = Some(max_index + offset);
         panel.position += diff;
         offset += 1;
+        panel_updated = true;
+    }
+
+    if !panel_updated {
+        return;
     }
 
     let mut panel_indices: Vec<(Entity, Option<usize>)> = q_panels
@@ -380,6 +394,7 @@ pub struct FloatingPanel {
     drag_handle: Entity,
     resize_handles: Entity,
     content: Entity,
+    resizing: bool,
     pub priority: bool,
 }
 
@@ -394,6 +409,7 @@ impl Default for FloatingPanel {
             drag_handle: Entity::PLACEHOLDER,
             resize_handles: Entity::PLACEHOLDER,
             content: Entity::PLACEHOLDER,
+            resizing: Default::default(),
             priority: Default::default(),
         }
     }

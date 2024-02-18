@@ -4,7 +4,7 @@ use crate::{
     drag_interaction::{DragState, Draggable, DraggableUpdate},
     resize_interaction::{ResizeDirection, ResizeHandle},
     ui_builder::*,
-    ui_style::{SetBackgroundColorExt, SetEntityVisiblityExt, UiStyleExt},
+    ui_style::{SetBackgroundColorExt, SetEntityDisplayExt, SetEntityVisiblityExt, UiStyleExt},
 };
 
 use super::prelude::UiContainerExt;
@@ -161,6 +161,7 @@ fn preset_docking_zone_resize_handles(
 ) {
     let zone_count = q_docking_zone_parents.iter().count();
     let mut handle_visibility: Vec<(Entity, bool)> = Vec::with_capacity(zone_count * 4);
+    let mut handle_non_display: Vec<(Entity, bool)> = Vec::with_capacity(zone_count * 4);
     let mut handle_neighbours: Vec<(Entity, Option<Entity>)> = Vec::with_capacity(zone_count * 4);
     let parents: Vec<Entity> =
         q_docking_zone_parents
@@ -182,10 +183,14 @@ fn preset_docking_zone_resize_handles(
             let Ok(zone) = q_docking_zones.get(children[0]) else {
                 return;
             };
-            handle_visibility.push((zone.top_handle, false));
-            handle_visibility.push((zone.right_handle, false));
-            handle_visibility.push((zone.bottom_handle, false));
-            handle_visibility.push((zone.left_handle, false));
+            // handle_visibility.push((zone.top_handle, false));
+            // handle_visibility.push((zone.right_handle, false));
+            // handle_visibility.push((zone.bottom_handle, false));
+            // handle_visibility.push((zone.left_handle, false));
+            handle_non_display.push((zone.top_handle, false));
+            handle_non_display.push((zone.right_handle, false));
+            handle_non_display.push((zone.bottom_handle, false));
+            handle_non_display.push((zone.left_handle, false));
         } else {
             let mut zone_children: Vec<Entity> = Vec::with_capacity(child_count);
             let mut prev_is_zone = true;
@@ -210,14 +215,22 @@ fn preset_docking_zone_resize_handles(
                     FlexDirection::Row => {
                         handle_visibility.push((zone.top_handle, !prev_is_zone));
                         handle_visibility.push((zone.bottom_handle, i != child_count - 1));
-                        handle_visibility.push((zone.right_handle, false));
-                        handle_visibility.push((zone.left_handle, false));
+                        // handle_visibility.push((zone.right_handle, false));
+                        // handle_visibility.push((zone.left_handle, false));
+                        handle_non_display.push((zone.top_handle, true));
+                        handle_non_display.push((zone.bottom_handle, true));
+                        handle_non_display.push((zone.left_handle, false));
+                        handle_non_display.push((zone.right_handle, false));
                     }
                     FlexDirection::Column => {
                         handle_visibility.push((zone.left_handle, !prev_is_zone));
                         handle_visibility.push((zone.right_handle, i != child_count - 1));
-                        handle_visibility.push((zone.top_handle, false));
-                        handle_visibility.push((zone.bottom_handle, false));
+                        handle_non_display.push((zone.left_handle, true));
+                        handle_non_display.push((zone.right_handle, true));
+                        handle_non_display.push((zone.top_handle, false));
+                        handle_non_display.push((zone.bottom_handle, false));
+                        // handle_visibility.push((zone.top_handle, false));
+                        // handle_visibility.push((zone.bottom_handle, false));
                     }
                     _ => warn!(
                         "Invalid flex_direction detected on docking zone {:?}",
@@ -274,6 +287,13 @@ fn preset_docking_zone_resize_handles(
         commands.entity(handle).style().visibility(match visible {
             true => Visibility::Visible,
             false => Visibility::Hidden,
+        });
+    }
+
+    for (handle, visible) in handle_non_display {
+        commands.entity(handle).style().display(match visible {
+            true => Display::Flex,
+            false => Display::None,
         });
     }
 

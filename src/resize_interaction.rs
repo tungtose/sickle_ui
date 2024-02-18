@@ -115,11 +115,11 @@ impl ResizeHandle {
                 width: Val::Percent(100.),
                 height: Val::Percent(100.),
                 margin: UiRect::all(Val::Px(-ResizeHandle::resize_zone_pullback())),
-                justify_self: JustifySelf::Stretch,
+                // justify_self: JustifySelf::Stretch,
                 justify_content: JustifyContent::SpaceBetween,
                 align_self: AlignSelf::Stretch,
                 flex_direction: FlexDirection::Column,
-                flex_grow: 1.,
+                //flex_grow: 1.,
                 ..default()
             },
             z_index: ZIndex::Local(10),
@@ -148,7 +148,7 @@ impl ResizeHandle {
                     height,
                     ..default()
                 },
-                focus_policy: bevy::ui::FocusPolicy::Block,
+                focus_policy: bevy::ui::FocusPolicy::Pass,
                 ..default()
             },
             Interaction::default(),
