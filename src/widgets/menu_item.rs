@@ -113,15 +113,15 @@ fn update_menu_item_on_config_change(
         if let Some(leading) = leading {
             commands
                 .entity(menu_item.leading)
-                .try_insert(UiImage::default())
-                .style()
+                .try_insert(UiImage::default());
+            commands
+                .style(menu_item.leading)
                 .image(leading)
                 .background_color(Color::WHITE);
         } else {
+            commands.entity(menu_item.leading).remove::<UiImage>();
             commands
-                .entity(menu_item.leading)
-                .remove::<UiImage>()
-                .style()
+                .style(menu_item.leading)
                 .background_color(Color::NONE);
         }
 
@@ -138,15 +138,15 @@ fn update_menu_item_on_config_change(
         if let Some(trailing) = trailing {
             commands
                 .entity(menu_item.trailing)
-                .try_insert(UiImage::default())
-                .style()
+                .try_insert(UiImage::default());
+            commands
+                .style(menu_item.trailing)
                 .image(trailing)
                 .background_color(Color::WHITE);
         } else {
+            commands.entity(menu_item.trailing).remove::<UiImage>();
             commands
-                .entity(menu_item.trailing)
-                .remove::<UiImage>()
-                .style()
+                .style(menu_item.trailing)
                 .background_color(Color::NONE);
         }
     }
@@ -293,7 +293,7 @@ impl<'w, 's> UiMenuItemExt<'w, 's> for UiBuilder<'w, 's, '_> {
             trailing = menu_item.spawn(MenuItem::trailing_icon()).id();
         });
 
-        item.entity_commands().insert(MenuItem {
+        item.insert(MenuItem {
             leading,
             label,
             shortcut,

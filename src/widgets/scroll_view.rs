@@ -607,7 +607,7 @@ impl<'w, 's> UiScrollViewExt<'w, 's> for UiBuilder<'w, 's, '_> {
                                 .id();
                         },
                     );
-                    scroll_bar.entity_commands().insert(ScrollBar {
+                    scroll_bar.insert(ScrollBar {
                         axis: *axis,
                         scroll_view: scroll_view_id,
                         handle: handle_id,
@@ -626,7 +626,7 @@ impl<'w, 's> UiScrollViewExt<'w, 's> for UiBuilder<'w, 's, '_> {
             });
         });
 
-        scroll_view.entity_commands().insert(ScrollView {
+        scroll_view.insert(ScrollView {
             viewport,
             content_container,
             horizontal_scroll_bar: horizontal_scroll_id,

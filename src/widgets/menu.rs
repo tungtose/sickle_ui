@@ -139,21 +139,15 @@ fn update_menu_container_visibility(
     mut commands: Commands,
 ) {
     for (entity, menu) in &q_menus {
-        commands
-            .entity(menu.container)
-            .style()
-            .display(match menu.is_open {
-                true => Display::Flex,
-                false => Display::None,
-            });
+        commands.style(menu.container).display(match menu.is_open {
+            true => Display::Flex,
+            false => Display::None,
+        });
 
-        commands
-            .entity(entity)
-            .style()
-            .border_color(match menu.is_open {
-                true => Color::WHITE,
-                false => Color::NONE,
-            });
+        commands.style(entity).border_color(match menu.is_open {
+            true => Color::WHITE,
+            false => Color::NONE,
+        });
     }
 }
 
@@ -263,7 +257,7 @@ impl<'w, 's> UiMenuExt<'w, 's> for UiBuilder<'w, 's, '_> {
             });
         });
 
-        menu.entity_commands().insert((
+        menu.insert((
             Menu {
                 container,
                 ..default()

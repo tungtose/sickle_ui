@@ -595,7 +595,7 @@ impl<'w, 's> UiSliderExt<'w, 's> for UiBuilder<'w, 's, '_> {
             }),
         };
 
-        input.entity_commands().insert(Slider {
+        input.insert(Slider {
             ratio: config.initial_value / (config.max - config.min),
             config,
             slider_bar,

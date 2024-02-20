@@ -284,14 +284,14 @@ fn preset_docking_zone_resize_handles(
     }
 
     for (handle, visible) in handle_visibility {
-        commands.entity(handle).style().visibility(match visible {
+        commands.style(handle).visibility(match visible {
             true => Visibility::Visible,
             false => Visibility::Hidden,
         });
     }
 
     for (handle, visible) in handle_non_display {
-        commands.entity(handle).style().display(match visible {
+        commands.style(handle).display(match visible {
             true => Display::Flex,
             false => Display::None,
         });
@@ -630,48 +630,40 @@ impl<'w, 's> UiDockingZoneExt<'w, 's> for UiBuilder<'w, 's, '_> {
             warn!("Docking zone as root node is not supported!");
         }
 
-        let docking_zone = self
-            .container(DockingZone::frame(), |container| {
-                let zone_id = container.id();
-                let handle = DockingZoneResizeHandle {
-                    docking_zone: zone_id,
-                    ..default()
-                };
+        let mut docking_zone = self.container(DockingZone::frame(), |container| {
+            let zone_id = container.id();
+            let handle = DockingZoneResizeHandle {
+                docking_zone: zone_id,
+                ..default()
+            };
 
-                // let mut commands = container.commands().entity(zone_id);
-                // let mut new_builder = commands.ui_builder();
-                spawn_children(container);
+            spawn_children(container);
 
-                container.container(
-                    ResizeHandle::resize_handle_container(),
-                    |resize_container| {
-                        top_handle = resize_container
-                            .spawn((ResizeHandle::resize_handle(ResizeDirection::North), handle))
-                            .id();
-                        resize_container.container(
-                            DockingZone::vertical_handles_container(),
-                            |middle_row| {
-                                left_handle = middle_row
-                                    .spawn((
-                                        ResizeHandle::resize_handle(ResizeDirection::West),
-                                        handle,
-                                    ))
-                                    .id();
-                                right_handle = middle_row
-                                    .spawn((
-                                        ResizeHandle::resize_handle(ResizeDirection::East),
-                                        handle,
-                                    ))
-                                    .id();
-                            },
-                        );
-                        bottom_handle = resize_container
-                            .spawn((ResizeHandle::resize_handle(ResizeDirection::South), handle))
-                            .id();
-                    },
-                );
-            })
-            .entity_commands()
+            container.container(
+                ResizeHandle::resize_handle_container(),
+                |resize_container| {
+                    top_handle = resize_container
+                        .spawn((ResizeHandle::resize_handle(ResizeDirection::North), handle))
+                        .id();
+                    resize_container.container(
+                        DockingZone::vertical_handles_container(),
+                        |middle_row| {
+                            left_handle = middle_row
+                                .spawn((ResizeHandle::resize_handle(ResizeDirection::West), handle))
+                                .id();
+                            right_handle = middle_row
+                                .spawn((ResizeHandle::resize_handle(ResizeDirection::East), handle))
+                                .id();
+                        },
+                    );
+                    bottom_handle = resize_container
+                        .spawn((ResizeHandle::resize_handle(ResizeDirection::South), handle))
+                        .id();
+                },
+            );
+        });
+
+        docking_zone
             .insert(DockingZone {
                 size_percent: size,
                 min_size,
@@ -682,9 +674,8 @@ impl<'w, 's> UiDockingZoneExt<'w, 's> for UiBuilder<'w, 's, '_> {
                 ..default()
             })
             .style()
-            .background_color(config.background_color)
-            .id();
+            .background_color(config.background_color);
 
-        self.commands().ui_builder(docking_zone.into())
+        docking_zone
     }
 }

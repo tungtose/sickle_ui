@@ -63,8 +63,7 @@ fn process_panel_config_update(
 ) {
     for (panel, config) in &q_panels {
         commands
-            .entity(panel.title_container)
-            .style()
+            .style(panel.title_container)
             .display(match config.title.is_some() {
                 true => Display::Flex,
                 false => Display::None,
@@ -83,8 +82,7 @@ fn process_panel_config_update(
             }
         } else {
             commands
-                .entity(panel.drag_handle)
-                .style()
+                .style(panel.drag_handle)
                 .display(match config.draggable {
                     true => Display::Flex,
                     false => Display::None,
@@ -92,8 +90,7 @@ fn process_panel_config_update(
         }
 
         commands
-            .entity(panel.resize_handles)
-            .style()
+            .style(panel.resize_handles)
             .display(match config.resizable {
                 true => Display::Flex,
                 false => Display::None,
@@ -599,7 +596,6 @@ impl<'w, 's> UiFloatingPanelExt<'w, 's> for UiBuilder<'w, 's, '_> {
                         );
                     },
                 )
-                .entity_commands()
                 .style()
                 .display(match config.resizable {
                     true => Display::Flex,
@@ -624,7 +620,6 @@ impl<'w, 's> UiFloatingPanelExt<'w, 's> for UiBuilder<'w, 's, '_> {
                             .id();
                     },
                 )
-                .entity_commands()
                 .style()
                 .display(match config.title.is_some() {
                     true => Display::Flex,
@@ -637,7 +632,6 @@ impl<'w, 's> UiFloatingPanelExt<'w, 's> for UiBuilder<'w, 's, '_> {
                     FloatingPanel::drag_handle(),
                     FloatingPanelDragHandle { panel },
                 ))
-                .entity_commands()
                 .style()
                 .display(match config.title.is_some() {
                     true => Display::None,
@@ -646,13 +640,13 @@ impl<'w, 's> UiFloatingPanelExt<'w, 's> for UiBuilder<'w, 's, '_> {
                 .id();
 
             if layout.hidden {
-                container.entity_commands().style().display(Display::None);
+                container.style().display(Display::None);
             }
 
             container.scroll_view(restrict_to, spawn_children);
         });
 
-        frame.entity_commands().insert((
+        frame.insert((
             config,
             FloatingPanel {
                 size: layout.size.max(MIN_PANEL_SIZE),

@@ -76,7 +76,7 @@ pub trait UiToggleMenuItemExt<'w, 's> {
 impl<'w, 's> UiToggleMenuItemExt<'w, 's> for UiBuilder<'w, 's, '_> {
     fn toggle_menu_item<'a>(&'a mut self, config: ToggleMenuItemConfig) -> UiBuilder<'w, 's, 'a> {
         let mut item = self.menu_item(config.clone().into());
-        item.entity_commands().insert((
+        item.insert((
             ToggleMenuItem {
                 checked: config.initially_checked,
             },

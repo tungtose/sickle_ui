@@ -2,7 +2,7 @@ use bevy::prelude::*;
 
 use crate::{
     ui_builder::*,
-    ui_style::{SetBackgroundColorExt, SetEntityWidthExt, UiStyleExt},
+    ui_style::{SetBackgroundColorExt, SetEntityWidthExt},
 };
 
 use super::prelude::UiContainerExt;
@@ -47,7 +47,6 @@ impl<'w, 's> UiColumnExt<'w, 's> for UiBuilder<'w, 's, '_> {
         let mut column = self.container((Column::frame(), Column), spawn_children);
 
         column
-            .entity_commands()
             .style()
             .width(config.width)
             .background_color(config.background_color);

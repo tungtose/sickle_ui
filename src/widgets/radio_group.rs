@@ -254,7 +254,6 @@ impl<'w, 's> UiRadioGroupExt<'w, 's> for UiBuilder<'w, 's, '_> {
                                 ..default()
                             });
                         })
-                        .entity_commands()
                         .insert(RadioButton {
                             index: i.try_into().unwrap(),
                             checked: false,

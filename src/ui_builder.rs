@@ -7,6 +7,8 @@ use bevy::{
     hierarchy::BuildChildren,
 };
 
+use crate::ui_style::{UiStyle, UiStyleExt};
+
 pub struct UiBuilder<'w, 's, 'a> {
     commands: &'a mut Commands<'w, 's>,
     entity: Option<Entity>,
@@ -30,6 +32,11 @@ impl<'w, 's> UiBuilder<'w, 's, '_> {
         self.commands().entity(entity)
     }
 
+    pub fn style(&mut self) -> UiStyle<'w, 's, '_> {
+        let entity = self.id();
+        self.commands().style(entity)
+    }
+
     pub fn spawn<'a>(&'a mut self, bundle: impl Bundle) -> UiBuilder<'w, 's, 'a> {
         let mut new_entity = Entity::PLACEHOLDER;
 
@@ -42,6 +49,11 @@ impl<'w, 's> UiBuilder<'w, 's, '_> {
         }
 
         self.commands().ui_builder(new_entity.into())
+    }
+
+    pub fn insert(&mut self, bundle: impl Bundle) -> &mut Self {
+        self.entity_commands().insert(bundle);
+        self
     }
 }
 

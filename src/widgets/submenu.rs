@@ -200,9 +200,9 @@ fn update_submenu_container_visibility(
 ) {
     for (entity, container) in &q_submenus {
         if container.is_open {
-            commands.entity(entity).style().display(Display::Flex);
+            commands.style(entity).display(Display::Flex);
         } else {
-            commands.entity(entity).style().display(Display::None);
+            commands.style(entity).display(Display::None);
         }
     }
 }
@@ -223,15 +223,9 @@ fn update_submenu_state(
 fn update_submenu_style(q_submenus: Query<(Entity, Ref<Submenu>)>, mut commands: Commands) {
     for (entity, submenu) in &q_submenus {
         if submenu.is_open {
-            commands
-                .entity(entity)
-                .style()
-                .background_color(Color::BISQUE);
+            commands.style(entity).background_color(Color::BISQUE);
         } else if submenu.is_changed() {
-            commands
-                .entity(entity)
-                .style()
-                .background_color(Color::NONE);
+            commands.style(entity).background_color(Color::NONE);
         }
     }
 }
@@ -368,17 +362,14 @@ impl<'w, 's> UiSubmenuExt<'w, 's> for UiBuilder<'w, 's, '_> {
             )
             .id();
 
-        self.commands()
-            .ui_builder(menu_id.into())
-            .entity_commands()
-            .insert((
-                Submenu {
-                    container,
-                    external_container,
-                    ..default()
-                },
-                config,
-            ));
+        self.commands().ui_builder(menu_id.into()).insert((
+            Submenu {
+                container,
+                external_container,
+                ..default()
+            },
+            config,
+        ));
 
         self.commands().ui_builder(menu_id.into())
     }

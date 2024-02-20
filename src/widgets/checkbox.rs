@@ -37,8 +37,7 @@ fn toggle_checkbox(
 fn update_checkbox(q_checkboxes: Query<&Checkbox, Changed<Checkbox>>, mut commands: Commands) {
     for checkbox in &q_checkboxes {
         commands
-            .entity(checkbox.check_node)
-            .style()
+            .style(checkbox.check_node)
             .display(match checkbox.checked {
                 true => Display::Flex,
                 false => Display::None,
@@ -139,7 +138,7 @@ impl<'w, 's> UiCheckboxExt<'w, 's> for UiBuilder<'w, 's, '_> {
                 let mut check_mark = checkmark_bg.container(Checkbox::checkmark(), |_| {});
                 check_node = check_mark.id();
 
-                check_mark.entity_commands().style().image(CHECK_MARK);
+                check_mark.style().image(CHECK_MARK);
             });
 
             if let Some(label) = label {
@@ -151,7 +150,7 @@ impl<'w, 's> UiCheckboxExt<'w, 's> for UiBuilder<'w, 's, '_> {
             }
         });
 
-        input.entity_commands().insert(Checkbox {
+        input.insert(Checkbox {
             check_node,
             checked: false,
         });

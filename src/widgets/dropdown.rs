@@ -309,14 +309,13 @@ impl<'w, 's> UiDropdownExt<'w, 's> for UiBuilder<'w, 's, '_> {
                             }
                         },
                     )
-                    .entity_commands()
                     .insert(DropdownPanel {
                         dropdown: dropdown_id,
                     })
                     .id();
             });
 
-        dropdown.entity_commands().insert(Dropdown {
+        dropdown.insert(Dropdown {
             button_label: selected,
             panel: panel_id,
             ..default()

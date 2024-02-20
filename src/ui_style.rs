@@ -1,7 +1,4 @@
-use bevy::{
-    ecs::system::{Command, EntityCommands},
-    prelude::*,
-};
+use bevy::{ecs::system::Command, prelude::*};
 use sickle_macros::StyleCommand;
 
 pub struct UiStyle<'w, 's, 'a> {
@@ -16,14 +13,13 @@ impl<'w, 's, 'a> UiStyle<'w, 's, 'a> {
 }
 
 pub trait UiStyleExt<'w, 's, 'a> {
-    fn style(&'a mut self) -> UiStyle<'w, 's, 'a>;
+    fn style(&'a mut self, entity: Entity) -> UiStyle<'w, 's, 'a>;
 }
 
-impl<'w, 's, 'a> UiStyleExt<'w, 's, 'a> for EntityCommands<'w, 's, 'a> {
-    fn style(&'a mut self) -> UiStyle<'w, 's, 'a> {
-        let entity = self.id();
+impl<'w, 's, 'a> UiStyleExt<'w, 's, 'a> for Commands<'w, 's> {
+    fn style(&'a mut self, entity: Entity) -> UiStyle<'w, 's, 'a> {
         UiStyle {
-            commands: self.commands(),
+            commands: self,
             entity,
         }
     }
