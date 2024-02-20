@@ -5,7 +5,7 @@ use crate::{
     animated_interaction::{AnimatedInteraction, AnimationConfig},
     interactions::InteractiveBackground,
     ui_builder::*,
-    ui_style::{SetBorderColorExt, SetEntityDisplayExt, UiStyleExt},
+    ui_style::{SetBorderColorExt, SetEntityVisiblityExt, UiStyleExt},
     FluxInteraction, FluxInteractionUpdate, TrackedInteraction,
 };
 
@@ -140,10 +140,12 @@ fn update_menu_container_visibility(
     mut commands: Commands,
 ) {
     for (entity, menu) in &q_menus {
-        commands.style(menu.container).display(match menu.is_open {
-            true => Display::Flex,
-            false => Display::None,
-        });
+        commands
+            .style(menu.container)
+            .visibility(match menu.is_open {
+                true => Visibility::Inherited,
+                false => Visibility::Hidden,
+            });
 
         commands.style(entity).border_color(match menu.is_open {
             true => Color::WHITE,
@@ -221,13 +223,13 @@ impl Menu {
                     flex_direction: FlexDirection::Column,
                     align_self: AlignSelf::End,
                     align_items: AlignItems::Stretch,
-                    display: Display::None,
                     ..default()
                 },
                 z_index: ZIndex::Global(MENU_CONTAINER_Z_INDEX),
                 background_color: Color::rgb(0.7, 0.6, 0.5).into(),
                 border_color: Color::WHITE.into(),
                 focus_policy: bevy::ui::FocusPolicy::Block,
+                visibility: Visibility::Hidden,
                 ..default()
             },
             Interaction::default(),

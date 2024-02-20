@@ -158,7 +158,7 @@ fn update_slider_handle(
 
 fn update_slider_readout(
     q_slider: Query<&Slider, Changed<Slider>>,
-    mut q_style: Query<&mut Style>,
+    mut q_visibility: Query<&mut Visibility>,
     mut q_text: Query<&mut Text>,
 ) {
     for slider in &q_slider {
@@ -168,13 +168,13 @@ fn update_slider_readout(
         let Ok(mut text) = q_text.get_mut(readout_target) else {
             continue;
         };
-        let Ok(mut style) = q_style.get_mut(readout_target) else {
+        let Ok(mut visibility) = q_visibility.get_mut(readout_target) else {
             continue;
         };
 
         if slider.config.show_current {
-            if style.display == Display::None {
-                style.display = Display::Flex;
+            if *visibility == Visibility::Hidden {
+                *visibility = Visibility::Inherited;
             }
 
             let content = format!("{:.1}", slider.value());
@@ -188,8 +188,8 @@ fn update_slider_readout(
             };
 
             text.sections = vec![section];
-        } else if !slider.config.show_current && style.display == Display::Flex {
-            style.display = Display::None;
+        } else if !slider.config.show_current && *visibility == Visibility::Inherited {
+            *visibility = Visibility::Hidden;
         }
     }
 }

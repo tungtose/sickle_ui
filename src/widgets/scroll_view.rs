@@ -200,6 +200,7 @@ fn update_scroll_view_layout(
     q_scroll_view: Query<(Entity, &ScrollView), Or<(Changed<ScrollView>, Changed<Node>)>>,
     mut q_node: Query<&Node>,
     mut q_style: Query<&mut Style>,
+    mut q_visibility: Query<&mut Visibility>,
 ) {
     for (entity, scroll_view) in &q_scroll_view {
         let Ok(container_node) = q_node.get(entity) else {
@@ -244,11 +245,11 @@ fn update_scroll_view_layout(
             scroll_view.vertical_scroll_bar,
             scroll_view.vertical_scroll_bar_handle,
         ) {
-            if let Ok(mut vertical_bar_style) = q_style.get_mut(vertical_scroll_bar) {
+            if let Ok(mut vertical_bar_visibility) = q_visibility.get_mut(vertical_scroll_bar) {
                 if container_height >= content_height || container_height <= 5. {
-                    vertical_bar_style.display = Display::None;
+                    *vertical_bar_visibility = Visibility::Hidden;
                 } else {
-                    vertical_bar_style.display = Display::Flex;
+                    *vertical_bar_visibility = Visibility::Inherited;
 
                     if let Ok(mut handle_style) = q_style.get_mut(vertical_scroll_bar_handle) {
                         let scroll_offset_y = scroll_view.scroll_offset.y.clamp(0., overflow_y);
@@ -270,11 +271,11 @@ fn update_scroll_view_layout(
             scroll_view.horizontal_scroll_bar_handle,
         ) {
             // Update horizontal scroll bar
-            if let Ok(mut horizontal_bar_style) = q_style.get_mut(horizontal_scroll_bar) {
+            if let Ok(mut horizontal_bar_visibility) = q_visibility.get_mut(horizontal_scroll_bar) {
                 if container_width >= content_width || container_width <= 5. {
-                    horizontal_bar_style.display = Display::None;
+                    *horizontal_bar_visibility = Visibility::Hidden;
                 } else {
-                    horizontal_bar_style.display = Display::Flex;
+                    *horizontal_bar_visibility = Visibility::Inherited;
 
                     if let Ok(mut handle_style) = q_style.get_mut(horizontal_scroll_bar_handle) {
                         let scroll_offset_x = scroll_view.scroll_offset.x.clamp(0., overflow_x);

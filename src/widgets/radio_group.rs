@@ -103,14 +103,13 @@ fn update_radio_group_buttons(
 
 fn update_radio_button(
     q_checkboxes: Query<&RadioButton, Changed<RadioButton>>,
-    mut style: Query<&mut Style>,
+    mut q_visibility: Query<&mut Visibility>,
 ) {
     for checkbox in &q_checkboxes {
-        if let Ok(mut target) = style.get_mut(checkbox.check_node) {
-            target.display = if checkbox.checked {
-                Display::Flex
-            } else {
-                Display::None
+        if let Ok(mut visiblity) = q_visibility.get_mut(checkbox.check_node) {
+            *visiblity = match checkbox.checked {
+                true => Visibility::Inherited,
+                false => Visibility::Hidden,
             };
         }
     }
@@ -203,7 +202,6 @@ impl RadioButton {
     fn radio_mark() -> impl Bundle {
         NodeBundle {
             style: Style {
-                display: Display::None,
                 width: Val::Px(10.),
                 height: Val::Px(10.),
                 margin: UiRect::all(Val::Px(2.)),

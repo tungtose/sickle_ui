@@ -5,7 +5,7 @@ use crate::{
     animated_interaction::{AnimatedInteraction, AnimationConfig},
     interactions::InteractiveBackground,
     ui_builder::UiBuilder,
-    ui_style::{SetEntityDisplayExt, SetImageExt, UiStyleExt},
+    ui_style::{SetEntityVisiblityExt, SetImageExt, UiStyleExt},
     FluxInteraction, TrackedInteraction,
 };
 
@@ -38,9 +38,9 @@ fn update_checkbox(q_checkboxes: Query<&Checkbox, Changed<Checkbox>>, mut comman
     for checkbox in &q_checkboxes {
         commands
             .style(checkbox.check_node)
-            .display(match checkbox.checked {
-                true => Display::Flex,
-                false => Display::None,
+            .visibility(match checkbox.checked {
+                true => Visibility::Inherited,
+                false => Visibility::Hidden,
             });
     }
 }
@@ -113,7 +113,6 @@ impl Checkbox {
     fn checkmark() -> impl Bundle {
         ImageBundle {
             style: Style {
-                display: Display::None,
                 width: Val::Px(10.),
                 height: Val::Px(10.),
                 margin: UiRect::all(Val::Px(2.)),

@@ -4,7 +4,7 @@ use bevy::{prelude::*, window::WindowResized};
 use super::prelude::{LabelConfig, UiContainerExt, UiLabelExt};
 use super::prelude::{SetLabelTextExt, UiScrollViewExt};
 use crate::resize_interaction::ResizeHandle;
-use crate::ui_style::{SetEntityDisplayExt, UiStyleExt};
+use crate::ui_style::{SetEntityVisiblityExt, UiStyleExt};
 use crate::{
     drag_interaction::{DragState, Draggable, DraggableUpdate},
     resize_interaction::ResizeDirection,
@@ -64,9 +64,9 @@ fn process_panel_config_update(
     for (panel, config) in &q_panels {
         commands
             .style(panel.title_container)
-            .display(match config.title.is_some() {
-                true => Display::Flex,
-                false => Display::None,
+            .visibility(match config.title.is_some() {
+                true => Visibility::Inherited,
+                false => Visibility::Hidden,
             });
 
         if let Some(title) = config.title.clone() {
@@ -83,17 +83,17 @@ fn process_panel_config_update(
         } else {
             commands
                 .style(panel.drag_handle)
-                .display(match config.draggable {
-                    true => Display::Flex,
-                    false => Display::None,
+                .visibility(match config.draggable {
+                    true => Visibility::Inherited,
+                    false => Visibility::Hidden,
                 });
         }
 
         commands
             .style(panel.resize_handles)
-            .display(match config.resizable {
-                true => Display::Flex,
-                false => Display::None,
+            .visibility(match config.resizable {
+                true => Visibility::Inherited,
+                false => Visibility::Hidden,
             });
     }
 }
@@ -597,9 +597,9 @@ impl<'w, 's> UiFloatingPanelExt<'w, 's> for UiBuilder<'w, 's, '_> {
                     },
                 )
                 .style()
-                .display(match config.resizable {
-                    true => Display::Flex,
-                    false => Display::None,
+                .visibility(match config.resizable {
+                    true => Visibility::Inherited,
+                    false => Visibility::Hidden,
                 })
                 .id();
 
@@ -621,9 +621,9 @@ impl<'w, 's> UiFloatingPanelExt<'w, 's> for UiBuilder<'w, 's, '_> {
                     },
                 )
                 .style()
-                .display(match config.title.is_some() {
-                    true => Display::Flex,
-                    false => Display::None,
+                .visibility(match config.title.is_some() {
+                    true => Visibility::Inherited,
+                    false => Visibility::Hidden,
                 })
                 .id();
 
@@ -633,14 +633,14 @@ impl<'w, 's> UiFloatingPanelExt<'w, 's> for UiBuilder<'w, 's, '_> {
                     FloatingPanelDragHandle { panel },
                 ))
                 .style()
-                .display(match config.title.is_some() {
-                    true => Display::None,
-                    false => Display::Flex,
+                .visibility(match config.title.is_some() {
+                    true => Visibility::Hidden,
+                    false => Visibility::Inherited,
                 })
                 .id();
 
             if layout.hidden {
-                container.style().display(Display::None);
+                container.style().visibility(Visibility::Hidden);
             }
 
             container.scroll_view(restrict_to, spawn_children);

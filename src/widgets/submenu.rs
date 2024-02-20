@@ -2,7 +2,7 @@ use bevy::prelude::*;
 
 use crate::{
     ui_builder::{UiBuilder, UiBuilderExt},
-    ui_style::{SetBackgroundColorExt, SetEntityDisplayExt, UiStyleExt},
+    ui_style::{SetBackgroundColorExt, SetEntityVisiblityExt, UiStyleExt},
     FluxInteraction, FluxInteractionStopwatch, FluxInteractionUpdate, TrackedInteraction,
 };
 
@@ -199,11 +199,10 @@ fn update_submenu_container_visibility(
     mut commands: Commands,
 ) {
     for (entity, container) in &q_submenus {
-        if container.is_open {
-            commands.style(entity).display(Display::Flex);
-        } else {
-            commands.style(entity).display(Display::None);
-        }
+        commands.style(entity).visibility(match container.is_open {
+            true => Visibility::Inherited,
+            false => Visibility::Hidden,
+        });
     }
 }
 
@@ -314,7 +313,6 @@ impl SubmenuContainer {
                     flex_direction: FlexDirection::Column,
                     align_self: AlignSelf::FlexStart,
                     align_items: AlignItems::Stretch,
-                    display: Display::None,
                     ..default()
                 },
                 z_index: ZIndex::Global(MENU_CONTAINER_Z_INDEX),

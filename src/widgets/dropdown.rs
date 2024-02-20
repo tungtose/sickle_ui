@@ -108,10 +108,10 @@ fn handle_option_press(
 }
 
 fn update_dropdown_panel_visibility(
-    mut q_panels: Query<(&DropdownPanel, &mut Style, &mut FloatingPanel)>,
+    mut q_panels: Query<(&DropdownPanel, &mut Visibility, &mut FloatingPanel)>,
     q_dropdown: Query<Ref<Dropdown>>,
 ) {
-    for (panel, mut style, mut floating_panel) in &mut q_panels {
+    for (panel, mut visibility, mut floating_panel) in &mut q_panels {
         let Ok(dropdown) = q_dropdown.get(panel.dropdown) else {
             continue;
         };
@@ -121,10 +121,10 @@ fn update_dropdown_panel_visibility(
         }
 
         if dropdown.is_open {
-            style.display = Display::Flex;
+            *visibility = Visibility::Inherited;
             floating_panel.priority = true;
-        } else if style.display != Display::None {
-            style.display = Display::None;
+        } else if *visibility != Visibility::Hidden {
+            *visibility = Visibility::Hidden;
             floating_panel.priority = false;
         }
     }
