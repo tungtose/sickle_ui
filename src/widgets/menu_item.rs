@@ -58,7 +58,7 @@ fn update_menu_item_on_pressed(
 
 fn update_menu_item_on_key_press(
     mut q_menu_items: Query<(&mut MenuItem, &MenuItemConfig)>,
-    r_keys: Res<Input<KeyCode>>,
+    r_keys: Res<ButtonInput<KeyCode>>,
 ) {
     if !r_keys.is_changed() {
         return;

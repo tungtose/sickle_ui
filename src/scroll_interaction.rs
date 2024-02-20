@@ -17,7 +17,7 @@ pub struct ScrollableUpdate;
 
 fn update_scrollables(
     mut mouse_wheel_events: EventReader<MouseWheel>,
-    r_keys: Res<Input<KeyCode>>,
+    r_keys: Res<ButtonInput<KeyCode>>,
     mut q_scrollables: Query<(&mut Scrollable, &Interaction)>,
 ) {
     let mut axis = ScrollAxis::Vertical;

@@ -47,7 +47,7 @@ pub struct RadioGroupUpdate;
 
 fn toggle_radio_button(
     mut q_radio_buttons: Query<(&mut RadioButton, &FluxInteraction), Changed<FluxInteraction>>,
-    keys: Res<Input<KeyCode>>,
+    keys: Res<ButtonInput<KeyCode>>,
     mut q_group: Query<&mut RadioGroup>,
 ) {
     for (mut radio_button, interaction) in &mut q_radio_buttons {
@@ -150,7 +150,7 @@ impl Default for RadioButton {
     }
 }
 
-impl<'w, 's, 'a> RadioButton {
+impl RadioButton {
     fn base_tween() -> AnimationConfig {
         AnimationConfig {
             duration: 0.1,

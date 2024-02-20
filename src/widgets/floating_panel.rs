@@ -412,7 +412,7 @@ impl Default for FloatingPanel {
     }
 }
 
-impl<'w, 's, 'a> FloatingPanel {
+impl FloatingPanel {
     fn frame() -> impl Bundle {
         NodeBundle {
             style: Style {

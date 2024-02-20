@@ -1,5 +1,5 @@
 use bevy::{input::mouse::MouseScrollUnit, prelude::*};
-use sickle_math::{ease::Ease, lerp::Lerp};
+use sickle_math::ease::Ease;
 
 use crate::{
     animated_interaction::{AnimatedInteraction, AnimationConfig},
@@ -356,7 +356,7 @@ impl Default for SliderBar {
     }
 }
 
-impl<'w, 's, 'a> Slider {
+impl Slider {
     pub fn value(&self) -> f32 {
         self.config.min.lerp(self.config.max, self.ratio)
     }

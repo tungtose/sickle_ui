@@ -29,18 +29,12 @@ impl EntityCommand for SetTextSections {
     }
 }
 
-pub trait SetTextSectionsExt<'w, 's, 'a> {
-    fn set_text_sections(
-        &'a mut self,
-        sections: Vec<TextSection>,
-    ) -> &mut EntityCommands<'w, 's, 'a>;
+pub trait SetTextSectionsExt<'a> {
+    fn set_text_sections(&'a mut self, sections: Vec<TextSection>) -> &mut EntityCommands<'a>;
 }
 
-impl<'w, 's, 'a> SetTextSectionsExt<'w, 's, 'a> for EntityCommands<'w, 's, 'a> {
-    fn set_text_sections(
-        &'a mut self,
-        sections: Vec<TextSection>,
-    ) -> &mut EntityCommands<'w, 's, 'a> {
+impl<'a> SetTextSectionsExt<'a> for EntityCommands<'a> {
+    fn set_text_sections(&'a mut self, sections: Vec<TextSection>) -> &mut EntityCommands<'a> {
         self.add(SetTextSections { sections });
         self
     }
@@ -66,20 +60,20 @@ impl EntityCommand for SetText {
     }
 }
 
-pub trait SetTextExt<'w, 's, 'a> {
+pub trait SetTextExt<'a> {
     fn set_text(
         &'a mut self,
         text: impl Into<String>,
         style: Option<TextStyle>,
-    ) -> &mut EntityCommands<'w, 's, 'a>;
+    ) -> &mut EntityCommands<'a>;
 }
 
-impl<'w, 's, 'a> SetTextExt<'w, 's, 'a> for EntityCommands<'w, 's, 'a> {
+impl<'a> SetTextExt<'a> for EntityCommands<'a> {
     fn set_text(
         &'a mut self,
         text: impl Into<String>,
         style: Option<TextStyle>,
-    ) -> &mut EntityCommands<'w, 's, 'a> {
+    ) -> &mut EntityCommands<'a> {
         self.add(SetText {
             text: text.into(),
             style: style.unwrap_or_default(),

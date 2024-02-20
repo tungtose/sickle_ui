@@ -36,7 +36,7 @@ impl Plugin for MenuPlugin {
 pub struct MenuUpdate;
 
 fn handle_click_or_touch(
-    r_mouse: Res<Input<MouseButton>>,
+    r_mouse: Res<ButtonInput<MouseButton>>,
     r_touches: Res<Touches>,
     q_menu_items: Query<(&MenuItem, Ref<FluxInteraction>)>,
     mut q_menus: Query<(Entity, &mut Menu, Ref<FluxInteraction>)>,
@@ -100,7 +100,8 @@ fn handle_click_or_touch(
             {
                 open = entity.into();
                 break;
-            } else if any_open && *interaction == FluxInteraction::PointerEnter {
+            }
+            if any_open && *interaction == FluxInteraction::PointerEnter {
                 open = entity.into();
                 break;
             }

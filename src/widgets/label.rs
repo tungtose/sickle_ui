@@ -1,5 +1,5 @@
 use bevy::{
-    ecs::system::{Command, EntityCommands},
+    ecs::system::{EntityCommand, EntityCommands},
     prelude::*,
     ui::FocusPolicy,
 };
@@ -80,27 +80,26 @@ impl<'w, 's> UiLabelExt<'w, 's> for UiBuilder<'w, 's, '_> {
 }
 
 struct UpdateLabelText {
-    entity: Entity,
     text: String,
 }
 
-impl Command for UpdateLabelText {
-    fn apply(self, world: &mut World) {
+impl EntityCommand for UpdateLabelText {
+    fn apply(self, entity: Entity, world: &mut World) {
         let mut q_text = world.query::<&mut Text>();
         let mut q_config = world.query::<&LabelConfig>();
-        let Ok(config) = q_config.get(world, self.entity) else {
+        let Ok(config) = q_config.get(world, entity) else {
             warn!(
                 "Failed to set label text on entity {:?}: No LabelConfig component found!",
-                self.entity
+                entity
             );
 
             return;
         };
         let style = config.text_style();
-        let Ok(mut text) = q_text.get_mut(world, self.entity) else {
+        let Ok(mut text) = q_text.get_mut(world, entity) else {
             warn!(
                 "Failed to set label text on entity {:?}: No Text component found!",
-                self.entity
+                entity
             );
 
             return;
@@ -110,18 +109,14 @@ impl Command for UpdateLabelText {
     }
 }
 
-pub trait SetLabelTextExt<'w, 's, 'a> {
-    fn set_label_text(&'a mut self, text: impl Into<String>) -> EntityCommands<'w, 's, 'a>;
+pub trait SetLabelTextExt {
+    fn set_label_text(&mut self, text: impl Into<String>) -> &mut Self;
 }
 
-impl<'w, 's, 'a> SetLabelTextExt<'w, 's, 'a> for EntityCommands<'w, 's, 'a> {
-    fn set_label_text(&'a mut self, text: impl Into<String>) -> EntityCommands<'w, 's, 'a> {
-        let entity = self.id();
-        self.commands().add(UpdateLabelText {
-            entity,
-            text: text.into(),
-        });
+impl SetLabelTextExt for EntityCommands<'_> {
+    fn set_label_text(&mut self, text: impl Into<String>) -> &mut Self {
+        self.add(UpdateLabelText { text: text.into() });
 
-        self.commands().entity(entity)
+        self
     }
 }

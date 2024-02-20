@@ -61,7 +61,7 @@ impl Default for Checkbox {
     }
 }
 
-impl<'w, 's, 'a> Checkbox {
+impl Checkbox {
     fn base_tween() -> AnimationConfig {
         AnimationConfig {
             duration: 0.1,

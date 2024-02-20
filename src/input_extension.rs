@@ -1,4 +1,4 @@
-use bevy::input::{keyboard::KeyCode, Input};
+use bevy::input::{keyboard::KeyCode, ButtonInput};
 
 pub trait SymmetricKeysExt {
     fn symmetry_pressed(&self, input: KeyCode) -> bool;
@@ -6,7 +6,7 @@ pub trait SymmetricKeysExt {
     fn symmetry_just_released(&self, input: KeyCode) -> bool;
 }
 
-impl SymmetricKeysExt for Input<KeyCode> {
+impl SymmetricKeysExt for ButtonInput<KeyCode> {
     fn symmetry_pressed(&self, keycode: KeyCode) -> bool {
         match keycode {
             KeyCode::AltLeft | KeyCode::AltRight => {
@@ -72,30 +72,27 @@ impl KeyCodeToStringExt for KeyCode {
         let formatted_str = formatted.as_str();
 
         let renamed = match self {
-            KeyCode::Key1 => "1",
-            KeyCode::Key2 => "2",
-            KeyCode::Key3 => "3",
-            KeyCode::Key4 => "4",
-            KeyCode::Key5 => "5",
-            KeyCode::Key6 => "6",
-            KeyCode::Key7 => "7",
-            KeyCode::Key8 => "8",
-            KeyCode::Key9 => "9",
-            KeyCode::Key0 => "0",
+            KeyCode::Digit1 => "1",
+            KeyCode::Digit2 => "2",
+            KeyCode::Digit3 => "3",
+            KeyCode::Digit4 => "4",
+            KeyCode::Digit5 => "5",
+            KeyCode::Digit6 => "6",
+            KeyCode::Digit7 => "7",
+            KeyCode::Digit8 => "8",
+            KeyCode::Digit9 => "9",
+            KeyCode::Digit0 => "0",
             KeyCode::Escape => "ESC",
             KeyCode::Insert => "Ins",
             KeyCode::Delete => "Del",
-            KeyCode::Apostrophe => "'",
-            KeyCode::Asterisk => "*",
-            KeyCode::Plus => "+",
-            KeyCode::At => "@",
+            KeyCode::Quote => "'",
+            KeyCode::NumpadAdd => "+",
             KeyCode::Backslash => "\\",
-            KeyCode::Colon => ":",
             KeyCode::Comma => ",",
             KeyCode::NumpadDecimal => ".",
             KeyCode::NumpadDivide => "/",
-            KeyCode::Equals => "=",
-            KeyCode::Grave => "`",
+            KeyCode::Equal => "=",
+            KeyCode::Backquote => "`",
             KeyCode::AltLeft => "Alt",
             KeyCode::BracketLeft => "[",
             KeyCode::ControlLeft => "Ctrl",
@@ -103,7 +100,7 @@ impl KeyCodeToStringExt for KeyCode {
             KeyCode::Minus => "-",
             KeyCode::NumpadMultiply => "*",
             KeyCode::NumpadComma => ",",
-            KeyCode::NumpadEquals => "=",
+            KeyCode::NumpadEqual => "=",
             KeyCode::Period => ",",
             KeyCode::AltRight => "Alt",
             KeyCode::BracketRight => "]",
@@ -112,7 +109,6 @@ impl KeyCodeToStringExt for KeyCode {
             KeyCode::Semicolon => ";",
             KeyCode::Slash => "/",
             KeyCode::NumpadSubtract => "-",
-            KeyCode::Underline => "_",
             _ => formatted_str,
         };
 

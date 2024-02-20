@@ -4,22 +4,22 @@ use bevy::{
 };
 use sickle_macros::StyleCommand;
 
-pub struct UiStyle<'w, 's, 'a> {
-    commands: EntityCommands<'w, 's, 'a>,
+pub struct UiStyle<'a> {
+    commands: EntityCommands<'a>,
 }
 
-impl<'w, 's, 'a> UiStyle<'w, 's, 'a> {
+impl<'a> UiStyle<'a> {
     pub fn id(&self) -> Entity {
         self.commands.id()
     }
 }
 
-pub trait UiStyleExt<'w, 's, 'a> {
-    fn style(&'a mut self, entity: Entity) -> UiStyle<'w, 's, 'a>;
+pub trait UiStyleExt<'a> {
+    fn style(&'a mut self, entity: Entity) -> UiStyle<'a>;
 }
 
-impl<'w, 's, 'a> UiStyleExt<'w, 's, 'a> for Commands<'w, 's> {
-    fn style(&'a mut self, entity: Entity) -> UiStyle<'w, 's, 'a> {
+impl<'a> UiStyleExt<'a> for Commands<'_, '_> {
+    fn style(&'a mut self, entity: Entity) -> UiStyle<'a> {
         UiStyle {
             commands: self.entity(entity),
         }
@@ -83,12 +83,12 @@ impl EntityCommand for SetImage {
     }
 }
 
-pub trait SetImageExt<'w, 's, 'a> {
-    fn image(&'a mut self, path: impl Into<String>) -> &mut UiStyle<'w, 's, 'a>;
+pub trait SetImageExt<'a> {
+    fn image(&'a mut self, path: impl Into<String>) -> &mut UiStyle<'a>;
 }
 
-impl<'w, 's, 'a> SetImageExt<'w, 's, 'a> for UiStyle<'w, 's, 'a> {
-    fn image(&'a mut self, path: impl Into<String>) -> &mut UiStyle<'w, 's, 'a> {
+impl<'a> SetImageExt<'a> for UiStyle<'a> {
+    fn image(&'a mut self, path: impl Into<String>) -> &mut UiStyle<'a> {
         self.commands.add(SetImage { path: path.into() });
         self
     }
@@ -115,12 +115,12 @@ impl EntityCommand for SetEntityVisiblity {
     }
 }
 
-pub trait SetEntityVisiblityExt<'w, 's, 'a> {
-    fn visibility(&'a mut self, visibility: Visibility) -> &mut UiStyle<'w, 's, 'a>;
+pub trait SetEntityVisiblityExt<'a> {
+    fn visibility(&'a mut self, visibility: Visibility) -> &mut UiStyle<'a>;
 }
 
-impl<'w, 's, 'a> SetEntityVisiblityExt<'w, 's, 'a> for UiStyle<'w, 's, 'a> {
-    fn visibility(&'a mut self, visibility: Visibility) -> &mut UiStyle<'w, 's, 'a> {
+impl<'a> SetEntityVisiblityExt<'a> for UiStyle<'a> {
+    fn visibility(&'a mut self, visibility: Visibility) -> &mut UiStyle<'a> {
         self.commands.add(SetEntityVisiblity { visibility });
         self
     }
@@ -147,12 +147,12 @@ impl EntityCommand for SetBorderColor {
     }
 }
 
-pub trait SetBorderColorExt<'w, 's, 'a> {
-    fn border_color(&'a mut self, color: Color) -> &mut UiStyle<'w, 's, 'a>;
+pub trait SetBorderColorExt<'a> {
+    fn border_color(&'a mut self, color: Color) -> &mut UiStyle<'a>;
 }
 
-impl<'w, 's, 'a> SetBorderColorExt<'w, 's, 'a> for UiStyle<'w, 's, 'a> {
-    fn border_color(&'a mut self, color: Color) -> &mut UiStyle<'w, 's, 'a> {
+impl<'a> SetBorderColorExt<'a> for UiStyle<'a> {
+    fn border_color(&'a mut self, color: Color) -> &mut UiStyle<'a> {
         self.commands.add(SetBorderColor { color });
         self
     }
@@ -179,12 +179,12 @@ impl EntityCommand for SetBackgroundColor {
     }
 }
 
-pub trait SetBackgroundColorExt<'w, 's, 'a> {
-    fn background_color(&'a mut self, color: Color) -> &mut UiStyle<'w, 's, 'a>;
+pub trait SetBackgroundColorExt<'a> {
+    fn background_color(&'a mut self, color: Color) -> &mut UiStyle<'a>;
 }
 
-impl<'w, 's, 'a> SetBackgroundColorExt<'w, 's, 'a> for UiStyle<'w, 's, 'a> {
-    fn background_color(&'a mut self, color: Color) -> &mut UiStyle<'w, 's, 'a> {
+impl<'a> SetBackgroundColorExt<'a> for UiStyle<'a> {
+    fn background_color(&'a mut self, color: Color) -> &mut UiStyle<'a> {
         self.commands.add(SetBackgroundColor { color });
         self
     }

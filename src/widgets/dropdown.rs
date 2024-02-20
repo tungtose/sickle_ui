@@ -63,7 +63,7 @@ fn update_dropdown_label(
 }
 
 fn handle_click_or_touch(
-    r_mouse: Res<Input<MouseButton>>,
+    r_mouse: Res<ButtonInput<MouseButton>>,
     r_touches: Res<Touches>,
     mut q_dropdowns: Query<(Entity, &mut Dropdown, &FluxInteraction)>,
 ) {
@@ -184,7 +184,7 @@ impl Default for Dropdown {
     }
 }
 
-impl<'w, 's, 'a> Dropdown {
+impl Dropdown {
     pub fn value(&self) -> Option<usize> {
         self.value
     }

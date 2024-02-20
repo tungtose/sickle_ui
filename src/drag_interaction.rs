@@ -90,7 +90,7 @@ fn update_drag_progress(
     mut q_draggable: Query<(&mut Draggable, &FluxInteraction)>,
     q_window: Query<&Window, With<PrimaryWindow>>,
     r_touches: Res<Touches>,
-    r_keys: Res<Input<KeyCode>>,
+    r_keys: Res<ButtonInput<KeyCode>>,
 ) {
     let Ok(window) = q_window.get_single() else {
         return;

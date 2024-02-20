@@ -384,7 +384,7 @@ impl Default for ScrollView {
     }
 }
 
-impl<'w, 's> ScrollView {
+impl ScrollView {
     fn base_tween() -> AnimationConfig {
         AnimationConfig {
             duration: 0.1,

@@ -33,7 +33,7 @@ impl Plugin for ContextMenuPlugin {
 
 // TODO: Handle long press on touch
 fn handle_click_or_touch(
-    r_mouse: Res<Input<MouseButton>>,
+    r_mouse: Res<ButtonInput<MouseButton>>,
     q_context_menu: Query<&Interaction, (With<ContextMenu>, Changed<Interaction>)>,
     mut q_interacted: Query<(Entity, &Interaction, &mut GenerateContextMenu)>,
     mut commands: Commands,

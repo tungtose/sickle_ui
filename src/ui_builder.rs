@@ -27,12 +27,12 @@ impl<'w, 's> UiBuilder<'w, 's, '_> {
         self.commands
     }
 
-    pub fn entity_commands(&mut self) -> EntityCommands<'w, 's, '_> {
+    pub fn entity_commands(&mut self) -> EntityCommands<'_> {
         let entity = self.id();
         self.commands().entity(entity)
     }
 
-    pub fn style(&mut self) -> UiStyle<'w, 's, '_> {
+    pub fn style(&mut self) -> UiStyle<'_> {
         let entity = self.id();
         self.commands().style(entity)
     }
