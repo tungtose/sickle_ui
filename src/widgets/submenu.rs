@@ -349,7 +349,7 @@ impl<'w, 's> UiSubmenuExt<'w, 's> for UiBuilder<'w, 's, '_> {
         config: SubmenuConfig,
         spawn_items: impl FnOnce(&mut UiBuilder),
     ) -> EntityCommands<'w, 's, 'a> {
-        let external_container = self.id();
+        let external_container = self.entity();
 
         let menu_id = self.menu_item(config.clone().into()).id();
         let container = self

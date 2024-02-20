@@ -513,7 +513,7 @@ impl<'w, 's> UiFloatingPanelExt<'w, 's> for UiBuilder<'w, 's, '_> {
         let mut title = Entity::PLACEHOLDER;
         let mut drag_handle = Entity::PLACEHOLDER;
         let mut frame = self.container(FloatingPanel::frame(), |container| {
-            let panel = container.id().unwrap();
+            let panel = container.id();
 
             let title_text = if let Some(text) = config.title.clone() {
                 text
@@ -645,7 +645,6 @@ impl<'w, 's> UiFloatingPanelExt<'w, 's> for UiBuilder<'w, 's, '_> {
             if layout.hidden {
                 container
                     .entity_commands()
-                    .unwrap()
                     .style()
                     .display(Display::None);
             }

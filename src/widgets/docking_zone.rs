@@ -637,19 +637,19 @@ impl<'w, 's> UiDockingZoneExt<'w, 's> for UiBuilder<'w, 's, '_> {
         let mut top_handle = Entity::PLACEHOLDER;
         let mut bottom_handle = Entity::PLACEHOLDER;
 
-        if self.id().is_none() {
+        if self.entity().is_none() {
             warn!("Docking zone as root node is not supported! An additional node has been injected as container.");
         }
 
-        let mut root = match self.id().is_none() {
+        let mut root = match self.entity().is_none() {
             true => self.spawn(DockingZone::container()),
-            false => self.entity_commands().unwrap(),
+            false => self.entity_commands(),
         };
 
         let docking_zone = root
             .ui_builder()
             .container(DockingZone::frame(), |container| {
-                let zone_id = container.id().unwrap();
+                let zone_id = container.id();
                 let handle = DockingZoneResizeHandle {
                     docking_zone: zone_id,
                     ..default()

@@ -515,7 +515,7 @@ impl<'w, 's> UiSliderExt<'w, 's> for UiBuilder<'w, 's, '_> {
 
         let mut input = match config.axis {
             SliderAxis::Horizontal => self.container(Slider::horizontal_container(), |slider| {
-                let input_id = slider.id().unwrap();
+                let input_id = slider.id();
 
                 if let Some(label) = config.label.clone() {
                     slider.label(LabelConfig {
@@ -557,7 +557,7 @@ impl<'w, 's> UiSliderExt<'w, 's> for UiBuilder<'w, 's, '_> {
                 }
             }),
             SliderAxis::Vertical => self.container(Slider::vertical_container(), |slider| {
-                let input_id = slider.id().unwrap();
+                let input_id = slider.id();
 
                 if config.show_current {
                     readout_target = slider

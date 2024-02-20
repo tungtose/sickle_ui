@@ -237,7 +237,7 @@ impl<'w, 's> UiRadioGroupExt<'w, 's> for UiBuilder<'w, 's, '_> {
             |radio_group| {
                 for i in 0..option_count {
                     let label = queue.pop_front().unwrap();
-                    let id = radio_group.id();
+                    let id = radio_group.entity();
                     let mut check_node: Entity = Entity::PLACEHOLDER;
                     radio_group
                         .container(RadioButton::button(), |button| {

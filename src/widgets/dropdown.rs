@@ -273,7 +273,7 @@ impl<'w, 's> UiDropdownExt<'w, 's> for UiBuilder<'w, 's, '_> {
 
         let mut dropdown =
             self.container(Dropdown::base_bundle(string_options.clone()), |builder| {
-                let dropdown_id = builder.id().unwrap();
+                let dropdown_id = builder.id();
                 selected = builder
                     .label(LabelConfig {
                         margin: UiRect::right(Val::Px(10.)),

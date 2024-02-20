@@ -13,7 +13,11 @@ pub struct UiBuilder<'w, 's, 'a> {
 }
 
 impl<'w, 's> UiBuilder<'w, 's, '_> {
-    pub fn id(&self) -> Option<Entity> {
+    pub fn id(&self) -> Entity {
+        self.entity.unwrap()
+    }
+
+    pub fn entity(&self) -> Option<Entity> {
         self.entity
     }
 
@@ -21,18 +25,15 @@ impl<'w, 's> UiBuilder<'w, 's, '_> {
         self.commands
     }
 
-    pub fn entity_commands<'a>(&'a mut self) -> Result<EntityCommands<'w, 's, 'a>, &'static str> {
-        if let Some(entity) = self.entity {
-            Ok(self.commands().entity(entity))
-        } else {
-            Err("No entity set for UiBuilder")
-        }
+    pub fn entity_commands(&mut self) -> EntityCommands<'w, 's, '_> {
+        let entity = self.id();
+        self.commands().entity(entity)
     }
 
     pub fn spawn<'a>(&'a mut self, bundle: impl Bundle) -> EntityCommands<'w, 's, 'a> {
         let mut new_entity = Entity::PLACEHOLDER;
 
-        if let Some(entity) = self.id() {
+        if let Some(entity) = self.entity {
             self.commands().entity(entity).with_children(|parent| {
                 new_entity = parent.spawn(bundle).id();
             });

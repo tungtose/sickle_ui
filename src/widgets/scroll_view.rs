@@ -570,7 +570,7 @@ impl<'w, 's> UiScrollViewExt<'w, 's> for UiBuilder<'w, 's, '_> {
                 vec![ScrollAxis::Horizontal, ScrollAxis::Vertical]
             };
 
-            let scroll_view_id = frame.id().unwrap();
+            let scroll_view_id = frame.id();
             viewport = frame
                 .container(
                     (
