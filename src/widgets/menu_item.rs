@@ -1,4 +1,4 @@
-use bevy::{ecs::system::EntityCommands, prelude::*};
+use bevy::prelude::*;
 use sickle_math::ease::Ease;
 
 use crate::{
@@ -261,11 +261,11 @@ impl MenuItem {
 }
 
 pub trait UiMenuItemExt<'w, 's> {
-    fn menu_item<'a>(&'a mut self, config: MenuItemConfig) -> EntityCommands<'w, 's, 'a>;
+    fn menu_item<'a>(&'a mut self, config: MenuItemConfig) -> UiBuilder<'w, 's, 'a>;
 }
 
 impl<'w, 's> UiMenuItemExt<'w, 's> for UiBuilder<'w, 's, '_> {
-    fn menu_item<'a>(&'a mut self, config: MenuItemConfig) -> EntityCommands<'w, 's, 'a> {
+    fn menu_item<'a>(&'a mut self, config: MenuItemConfig) -> UiBuilder<'w, 's, 'a> {
         let mut leading = Entity::PLACEHOLDER;
         let mut label = Entity::PLACEHOLDER;
         let mut shortcut = Entity::PLACEHOLDER;
@@ -293,7 +293,7 @@ impl<'w, 's> UiMenuItemExt<'w, 's> for UiBuilder<'w, 's, '_> {
             trailing = menu_item.spawn(MenuItem::trailing_icon()).id();
         });
 
-        item.insert(MenuItem {
+        item.entity_commands().insert(MenuItem {
             leading,
             label,
             shortcut,

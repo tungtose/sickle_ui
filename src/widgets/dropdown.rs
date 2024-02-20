@@ -1,6 +1,6 @@
 use std::collections::VecDeque;
 
-use bevy::{ecs::system::EntityCommands, prelude::*};
+use bevy::prelude::*;
 use sickle_math::ease::Ease;
 
 use crate::{
@@ -255,11 +255,11 @@ impl<'w, 's, 'a> Dropdown {
 }
 
 pub trait UiDropdownExt<'w, 's> {
-    fn dropdown<'a>(&'a mut self, options: Vec<impl Into<String>>) -> EntityCommands<'w, 's, 'a>;
+    fn dropdown<'a>(&'a mut self, options: Vec<impl Into<String>>) -> UiBuilder<'w, 's, 'a>;
 }
 
 impl<'w, 's> UiDropdownExt<'w, 's> for UiBuilder<'w, 's, '_> {
-    fn dropdown<'a>(&'a mut self, options: Vec<impl Into<String>>) -> EntityCommands<'w, 's, 'a> {
+    fn dropdown<'a>(&'a mut self, options: Vec<impl Into<String>>) -> UiBuilder<'w, 's, 'a> {
         let mut selected = Entity::PLACEHOLDER;
         let mut panel_id = Entity::PLACEHOLDER;
 
@@ -309,13 +309,14 @@ impl<'w, 's> UiDropdownExt<'w, 's> for UiBuilder<'w, 's, '_> {
                             }
                         },
                     )
+                    .entity_commands()
                     .insert(DropdownPanel {
                         dropdown: dropdown_id,
                     })
                     .id();
             });
 
-        dropdown.insert(Dropdown {
+        dropdown.entity_commands().insert(Dropdown {
             button_label: selected,
             panel: panel_id,
             ..default()

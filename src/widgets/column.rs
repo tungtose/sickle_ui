@@ -1,4 +1,4 @@
-use bevy::{ecs::system::EntityCommands, prelude::*};
+use bevy::prelude::*;
 
 use crate::{
     ui_builder::*,
@@ -35,7 +35,7 @@ pub trait UiColumnExt<'w, 's> {
         &'a mut self,
         config: ColumnConfig,
         spawn_children: impl FnOnce(&mut UiBuilder),
-    ) -> EntityCommands<'w, 's, 'a>;
+    ) -> UiBuilder<'w, 's, 'a>;
 }
 
 impl<'w, 's> UiColumnExt<'w, 's> for UiBuilder<'w, 's, '_> {
@@ -43,17 +43,15 @@ impl<'w, 's> UiColumnExt<'w, 's> for UiBuilder<'w, 's, '_> {
         &'a mut self,
         config: ColumnConfig,
         spawn_children: impl FnOnce(&mut UiBuilder),
-    ) -> EntityCommands<'w, 's, 'a> {
-        let column = self
-            .container((Column::frame(), Column), spawn_children)
-            .id();
+    ) -> UiBuilder<'w, 's, 'a> {
+        let mut column = self.container((Column::frame(), Column), spawn_children);
 
-        self.commands()
-            .entity(column)
+        column
+            .entity_commands()
             .style()
             .width(config.width)
             .background_color(config.background_color);
 
-        self.commands().entity(column)
+        column
     }
 }

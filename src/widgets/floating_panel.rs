@@ -1,5 +1,5 @@
 use bevy::window::PrimaryWindow;
-use bevy::{ecs::system::EntityCommands, prelude::*, window::WindowResized};
+use bevy::{prelude::*, window::WindowResized};
 
 use super::prelude::{LabelConfig, UiContainerExt, UiLabelExt};
 use super::prelude::{SetLabelTextExt, UiScrollViewExt};
@@ -496,7 +496,7 @@ pub trait UiFloatingPanelExt<'w, 's> {
         config: FloatingPanelConfig,
         layout: FloatingPanelLayout,
         spawn_children: impl FnOnce(&mut UiBuilder),
-    ) -> EntityCommands<'w, 's, 'a>;
+    ) -> UiBuilder<'w, 's, 'a>;
 }
 
 impl<'w, 's> UiFloatingPanelExt<'w, 's> for UiBuilder<'w, 's, '_> {
@@ -505,7 +505,7 @@ impl<'w, 's> UiFloatingPanelExt<'w, 's> for UiBuilder<'w, 's, '_> {
         config: FloatingPanelConfig,
         layout: FloatingPanelLayout,
         spawn_children: impl FnOnce(&mut UiBuilder),
-    ) -> EntityCommands<'w, 's, 'a> {
+    ) -> UiBuilder<'w, 's, 'a> {
         let restrict_to = config.restrict_scroll;
 
         let mut resize_handles = Entity::PLACEHOLDER;
@@ -599,6 +599,7 @@ impl<'w, 's> UiFloatingPanelExt<'w, 's> for UiBuilder<'w, 's, '_> {
                         );
                     },
                 )
+                .entity_commands()
                 .style()
                 .display(match config.resizable {
                     true => Display::Flex,
@@ -623,6 +624,7 @@ impl<'w, 's> UiFloatingPanelExt<'w, 's> for UiBuilder<'w, 's, '_> {
                             .id();
                     },
                 )
+                .entity_commands()
                 .style()
                 .display(match config.title.is_some() {
                     true => Display::Flex,
@@ -635,6 +637,7 @@ impl<'w, 's> UiFloatingPanelExt<'w, 's> for UiBuilder<'w, 's, '_> {
                     FloatingPanel::drag_handle(),
                     FloatingPanelDragHandle { panel },
                 ))
+                .entity_commands()
                 .style()
                 .display(match config.title.is_some() {
                     true => Display::None,
@@ -643,16 +646,13 @@ impl<'w, 's> UiFloatingPanelExt<'w, 's> for UiBuilder<'w, 's, '_> {
                 .id();
 
             if layout.hidden {
-                container
-                    .entity_commands()
-                    .style()
-                    .display(Display::None);
+                container.entity_commands().style().display(Display::None);
             }
 
             container.scroll_view(restrict_to, spawn_children);
         });
 
-        frame.insert((
+        frame.entity_commands().insert((
             config,
             FloatingPanel {
                 size: layout.size.max(MIN_PANEL_SIZE),

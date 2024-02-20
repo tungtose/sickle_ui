@@ -1,4 +1,4 @@
-use bevy::{ecs::system::EntityCommands, prelude::*, ui::FocusPolicy};
+use bevy::{prelude::*, ui::FocusPolicy};
 use sickle_math::ease::Ease;
 
 use crate::{
@@ -127,18 +127,19 @@ impl<'w, 's, 'a> Checkbox {
 }
 
 pub trait UiCheckboxExt<'w, 's> {
-    fn checkbox<'a>(&'a mut self, label: Option<impl Into<String>>) -> EntityCommands<'w, 's, 'a>;
+    fn checkbox<'a>(&'a mut self, label: Option<impl Into<String>>) -> UiBuilder<'w, 's, 'a>;
 }
 
 impl<'w, 's> UiCheckboxExt<'w, 's> for UiBuilder<'w, 's, '_> {
-    fn checkbox<'a>(&'a mut self, label: Option<impl Into<String>>) -> EntityCommands<'w, 's, 'a> {
+    fn checkbox<'a>(&'a mut self, label: Option<impl Into<String>>) -> UiBuilder<'w, 's, 'a> {
         let mut check_node: Entity = Entity::PLACEHOLDER;
 
         let mut input = self.container(Checkbox::checkbox_container(), |container| {
             container.container(Checkbox::checkmark_background(), |checkmark_bg| {
                 let mut check_mark = checkmark_bg.container(Checkbox::checkmark(), |_| {});
                 check_node = check_mark.id();
-                check_mark.style().image(CHECK_MARK);
+
+                check_mark.entity_commands().style().image(CHECK_MARK);
             });
 
             if let Some(label) = label {
@@ -150,7 +151,7 @@ impl<'w, 's> UiCheckboxExt<'w, 's> for UiBuilder<'w, 's, '_> {
             }
         });
 
-        input.insert(Checkbox {
+        input.entity_commands().insert(Checkbox {
             check_node,
             checked: false,
         });

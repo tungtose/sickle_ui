@@ -188,7 +188,7 @@ fn generate_context_menu<'w, 's, 'a>(world: &mut World) {
     let mut commands = Commands::new(&mut queue, world);
 
     let container_id = commands
-        .ui_builder()
+        .ui_builder(None)
         .spawn((ContextMenu::frame(), ContextMenu { context: entity }))
         .id();
 
@@ -196,13 +196,12 @@ fn generate_context_menu<'w, 's, 'a>(world: &mut World) {
     for generator in generators {
         if generator.placement_index() > last_index + 1 {
             commands
-                .entity(container_id)
-                .ui_builder()
+                .ui_builder(container_id.into())
                 .menu_item_separator();
         }
         last_index = generator.placement_index();
 
-        generator.build_context_menu(entity, &mut commands.entity(container_id).ui_builder());
+        generator.build_context_menu(entity, &mut commands.ui_builder(container_id.into()));
     }
 
     queue.apply(world);

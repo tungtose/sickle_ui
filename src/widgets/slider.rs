@@ -1,4 +1,4 @@
-use bevy::{ecs::system::EntityCommands, input::mouse::MouseScrollUnit, prelude::*};
+use bevy::{input::mouse::MouseScrollUnit, prelude::*};
 use sickle_math::{ease::Ease, lerp::Lerp};
 
 use crate::{
@@ -504,11 +504,11 @@ impl<'w, 's, 'a> Slider {
 }
 
 pub trait UiSliderExt<'w, 's> {
-    fn slider<'a>(&'a mut self, config: SliderConfig) -> EntityCommands<'w, 's, 'a>;
+    fn slider<'a>(&'a mut self, config: SliderConfig) -> UiBuilder<'w, 's, 'a>;
 }
 
 impl<'w, 's> UiSliderExt<'w, 's> for UiBuilder<'w, 's, '_> {
-    fn slider<'a>(&'a mut self, config: SliderConfig) -> EntityCommands<'w, 's, 'a> {
+    fn slider<'a>(&'a mut self, config: SliderConfig) -> UiBuilder<'w, 's, 'a> {
         let mut drag_handle: Entity = Entity::PLACEHOLDER;
         let mut slider_bar: Entity = Entity::PLACEHOLDER;
         let mut readout_target: Option<Entity> = None;
@@ -595,7 +595,7 @@ impl<'w, 's> UiSliderExt<'w, 's> for UiBuilder<'w, 's, '_> {
             }),
         };
 
-        input.insert(Slider {
+        input.entity_commands().insert(Slider {
             ratio: config.initial_value / (config.max - config.min),
             config,
             slider_bar,

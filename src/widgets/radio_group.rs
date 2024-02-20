@@ -1,6 +1,6 @@
 use std::collections::VecDeque;
 
-use bevy::{ecs::system::EntityCommands, prelude::*, ui::FocusPolicy};
+use bevy::{prelude::*, ui::FocusPolicy};
 use sickle_math::ease::Ease;
 
 use crate::{
@@ -221,7 +221,7 @@ pub trait UiRadioGroupExt<'w, 's> {
         &'a mut self,
         options: Vec<impl Into<String>>,
         unselectable: bool,
-    ) -> EntityCommands<'w, 's, 'a>;
+    ) -> UiBuilder<'w, 's, 'a>;
 }
 
 impl<'w, 's> UiRadioGroupExt<'w, 's> for UiBuilder<'w, 's, '_> {
@@ -229,7 +229,7 @@ impl<'w, 's> UiRadioGroupExt<'w, 's> for UiBuilder<'w, 's, '_> {
         &'a mut self,
         options: Vec<impl Into<String>>,
         unselectable: bool,
-    ) -> EntityCommands<'w, 's, 'a> {
+    ) -> UiBuilder<'w, 's, 'a> {
         let option_count = options.len();
         let mut queue = VecDeque::from(options);
         self.container(
@@ -254,6 +254,7 @@ impl<'w, 's> UiRadioGroupExt<'w, 's> for UiBuilder<'w, 's, '_> {
                                 ..default()
                             });
                         })
+                        .entity_commands()
                         .insert(RadioButton {
                             index: i.try_into().unwrap(),
                             checked: false,

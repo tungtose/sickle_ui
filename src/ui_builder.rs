@@ -30,7 +30,7 @@ impl<'w, 's> UiBuilder<'w, 's, '_> {
         self.commands().entity(entity)
     }
 
-    pub fn spawn<'a>(&'a mut self, bundle: impl Bundle) -> EntityCommands<'w, 's, 'a> {
+    pub fn spawn<'a>(&'a mut self, bundle: impl Bundle) -> UiBuilder<'w, 's, 'a> {
         let mut new_entity = Entity::PLACEHOLDER;
 
         if let Some(entity) = self.entity {
@@ -41,29 +41,19 @@ impl<'w, 's> UiBuilder<'w, 's, '_> {
             new_entity = self.commands().spawn(bundle).id();
         }
 
-        self.commands().entity(new_entity)
+        self.commands().ui_builder(new_entity.into())
     }
 }
 
-pub trait UiBuilderExt<'w, 's, 'a> {
-    fn ui_builder(&'a mut self) -> UiBuilder<'w, 's, 'a>;
+pub trait UiBuilderExt<'w, 's> {
+    fn ui_builder<'a>(&'a mut self, entity: Option<Entity>) -> UiBuilder<'w, 's, 'a>;
 }
 
-impl<'w, 's, 'a> UiBuilderExt<'w, 's, 'a> for EntityCommands<'w, 's, 'a> {
-    fn ui_builder(&'a mut self) -> UiBuilder<'w, 's, 'a> {
-        let entity = self.id();
-        let mut builder = self.commands().ui_builder();
-        builder.entity = entity.into();
-
-        builder
-    }
-}
-
-impl<'w, 's, 'a> UiBuilderExt<'w, 's, 'a> for Commands<'w, 's> {
-    fn ui_builder(&'a mut self) -> UiBuilder<'w, 's, 'a> {
-        UiBuilder::<'w, 's, 'a> {
+impl<'w, 's> UiBuilderExt<'w, 's> for Commands<'w, 's> {
+    fn ui_builder<'a>(&'a mut self, entity: Option<Entity>) -> UiBuilder<'w, 's, 'a> {
+        UiBuilder {
             commands: self,
-            entity: None,
+            entity,
         }
     }
 }

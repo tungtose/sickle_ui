@@ -1,4 +1,4 @@
-use bevy::{ecs::system::EntityCommands, prelude::*};
+use bevy::prelude::*;
 
 use crate::ui_builder::UiBuilder;
 
@@ -70,19 +70,13 @@ impl Into<MenuItemConfig> for ToggleMenuItemConfig {
 }
 
 pub trait UiToggleMenuItemExt<'w, 's> {
-    fn toggle_menu_item<'a>(
-        &'a mut self,
-        config: ToggleMenuItemConfig,
-    ) -> EntityCommands<'w, 's, 'a>;
+    fn toggle_menu_item<'a>(&'a mut self, config: ToggleMenuItemConfig) -> UiBuilder<'w, 's, 'a>;
 }
 
 impl<'w, 's> UiToggleMenuItemExt<'w, 's> for UiBuilder<'w, 's, '_> {
-    fn toggle_menu_item<'a>(
-        &'a mut self,
-        config: ToggleMenuItemConfig,
-    ) -> EntityCommands<'w, 's, 'a> {
+    fn toggle_menu_item<'a>(&'a mut self, config: ToggleMenuItemConfig) -> UiBuilder<'w, 's, 'a> {
         let mut item = self.menu_item(config.clone().into());
-        item.insert((
+        item.entity_commands().insert((
             ToggleMenuItem {
                 checked: config.initially_checked,
             },

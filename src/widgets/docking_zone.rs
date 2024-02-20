@@ -1,4 +1,4 @@
-use bevy::{ecs::system::EntityCommands, prelude::*, ui::UiSystem};
+use bevy::{prelude::*, ui::UiSystem};
 
 use crate::{
     drag_interaction::{DragState, Draggable, DraggableUpdate},
@@ -580,17 +580,6 @@ pub struct DockingZoneConfig {
 }
 
 impl DockingZone {
-    fn container() -> impl Bundle {
-        NodeBundle {
-            style: Style {
-                width: Val::Percent(100.),
-                height: Val::Percent(100.),
-                ..default()
-            },
-            ..default()
-        }
-    }
-
     fn frame() -> impl Bundle {
         NodeBundle {
             style: Style {
@@ -621,7 +610,7 @@ pub trait UiDockingZoneExt<'w, 's> {
         &'a mut self,
         config: DockingZoneConfig,
         spawn_children: impl FnOnce(&mut UiBuilder),
-    ) -> EntityCommands<'w, 's, 'a>;
+    ) -> UiBuilder<'w, 's, 'a>;
 }
 
 impl<'w, 's> UiDockingZoneExt<'w, 's> for UiBuilder<'w, 's, '_> {
@@ -629,7 +618,7 @@ impl<'w, 's> UiDockingZoneExt<'w, 's> for UiBuilder<'w, 's, '_> {
         &'a mut self,
         config: DockingZoneConfig,
         spawn_children: impl FnOnce(&mut UiBuilder),
-    ) -> EntityCommands<'w, 's, 'a> {
+    ) -> UiBuilder<'w, 's, 'a> {
         let size = config.size.clamp(0., 100.);
         let min_size = config.min_size.max(MIN_DOCKING_ZONE_SIZE);
         let mut left_handle = Entity::PLACEHOLDER;
@@ -638,16 +627,10 @@ impl<'w, 's> UiDockingZoneExt<'w, 's> for UiBuilder<'w, 's, '_> {
         let mut bottom_handle = Entity::PLACEHOLDER;
 
         if self.entity().is_none() {
-            warn!("Docking zone as root node is not supported! An additional node has been injected as container.");
+            warn!("Docking zone as root node is not supported!");
         }
 
-        let mut root = match self.entity().is_none() {
-            true => self.spawn(DockingZone::container()),
-            false => self.entity_commands(),
-        };
-
-        let docking_zone = root
-            .ui_builder()
+        let docking_zone = self
             .container(DockingZone::frame(), |container| {
                 let zone_id = container.id();
                 let handle = DockingZoneResizeHandle {
@@ -655,9 +638,9 @@ impl<'w, 's> UiDockingZoneExt<'w, 's> for UiBuilder<'w, 's, '_> {
                     ..default()
                 };
 
-                let mut commands = container.commands().entity(zone_id);
-                let mut new_builder = commands.ui_builder();
-                spawn_children(&mut new_builder);
+                // let mut commands = container.commands().entity(zone_id);
+                // let mut new_builder = commands.ui_builder();
+                spawn_children(container);
 
                 container.container(
                     ResizeHandle::resize_handle_container(),
@@ -688,6 +671,7 @@ impl<'w, 's> UiDockingZoneExt<'w, 's> for UiBuilder<'w, 's, '_> {
                     },
                 );
             })
+            .entity_commands()
             .insert(DockingZone {
                 size_percent: size,
                 min_size,
@@ -701,6 +685,6 @@ impl<'w, 's> UiDockingZoneExt<'w, 's> for UiBuilder<'w, 's, '_> {
             .background_color(config.background_color)
             .id();
 
-        self.commands().entity(docking_zone)
+        self.commands().ui_builder(docking_zone.into())
     }
 }

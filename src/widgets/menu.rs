@@ -1,4 +1,4 @@
-use bevy::{ecs::system::EntityCommands, prelude::*};
+use bevy::prelude::*;
 use sickle_math::ease::Ease;
 
 use crate::{
@@ -245,7 +245,7 @@ pub trait UiMenuExt<'w, 's> {
         &'a mut self,
         config: MenuConfig,
         spawn_items: impl FnOnce(&mut UiBuilder),
-    ) -> EntityCommands<'w, 's, 'a>;
+    ) -> UiBuilder<'w, 's, 'a>;
 }
 
 impl<'w, 's> UiMenuExt<'w, 's> for UiBuilder<'w, 's, '_> {
@@ -253,7 +253,7 @@ impl<'w, 's> UiMenuExt<'w, 's> for UiBuilder<'w, 's, '_> {
         &'a mut self,
         config: MenuConfig,
         spawn_items: impl FnOnce(&mut UiBuilder),
-    ) -> EntityCommands<'w, 's, 'a> {
+    ) -> UiBuilder<'w, 's, 'a> {
         let mut container = Entity::PLACEHOLDER;
         let mut menu = self.container(Menu::button(), |menu_button| {
             container = menu_button.container(Menu::container(), spawn_items).id();
@@ -263,7 +263,7 @@ impl<'w, 's> UiMenuExt<'w, 's> for UiBuilder<'w, 's, '_> {
             });
         });
 
-        menu.insert((
+        menu.entity_commands().insert((
             Menu {
                 container,
                 ..default()
@@ -295,11 +295,11 @@ impl MenuSeparator {
 }
 
 pub trait UiMenuSeparatorExt<'w, 's> {
-    fn menu_separator<'a>(&'a mut self) -> EntityCommands<'w, 's, 'a>;
+    fn menu_separator<'a>(&'a mut self) -> UiBuilder<'w, 's, 'a>;
 }
 
 impl<'w, 's> UiMenuSeparatorExt<'w, 's> for UiBuilder<'w, 's, '_> {
-    fn menu_separator<'a>(&'a mut self) -> EntityCommands<'w, 's, 'a> {
+    fn menu_separator<'a>(&'a mut self) -> UiBuilder<'w, 's, 'a> {
         self.spawn(MenuSeparator::separator())
     }
 }
@@ -324,11 +324,11 @@ impl MenuItemSeparator {
 }
 
 pub trait UiMenuItemSeparatorExt<'w, 's> {
-    fn menu_item_separator<'a>(&'a mut self) -> EntityCommands<'w, 's, 'a>;
+    fn menu_item_separator<'a>(&'a mut self) -> UiBuilder<'w, 's, 'a>;
 }
 
 impl<'w, 's> UiMenuItemSeparatorExt<'w, 's> for UiBuilder<'w, 's, '_> {
-    fn menu_item_separator<'a>(&'a mut self) -> EntityCommands<'w, 's, 'a> {
+    fn menu_item_separator<'a>(&'a mut self) -> UiBuilder<'w, 's, 'a> {
         self.spawn(MenuItemSeparator::separator())
     }
 }

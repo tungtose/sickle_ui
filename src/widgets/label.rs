@@ -70,11 +70,11 @@ impl LabelConfig {
 }
 
 pub trait UiLabelExt<'w, 's> {
-    fn label<'a>(&'a mut self, config: LabelConfig) -> EntityCommands<'w, 's, 'a>;
+    fn label<'a>(&'a mut self, config: LabelConfig) -> UiBuilder<'w, 's, 'a>;
 }
 
 impl<'w, 's> UiLabelExt<'w, 's> for UiBuilder<'w, 's, '_> {
-    fn label<'a>(&'a mut self, config: LabelConfig) -> EntityCommands<'w, 's, 'a> {
+    fn label<'a>(&'a mut self, config: LabelConfig) -> UiBuilder<'w, 's, 'a> {
         self.spawn((config.frame(), Label))
     }
 }

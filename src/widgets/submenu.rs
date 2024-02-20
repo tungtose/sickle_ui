@@ -1,4 +1,4 @@
-use bevy::{ecs::system::EntityCommands, prelude::*};
+use bevy::prelude::*;
 
 use crate::{
     ui_builder::{UiBuilder, UiBuilderExt},
@@ -340,7 +340,7 @@ pub trait UiSubmenuExt<'w, 's> {
         &'a mut self,
         config: SubmenuConfig,
         spawn_items: impl FnOnce(&mut UiBuilder),
-    ) -> EntityCommands<'w, 's, 'a>;
+    ) -> UiBuilder<'w, 's, 'a>;
 }
 
 impl<'w, 's> UiSubmenuExt<'w, 's> for UiBuilder<'w, 's, '_> {
@@ -348,14 +348,13 @@ impl<'w, 's> UiSubmenuExt<'w, 's> for UiBuilder<'w, 's, '_> {
         &'a mut self,
         config: SubmenuConfig,
         spawn_items: impl FnOnce(&mut UiBuilder),
-    ) -> EntityCommands<'w, 's, 'a> {
+    ) -> UiBuilder<'w, 's, 'a> {
         let external_container = self.entity();
 
         let menu_id = self.menu_item(config.clone().into()).id();
         let container = self
             .commands()
-            .entity(menu_id)
-            .ui_builder()
+            .ui_builder(menu_id.into())
             .container(
                 (
                     SubmenuContainer::frame(),
@@ -369,15 +368,18 @@ impl<'w, 's> UiSubmenuExt<'w, 's> for UiBuilder<'w, 's, '_> {
             )
             .id();
 
-        self.commands().entity(menu_id).insert((
-            Submenu {
-                container,
-                external_container,
-                ..default()
-            },
-            config,
-        ));
+        self.commands()
+            .ui_builder(menu_id.into())
+            .entity_commands()
+            .insert((
+                Submenu {
+                    container,
+                    external_container,
+                    ..default()
+                },
+                config,
+            ));
 
-        self.commands().entity(menu_id)
+        self.commands().ui_builder(menu_id.into())
     }
 }
