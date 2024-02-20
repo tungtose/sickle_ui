@@ -2,7 +2,7 @@ use bevy::{
     ecs::{
         entity::Entity,
         query::With,
-        system::{Command, Commands, EntityCommands},
+        system::{Command, Commands, EntityCommand, EntityCommands},
         world::World,
     },
     log::warn,
@@ -11,17 +11,16 @@ use bevy::{
 };
 
 struct SetTextSections {
-    entity: Entity,
     sections: Vec<TextSection>,
 }
 
-impl Command for SetTextSections {
-    fn apply(self, world: &mut World) {
+impl EntityCommand for SetTextSections {
+    fn apply(self, entity: Entity, world: &mut World) {
         let mut q_text = world.query::<&mut Text>();
-        let Ok(mut text) = q_text.get_mut(world, self.entity) else {
+        let Ok(mut text) = q_text.get_mut(world, entity) else {
             warn!(
                 "Failed to set text sections on entity {:?}: No Text component found!",
-                self.entity
+                entity
             );
             return;
         };
@@ -31,31 +30,34 @@ impl Command for SetTextSections {
 }
 
 pub trait SetTextSectionsExt<'w, 's, 'a> {
-    fn set_text_sections(&'a mut self, sections: Vec<TextSection>) -> EntityCommands<'w, 's, 'a>;
+    fn set_text_sections(
+        &'a mut self,
+        sections: Vec<TextSection>,
+    ) -> &mut EntityCommands<'w, 's, 'a>;
 }
 
 impl<'w, 's, 'a> SetTextSectionsExt<'w, 's, 'a> for EntityCommands<'w, 's, 'a> {
-    fn set_text_sections(&'a mut self, sections: Vec<TextSection>) -> EntityCommands<'w, 's, 'a> {
-        let entity = self.id();
-        self.commands().add(SetTextSections { entity, sections });
-
-        self.commands().entity(entity)
+    fn set_text_sections(
+        &'a mut self,
+        sections: Vec<TextSection>,
+    ) -> &mut EntityCommands<'w, 's, 'a> {
+        self.add(SetTextSections { sections });
+        self
     }
 }
 
 struct SetText {
-    entity: Entity,
     text: String,
     style: TextStyle,
 }
 
-impl Command for SetText {
-    fn apply(self, world: &mut World) {
+impl EntityCommand for SetText {
+    fn apply(self, entity: Entity, world: &mut World) {
         let mut q_text = world.query::<&mut Text>();
-        let Ok(mut text) = q_text.get_mut(world, self.entity) else {
+        let Ok(mut text) = q_text.get_mut(world, entity) else {
             warn!(
                 "Failed to set text on entity {:?}: No Text component found!",
-                self.entity
+                entity
             );
             return;
         };
@@ -69,7 +71,7 @@ pub trait SetTextExt<'w, 's, 'a> {
         &'a mut self,
         text: impl Into<String>,
         style: Option<TextStyle>,
-    ) -> EntityCommands<'w, 's, 'a>;
+    ) -> &mut EntityCommands<'w, 's, 'a>;
 }
 
 impl<'w, 's, 'a> SetTextExt<'w, 's, 'a> for EntityCommands<'w, 's, 'a> {
@@ -77,15 +79,13 @@ impl<'w, 's, 'a> SetTextExt<'w, 's, 'a> for EntityCommands<'w, 's, 'a> {
         &'a mut self,
         text: impl Into<String>,
         style: Option<TextStyle>,
-    ) -> EntityCommands<'w, 's, 'a> {
-        let entity = self.id();
-        self.commands().add(SetText {
-            entity,
+    ) -> &mut EntityCommands<'w, 's, 'a> {
+        self.add(SetText {
             text: text.into(),
             style: style.unwrap_or_default(),
         });
 
-        self.commands().entity(entity)
+        self
     }
 }
 
