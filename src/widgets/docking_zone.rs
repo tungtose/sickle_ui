@@ -4,7 +4,9 @@ use crate::{
     drag_interaction::{DragState, Draggable, DraggableUpdate},
     resize_interaction::{ResizeDirection, ResizeHandle},
     ui_builder::*,
-    ui_style::{SetBackgroundColorExt, SetEntityVisiblityExt, UiStyleExt},
+    ui_style::{
+        SetBackgroundColorExt, SetEntityVisiblityExt, SetNodeLeftExt, SetNodeTopExt, UiStyleExt,
+    },
 };
 
 use super::prelude::UiContainerExt;
@@ -620,25 +622,70 @@ impl<'w, 's> UiDockingZoneExt<'w, 's> for UiBuilder<'w, 's, '_> {
             spawn_children(container);
 
             container.container(
-                ResizeHandle::resize_handle_container(),
+                ResizeHandle::resize_handle_container(10),
                 |resize_container| {
-                    top_handle = resize_container
-                        .spawn((ResizeHandle::resize_handle(ResizeDirection::North), handle))
-                        .id();
+                    resize_container.container(
+                        NodeBundle {
+                            style: Style {
+                                width: Val::Percent(100.),
+                                height: Val::Px(ResizeHandle::resize_zone_size()),
+                                ..default()
+                            },
+                            ..default()
+                        },
+                        |top_row| {
+                            top_handle = top_row
+                                .spawn((
+                                    ResizeHandle::resize_handle(ResizeDirection::North),
+                                    handle,
+                                ))
+                                .style()
+                                .left(Val::Px(0.))
+                                .id();
+                        },
+                    );
+
+                    resize_container.container(
+                        NodeBundle {
+                            style: Style {
+                                width: Val::Percent(100.),
+                                height: Val::Px(ResizeHandle::resize_zone_size()),
+                                ..default()
+                            },
+                            ..default()
+                        },
+                        |bottom_row| {
+                            bottom_handle = bottom_row
+                                .spawn((
+                                    ResizeHandle::resize_handle(ResizeDirection::South),
+                                    handle,
+                                ))
+                                .style()
+                                .left(Val::Px(0.))
+                                .id();
+                        },
+                    );
+                },
+            );
+
+            container.container(
+                ResizeHandle::resize_handle_container(11),
+                |resize_container| {
                     resize_container.container(
                         DockingZone::vertical_handles_container(),
                         |middle_row| {
                             left_handle = middle_row
                                 .spawn((ResizeHandle::resize_handle(ResizeDirection::West), handle))
+                                .style()
+                                .top(Val::Px(0.))
                                 .id();
                             right_handle = middle_row
                                 .spawn((ResizeHandle::resize_handle(ResizeDirection::East), handle))
+                                .style()
+                                .top(Val::Px(0.))
                                 .id();
                         },
                     );
-                    bottom_handle = resize_container
-                        .spawn((ResizeHandle::resize_handle(ResizeDirection::South), handle))
-                        .id();
                 },
             );
         });

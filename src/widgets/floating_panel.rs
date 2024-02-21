@@ -4,7 +4,7 @@ use bevy::{prelude::*, window::WindowResized};
 use super::prelude::{LabelConfig, UiContainerExt, UiLabelExt};
 use super::prelude::{SetLabelTextExt, UiScrollViewExt};
 use crate::resize_interaction::ResizeHandle;
-use crate::ui_style::{SetEntityVisiblityExt, UiStyleExt};
+use crate::ui_style::{SetEntityVisiblityExt, SetNodeShowHideExt, UiStyleExt};
 use crate::{
     drag_interaction::{DragState, Draggable, DraggableUpdate},
     resize_interaction::ResizeDirection,
@@ -64,10 +64,7 @@ fn process_panel_config_update(
     for (panel, config) in &q_panels {
         commands
             .style(panel.title_container)
-            .visibility(match config.title.is_some() {
-                true => Visibility::Inherited,
-                false => Visibility::Hidden,
-            });
+            .render(config.title.is_some());
 
         if let Some(title) = config.title.clone() {
             commands.entity(panel.title).set_label_text(title);
@@ -81,20 +78,15 @@ fn process_panel_config_update(
                     .remove::<(TrackedInteraction, Draggable)>();
             }
         } else {
-            commands
-                .style(panel.drag_handle)
-                .visibility(match config.draggable {
-                    true => Visibility::Inherited,
-                    false => Visibility::Hidden,
-                });
+            commands.style(panel.drag_handle).render(config.draggable);
         }
 
         commands
-            .style(panel.resize_handles)
-            .visibility(match config.resizable {
-                true => Visibility::Inherited,
-                false => Visibility::Hidden,
-            });
+            .style(panel.resize_handles.0)
+            .render(config.resizable);
+        commands
+            .style(panel.resize_handles.1)
+            .render(config.resizable);
     }
 }
 
@@ -319,19 +311,19 @@ impl Default for FloatingPanelResizeHandle {
     }
 }
 
-#[derive(Component, Debug, Reflect)]
-#[reflect(Component)]
-pub struct FloatingPanelResizeHandleContainer {
-    panel: Entity,
-}
+// #[derive(Component, Debug, Reflect)]
+// #[reflect(Component)]
+// pub struct FloatingPanelResizeHandleContainer {
+//     panel: Entity,
+// }
 
-impl Default for FloatingPanelResizeHandleContainer {
-    fn default() -> Self {
-        Self {
-            panel: Entity::PLACEHOLDER,
-        }
-    }
-}
+// impl Default for FloatingPanelResizeHandleContainer {
+//     fn default() -> Self {
+//         Self {
+//             panel: Entity::PLACEHOLDER,
+//         }
+//     }
+// }
 
 #[derive(Component, Debug, Reflect)]
 #[reflect(Component)]
@@ -389,7 +381,7 @@ pub struct FloatingPanel {
     title_container: Entity,
     title: Entity,
     drag_handle: Entity,
-    resize_handles: Entity,
+    resize_handles: (Entity, Entity),
     content: Entity,
     resizing: bool,
     pub priority: bool,
@@ -404,7 +396,7 @@ impl Default for FloatingPanel {
             title_container: Entity::PLACEHOLDER,
             title: Entity::PLACEHOLDER,
             drag_handle: Entity::PLACEHOLDER,
-            resize_handles: Entity::PLACEHOLDER,
+            resize_handles: (Entity::PLACEHOLDER, Entity::PLACEHOLDER),
             content: Entity::PLACEHOLDER,
             resizing: Default::default(),
             priority: Default::default(),
@@ -505,7 +497,8 @@ impl<'w, 's> UiFloatingPanelExt<'w, 's> for UiBuilder<'w, 's, '_> {
     ) -> UiBuilder<'w, 's, 'a> {
         let restrict_to = config.restrict_scroll;
 
-        let mut resize_handles = Entity::PLACEHOLDER;
+        let mut vertical_resize_handles = Entity::PLACEHOLDER;
+        let mut horizontal_resize_handles = Entity::PLACEHOLDER;
         let mut title_container = Entity::PLACEHOLDER;
         let mut title = Entity::PLACEHOLDER;
         let mut drag_handle = Entity::PLACEHOLDER;
@@ -518,12 +511,9 @@ impl<'w, 's> UiFloatingPanelExt<'w, 's> for UiBuilder<'w, 's, '_> {
                 "".into()
             };
 
-            resize_handles = container
+            vertical_resize_handles = container
                 .container(
-                    (
-                        ResizeHandle::resize_handle_container(),
-                        FloatingPanelResizeHandleContainer { panel },
-                    ),
+                    (ResizeHandle::resize_handle_container(10),),
                     |resize_container| {
                         resize_container.container(
                             NodeBundle {
@@ -536,19 +526,38 @@ impl<'w, 's> UiFloatingPanelExt<'w, 's> for UiBuilder<'w, 's, '_> {
                             },
                             |top_row| {
                                 top_row.spawn((
-                                    ResizeHandle::resize_handle(ResizeDirection::NorthWest),
-                                    FloatingPanelResizeHandle { panel },
-                                ));
-                                top_row.spawn((
                                     ResizeHandle::resize_handle(ResizeDirection::North),
-                                    FloatingPanelResizeHandle { panel },
-                                ));
-                                top_row.spawn((
-                                    ResizeHandle::resize_handle(ResizeDirection::NorthEast),
                                     FloatingPanelResizeHandle { panel },
                                 ));
                             },
                         );
+
+                        resize_container.container(
+                            NodeBundle {
+                                style: Style {
+                                    width: Val::Percent(100.),
+                                    height: Val::Px(ResizeHandle::resize_zone_size()),
+                                    ..default()
+                                },
+                                ..default()
+                            },
+                            |bottom_row| {
+                                bottom_row.spawn((
+                                    ResizeHandle::resize_handle(ResizeDirection::South),
+                                    FloatingPanelResizeHandle { panel },
+                                ));
+                            },
+                        );
+                    },
+                )
+                .style()
+                .render(config.resizable)
+                .id();
+
+            horizontal_resize_handles = container
+                .container(
+                    (ResizeHandle::resize_handle_container(11),),
+                    |resize_container| {
                         resize_container.container(
                             NodeBundle {
                                 style: Style {
@@ -570,37 +579,10 @@ impl<'w, 's> UiFloatingPanelExt<'w, 's> for UiBuilder<'w, 's, '_> {
                                 ));
                             },
                         );
-                        resize_container.container(
-                            NodeBundle {
-                                style: Style {
-                                    width: Val::Percent(100.),
-                                    height: Val::Px(ResizeHandle::resize_zone_size()),
-                                    ..default()
-                                },
-                                ..default()
-                            },
-                            |bottom_row| {
-                                bottom_row.spawn((
-                                    ResizeHandle::resize_handle(ResizeDirection::SouthWest),
-                                    FloatingPanelResizeHandle { panel },
-                                ));
-                                bottom_row.spawn((
-                                    ResizeHandle::resize_handle(ResizeDirection::South),
-                                    FloatingPanelResizeHandle { panel },
-                                ));
-                                bottom_row.spawn((
-                                    ResizeHandle::resize_handle(ResizeDirection::SouthEast),
-                                    FloatingPanelResizeHandle { panel },
-                                ));
-                            },
-                        );
                     },
                 )
                 .style()
-                .visibility(match config.resizable {
-                    true => Visibility::Inherited,
-                    false => Visibility::Hidden,
-                })
+                .render(config.resizable)
                 .id();
 
             title_container = container
@@ -621,10 +603,7 @@ impl<'w, 's> UiFloatingPanelExt<'w, 's> for UiBuilder<'w, 's, '_> {
                     },
                 )
                 .style()
-                .visibility(match config.title.is_some() {
-                    true => Visibility::Inherited,
-                    false => Visibility::Hidden,
-                })
+                .render(config.title.is_some())
                 .id();
 
             drag_handle = container
@@ -633,10 +612,7 @@ impl<'w, 's> UiFloatingPanelExt<'w, 's> for UiBuilder<'w, 's, '_> {
                     FloatingPanelDragHandle { panel },
                 ))
                 .style()
-                .visibility(match config.title.is_some() {
-                    true => Visibility::Hidden,
-                    false => Visibility::Inherited,
-                })
+                .render(config.title.is_none())
                 .id();
 
             if layout.hidden {
@@ -656,7 +632,7 @@ impl<'w, 's> UiFloatingPanelExt<'w, 's> for UiBuilder<'w, 's, '_> {
                 title_container,
                 title,
                 drag_handle,
-                resize_handles,
+                resize_handles: (horizontal_resize_handles, vertical_resize_handles),
                 ..default()
             },
         ));

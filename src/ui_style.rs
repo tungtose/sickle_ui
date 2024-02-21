@@ -27,32 +27,52 @@ impl<'a> UiStyleExt<'a> for Commands<'_, '_> {
 }
 
 #[derive(StyleCommand)]
-struct SetEntityWidth {
+struct SetNodeWidth {
     width: Val,
 }
 
 #[derive(StyleCommand)]
-struct SetEntityHeight {
+struct SetNodeHeight {
     height: Val,
 }
 
 #[derive(StyleCommand)]
-struct SetEntityFlexDirection {
+struct SetNodeTop {
+    top: Val,
+}
+
+#[derive(StyleCommand)]
+struct SetNodeRight {
+    right: Val,
+}
+
+#[derive(StyleCommand)]
+struct SetNodeBottom {
+    bottom: Val,
+}
+
+#[derive(StyleCommand)]
+struct SetNodeLeft {
+    left: Val,
+}
+
+#[derive(StyleCommand)]
+struct SetNodeFlexDirection {
     flex_direction: FlexDirection,
 }
 
 #[derive(StyleCommand)]
-struct SetEntityDisplay {
+struct SetNodeDisplay {
     display: Display,
 }
 
 #[derive(StyleCommand)]
-struct SetEntityAlignSelf {
+struct SetNodeAlignSelf {
     align_self: AlignSelf,
 }
 
 #[derive(StyleCommand)]
-struct SetEntityJustifySelf {
+struct SetNodeJustifySelf {
     justify_self: JustifySelf,
 }
 
@@ -122,6 +142,58 @@ pub trait SetEntityVisiblityExt<'a> {
 impl<'a> SetEntityVisiblityExt<'a> for UiStyle<'a> {
     fn visibility(&'a mut self, visibility: Visibility) -> &mut UiStyle<'a> {
         self.commands.add(SetEntityVisiblity { visibility });
+        self
+    }
+}
+
+pub trait SetNodeShowHideExt<'a> {
+    fn show(&'a mut self) -> &mut UiStyle<'a>;
+    fn hide(&'a mut self) -> &mut UiStyle<'a>;
+    fn render(&'a mut self, render: bool) -> &mut UiStyle<'a>;
+}
+
+impl<'a> SetNodeShowHideExt<'a> for UiStyle<'a> {
+    fn show(&'a mut self) -> &mut UiStyle<'a> {
+        self.commands
+            .add(SetEntityVisiblity {
+                visibility: Visibility::Inherited,
+            })
+            .add(SetNodeDisplay {
+                display: Display::Flex,
+            });
+        self
+    }
+
+    fn hide(&'a mut self) -> &mut UiStyle<'a> {
+        self.commands
+            .add(SetEntityVisiblity {
+                visibility: Visibility::Hidden,
+            })
+            .add(SetNodeDisplay {
+                display: Display::None,
+            });
+        self
+    }
+
+    fn render(&'a mut self, render: bool) -> &mut UiStyle<'a> {
+        if render {
+            self.commands
+                .add(SetEntityVisiblity {
+                    visibility: Visibility::Inherited,
+                })
+                .add(SetNodeDisplay {
+                    display: Display::Flex,
+                });
+        } else {
+            self.commands
+                .add(SetEntityVisiblity {
+                    visibility: Visibility::Hidden,
+                })
+                .add(SetNodeDisplay {
+                    display: Display::None,
+                });
+        }
+
         self
     }
 }

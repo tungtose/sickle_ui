@@ -2,7 +2,7 @@ use bevy::prelude::*;
 
 use crate::{
     ui_builder::*,
-    ui_style::{SetBackgroundColorExt, SetEntityWidthExt},
+    ui_style::{SetBackgroundColorExt, SetNodeWidthExt},
 };
 
 use super::prelude::UiContainerExt;

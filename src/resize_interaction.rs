@@ -16,13 +16,21 @@ impl Plugin for ResizeHandlePlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(
             Update,
-            update_cursor_on_resize_handles.after(FluxInteractionUpdate),
+            update_cursor_on_resize_handles
+                .run_if(should_update_resize_handle_cursor)
+                .after(FluxInteractionUpdate),
         );
     }
 }
 
+fn should_update_resize_handle_cursor(
+    q_flux: Query<&ResizeHandle, Changed<FluxInteraction>>,
+) -> bool {
+    q_flux.iter().count() > 0
+}
+
 fn update_cursor_on_resize_handles(
-    q_flux: Query<(&ResizeHandle, &FluxInteraction), Changed<FluxInteraction>>,
+    q_flux: Query<(&ResizeHandle, &FluxInteraction)>,
     mut locked: Local<bool>,
     mut commands: Commands,
 ) {
@@ -108,21 +116,18 @@ impl ResizeHandle {
         2.
     }
 
-    pub fn resize_handle_container() -> impl Bundle {
+    pub fn resize_handle_container(elevation: i32) -> impl Bundle {
         NodeBundle {
             style: Style {
                 position_type: PositionType::Absolute,
                 width: Val::Percent(100.),
                 height: Val::Percent(100.),
-                margin: UiRect::all(Val::Px(-ResizeHandle::resize_zone_pullback())),
-                // justify_self: JustifySelf::Stretch,
                 justify_content: JustifyContent::SpaceBetween,
                 align_self: AlignSelf::Stretch,
                 flex_direction: FlexDirection::Column,
-                //flex_grow: 1.,
                 ..default()
             },
-            z_index: ZIndex::Local(10),
+            z_index: ZIndex::Local(elevation),
             ..default()
         }
     }
@@ -141,9 +146,12 @@ impl ResizeHandle {
             ResizeDirection::NorthWest => (Val::Px(zone_size), Val::Px(zone_size)),
         };
 
+        let pullback = Val::Px(-ResizeHandle::resize_zone_pullback());
         (
             NodeBundle {
                 style: Style {
+                    top: pullback,
+                    left: pullback,
                     width,
                     height,
                     ..default()
