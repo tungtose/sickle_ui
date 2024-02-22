@@ -1,10 +1,19 @@
 use bevy::window::PrimaryWindow;
 use bevy::{prelude::*, window::WindowResized};
+use sickle_math::ease::Ease;
 
+use super::icon::{IconConfig, UiIconExt};
 use super::prelude::{LabelConfig, UiContainerExt, UiLabelExt};
 use super::prelude::{SetLabelTextExt, UiScrollViewExt};
+use crate::animated_interaction::{AnimatedInteraction, AnimationConfig};
+use crate::interactions::InteractiveBackground;
 use crate::resize_interaction::ResizeHandle;
-use crate::ui_style::{SetEntityVisiblityExt, SetNodeShowHideExt, UiStyleExt};
+use crate::ui_style::{
+    SetBackgroundColorExt, SetEntityVisiblityExt, SetImageExt, SetNodeFlexGrowExt,
+    SetNodeHeightExt, SetNodeLeftExt, SetNodeMarginExt, SetNodeShowHideExt, SetNodeTopExt,
+    SetNodeWidthExt, SetZIndexExt, UiStyleExt,
+};
+use crate::FluxInteraction;
 use crate::{
     drag_interaction::{DragState, Draggable, DraggableUpdate},
     resize_interaction::ResizeDirection,
@@ -26,7 +35,9 @@ impl Plugin for FloatingPanelPlugin {
             Update,
             (
                 index_floating_panel.run_if(panel_added),
-                process_panel_config_update.before(FluxInteractionUpdate),
+                process_panel_close_pressed.after(FluxInteractionUpdate),
+                process_panel_fold_pressed.after(FluxInteractionUpdate),
+                process_panel_config_update.after(FluxInteractionUpdate),
                 update_panel_size_on_resize.after(DraggableUpdate),
                 update_panel_on_title_drag.after(DraggableUpdate),
                 handle_window_resize.run_if(window_resized),
@@ -57,6 +68,36 @@ fn index_floating_panel(mut q_panels: Query<&mut FloatingPanel>) {
     }
 }
 
+fn process_panel_close_pressed(
+    q_buttons: Query<(&FloatingPanelCloseButton, &FluxInteraction), Changed<FluxInteraction>>,
+    mut commands: Commands,
+) {
+    for (button, interaction) in &q_buttons {
+        if *interaction == FluxInteraction::Released {
+            commands.entity(button.panel).despawn_recursive();
+        }
+    }
+}
+
+fn process_panel_fold_pressed(
+    q_buttons: Query<
+        (Entity, &FloatingPanelFoldButton, &FluxInteraction),
+        Changed<FluxInteraction>,
+    >,
+    mut q_panel_configs: Query<&mut FloatingPanelConfig>,
+) {
+    for (entity, button, interaction) in &q_buttons {
+        if *interaction == FluxInteraction::Released {
+            let Ok(mut config) = q_panel_configs.get_mut(button.panel) else {
+                warn!("Missing floating panel config for fold button {:?}", entity);
+                continue;
+            };
+
+            config.folded = !config.folded;
+        }
+    }
+}
+
 fn process_panel_config_update(
     q_panels: Query<(&FloatingPanel, &FloatingPanelConfig), Changed<FloatingPanelConfig>>,
     mut commands: Commands,
@@ -81,12 +122,25 @@ fn process_panel_config_update(
             commands.style(panel.drag_handle).render(config.draggable);
         }
 
+        if config.folded {
+            commands.style(panel.resize_handles.0).render(false);
+            commands.style(panel.resize_handles.1).render(false);
+        } else {
+            commands
+                .style(panel.resize_handles.0)
+                .render(config.resizable);
+            commands
+                .style(panel.resize_handles.1)
+                .render(config.resizable);
+        }
+
+        commands.style(panel.content).render(!config.folded);
         commands
-            .style(panel.resize_handles.0)
-            .render(config.resizable);
-        commands
-            .style(panel.resize_handles.1)
-            .render(config.resizable);
+            .style(panel.fold_button)
+            .image(match config.folded {
+                true => "sickle://icons/chevron_right.png",
+                false => "sickle://icons/chevron_down.png",
+            });
     }
 }
 
@@ -281,18 +335,32 @@ fn handle_window_resize(
 }
 
 fn update_panel_layout(
-    mut q_panels: Query<(&FloatingPanel, &mut Style, &mut ZIndex), Changed<FloatingPanel>>,
+    q_panels: Query<
+        (Entity, &FloatingPanel, &FloatingPanelConfig),
+        Or<(Changed<FloatingPanel>, Changed<FloatingPanelConfig>)>,
+    >,
+    mut commands: Commands,
 ) {
-    for (panel, mut style, mut z_index) in &mut q_panels {
-        style.width = Val::Px(panel.size.x.max(MIN_PANEL_SIZE.x));
-        style.height = Val::Px(panel.size.y.max(MIN_PANEL_SIZE.y));
-        style.left = Val::Px(panel.position.x);
-        style.top = Val::Px(panel.position.y);
+    for (entity, panel, config) in &q_panels {
+        commands
+            .style(entity)
+            .width(match config.folded {
+                true => Val::Auto,
+                false => Val::Px(panel.size.x.max(MIN_PANEL_SIZE.x)),
+            })
+            .height(match config.folded {
+                true => Val::Auto,
+                false => Val::Px(panel.size.y.max(MIN_PANEL_SIZE.y)),
+            })
+            .left(Val::Px(panel.position.x))
+            .top(Val::Px(panel.position.y));
 
         if panel.priority {
-            *z_index = ZIndex::Global(PRIORITY_FLOATING_PANEL_Z_INDEX as i32);
+            commands
+                .style(entity)
+                .z_index(ZIndex::Global(PRIORITY_FLOATING_PANEL_Z_INDEX as i32));
         } else if let Some(index) = panel.z_index {
-            *z_index = ZIndex::Global(index as i32);
+            commands.style(entity).z_index(ZIndex::Global(index as i32));
         }
     }
 }
@@ -310,20 +378,6 @@ impl Default for FloatingPanelResizeHandle {
         }
     }
 }
-
-// #[derive(Component, Debug, Reflect)]
-// #[reflect(Component)]
-// pub struct FloatingPanelResizeHandleContainer {
-//     panel: Entity,
-// }
-
-// impl Default for FloatingPanelResizeHandleContainer {
-//     fn default() -> Self {
-//         Self {
-//             panel: Entity::PLACEHOLDER,
-//         }
-//     }
-// }
 
 #[derive(Component, Debug, Reflect)]
 #[reflect(Component)]
@@ -353,11 +407,42 @@ impl Default for FloatingPanelDragHandle {
     }
 }
 
+#[derive(Component, Debug, Reflect)]
+#[reflect(Component)]
+pub struct FloatingPanelFoldButton {
+    panel: Entity,
+}
+
+impl Default for FloatingPanelFoldButton {
+    fn default() -> Self {
+        Self {
+            panel: Entity::PLACEHOLDER,
+        }
+    }
+}
+
+#[derive(Component, Debug, Reflect)]
+#[reflect(Component)]
+pub struct FloatingPanelCloseButton {
+    panel: Entity,
+}
+
+impl Default for FloatingPanelCloseButton {
+    fn default() -> Self {
+        Self {
+            panel: Entity::PLACEHOLDER,
+        }
+    }
+}
+
 #[derive(Component, Clone, Debug, Reflect)]
 pub struct FloatingPanelConfig {
     pub title: Option<String>,
     pub draggable: bool,
     pub resizable: bool,
+    pub foldable: bool,
+    pub folded: bool,
+    pub closable: bool,
     pub restrict_scroll: Option<ScrollAxis>,
 }
 
@@ -367,6 +452,9 @@ impl Default for FloatingPanelConfig {
             title: None,
             draggable: true,
             resizable: true,
+            foldable: true,
+            folded: false,
+            closable: true,
             restrict_scroll: None,
         }
     }
@@ -378,11 +466,13 @@ pub struct FloatingPanel {
     size: Vec2,
     position: Vec2,
     z_index: Option<usize>,
+    drag_handle: Entity,
+    fold_button: Entity,
     title_container: Entity,
     title: Entity,
-    drag_handle: Entity,
-    resize_handles: (Entity, Entity),
+    close_button: Entity,
     content: Entity,
+    resize_handles: (Entity, Entity),
     resizing: bool,
     pub priority: bool,
 }
@@ -393,11 +483,13 @@ impl Default for FloatingPanel {
             size: Default::default(),
             position: Default::default(),
             z_index: Default::default(),
+            drag_handle: Entity::PLACEHOLDER,
+            fold_button: Entity::PLACEHOLDER,
             title_container: Entity::PLACEHOLDER,
             title: Entity::PLACEHOLDER,
-            drag_handle: Entity::PLACEHOLDER,
-            resize_handles: (Entity::PLACEHOLDER, Entity::PLACEHOLDER),
+            close_button: Entity::PLACEHOLDER,
             content: Entity::PLACEHOLDER,
+            resize_handles: (Entity::PLACEHOLDER, Entity::PLACEHOLDER),
             resizing: Default::default(),
             priority: Default::default(),
         }
@@ -405,6 +497,14 @@ impl Default for FloatingPanel {
 }
 
 impl FloatingPanel {
+    fn base_tween() -> AnimationConfig {
+        AnimationConfig {
+            duration: 0.1,
+            easing: Ease::OutExpo,
+            ..default()
+        }
+    }
+
     fn frame() -> impl Bundle {
         NodeBundle {
             style: Style {
@@ -425,10 +525,11 @@ impl FloatingPanel {
     fn title_container() -> impl Bundle {
         ButtonBundle {
             style: Style {
-                border: UiRect::right(Val::Px(2.)),
+                width: Val::Percent(100.),
+                align_items: AlignItems::Center,
+                justify_content: JustifyContent::Start,
                 ..default()
             },
-            border_color: Color::BLACK.into(),
             background_color: Color::DARK_GRAY.into(),
             ..default()
         }
@@ -450,6 +551,21 @@ impl FloatingPanel {
             TrackedInteraction::default(),
             Draggable::default(),
         )
+    }
+
+    fn close_button_container() -> impl Bundle {
+        NodeBundle {
+            style: Style {
+                position_type: PositionType::Absolute,
+                right: Val::Px(0.),
+                border: UiRect::left(Val::Px(2.)),
+                ..default()
+            },
+            border_color: Color::BLACK.into(),
+            background_color: Color::GRAY.into(),
+            focus_policy: bevy::ui::FocusPolicy::Block,
+            ..default()
+        }
     }
 }
 
@@ -501,7 +617,10 @@ impl<'w, 's> UiFloatingPanelExt<'w, 's> for UiBuilder<'w, 's, '_> {
         let mut horizontal_resize_handles = Entity::PLACEHOLDER;
         let mut title_container = Entity::PLACEHOLDER;
         let mut title = Entity::PLACEHOLDER;
+        let mut fold_button = Entity::PLACEHOLDER;
+        let mut close_button = Entity::PLACEHOLDER;
         let mut drag_handle = Entity::PLACEHOLDER;
+        let mut content = Entity::PLACEHOLDER;
         let mut frame = self.container(FloatingPanel::frame(), |container| {
             let panel = container.id();
 
@@ -592,14 +711,73 @@ impl<'w, 's> UiFloatingPanelExt<'w, 's> for UiBuilder<'w, 's, '_> {
                         FloatingPanelTitle { panel },
                     ),
                     |container| {
+                        fold_button = container
+                            .icon(IconConfig {
+                                path: match config.folded {
+                                    true => "sickle://icons/chevron_right.png",
+                                    false => "sickle://icons/chevron_down.png",
+                                }
+                                .into(),
+                                ..default()
+                            })
+                            .insert((
+                                Interaction::default(),
+                                TrackedInteraction::default(),
+                                InteractiveBackground {
+                                    highlight: Color::rgba(0., 1., 1., 1.).into(),
+                                    ..default()
+                                },
+                                AnimatedInteraction::<InteractiveBackground> {
+                                    tween: FloatingPanel::base_tween(),
+                                    ..default()
+                                },
+                                FloatingPanelFoldButton { panel },
+                            ))
+                            .style()
+                            .margin(UiRect::px(3., 0., 3., 3.))
+                            .background_color(Color::GRAY)
+                            .render(config.foldable)
+                            .id();
+
                         title = container
                             .label(LabelConfig {
                                 label: title_text,
-                                margin: UiRect::px(5., 5., 5., 2.),
+                                margin: UiRect::px(5., 29., 5., 2.),
                                 color: Color::WHITE,
                                 ..default()
                             })
+                            .style()
+                            .flex_grow(1.)
                             .id();
+
+                        container.container(
+                            FloatingPanel::close_button_container(),
+                            |close_button_container| {
+                                close_button = close_button_container
+                                    .icon(IconConfig {
+                                        path: "sickle://icons/close.png".into(),
+                                        ..default()
+                                    })
+                                    .insert((
+                                        Interaction::default(),
+                                        TrackedInteraction::default(),
+                                        InteractiveBackground {
+                                            highlight: Color::rgba(0., 1., 1., 1.).into(),
+                                            ..default()
+                                        },
+                                        AnimatedInteraction::<InteractiveBackground> {
+                                            tween: FloatingPanel::base_tween(),
+                                            ..default()
+                                        },
+                                        FloatingPanelCloseButton { panel },
+                                    ))
+                                    .style()
+                                    .margin(UiRect::px(3., 2., 2., 3.))
+                                    .background_color(Color::DARK_GRAY)
+                                    .render(config.closable)
+                                    .id();
+                            },
+                        );
                     },
                 )
                 .style()
@@ -619,7 +797,7 @@ impl<'w, 's> UiFloatingPanelExt<'w, 's> for UiBuilder<'w, 's, '_> {
                 container.style().visibility(Visibility::Hidden);
             }
 
-            container.scroll_view(restrict_to, spawn_children);
+            content = container.scroll_view(restrict_to, spawn_children).id();
         });
 
         frame.insert((
@@ -628,11 +806,14 @@ impl<'w, 's> UiFloatingPanelExt<'w, 's> for UiBuilder<'w, 's, '_> {
                 size: layout.size.max(MIN_PANEL_SIZE),
                 position: layout.position.unwrap_or_default(),
                 z_index: None,
-                priority: false,
+                drag_handle,
+                fold_button,
                 title_container,
                 title,
-                drag_handle,
+                close_button,
+                content,
                 resize_handles: (horizontal_resize_handles, vertical_resize_handles),
+                priority: false,
                 ..default()
             },
         ));

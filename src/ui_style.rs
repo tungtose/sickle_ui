@@ -27,6 +27,11 @@ impl<'a> UiStyleExt<'a> for Commands<'_, '_> {
 }
 
 #[derive(StyleCommand)]
+struct SetNodePositionType {
+    position_type: PositionType,
+}
+
+#[derive(StyleCommand)]
 struct SetNodeWidth {
     width: Val,
 }
@@ -57,8 +62,28 @@ struct SetNodeLeft {
 }
 
 #[derive(StyleCommand)]
+struct SetNodePadding {
+    padding: UiRect,
+}
+
+#[derive(StyleCommand)]
+struct SetNodeMargin {
+    margin: UiRect,
+}
+
+#[derive(StyleCommand)]
+struct SetNodeBorder {
+    border: UiRect,
+}
+
+#[derive(StyleCommand)]
 struct SetNodeFlexDirection {
     flex_direction: FlexDirection,
+}
+
+#[derive(StyleCommand)]
+struct SetNodeFlexGrow {
+    flex_grow: f32,
 }
 
 #[derive(StyleCommand)]
@@ -258,6 +283,47 @@ pub trait SetBackgroundColorExt<'a> {
 impl<'a> SetBackgroundColorExt<'a> for UiStyle<'a> {
     fn background_color(&'a mut self, color: Color) -> &mut UiStyle<'a> {
         self.commands.add(SetBackgroundColor { color });
+        self
+    }
+}
+
+struct SetZIndex {
+    z_index: ZIndex,
+}
+
+impl EntityCommand for SetZIndex {
+    fn apply(self, entity: Entity, world: &mut World) {
+        let mut q_z_index = world.query::<&mut ZIndex>();
+        let Ok(mut z_index) = q_z_index.get_mut(world, entity) else {
+            warn!(
+                "Failed to set z index on entity {:?}: No ZIndex component found!",
+                entity
+            );
+            return;
+        };
+
+        // Best effort avoid change triggering
+        if let (ZIndex::Local(level), ZIndex::Local(target)) = (*z_index, self.z_index) {
+            if level != target {
+                *z_index = self.z_index;
+            }
+        } else if let (ZIndex::Global(level), ZIndex::Global(target)) = (*z_index, self.z_index) {
+            if level != target {
+                *z_index = self.z_index;
+            }
+        } else {
+            *z_index = self.z_index;
+        }
+    }
+}
+
+pub trait SetZIndexExt<'a> {
+    fn z_index(&'a mut self, z_index: ZIndex) -> &mut UiStyle<'a>;
+}
+
+impl<'a> SetZIndexExt<'a> for UiStyle<'a> {
+    fn z_index(&'a mut self, z_index: ZIndex) -> &mut UiStyle<'a> {
+        self.commands.add(SetZIndex { z_index });
         self
     }
 }

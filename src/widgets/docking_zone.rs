@@ -439,7 +439,6 @@ fn fit_docking_zones_on_window_resize(
         };
 
         if parent_node.size() == Vec2::ZERO {
-            warn!("Docking zone parent {:?} doesn't have a size!", parent);
             continue;
         }
 

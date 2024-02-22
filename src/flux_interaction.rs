@@ -52,8 +52,11 @@ pub enum FluxInteraction {
     None,
     PointerEnter,
     PointerLeave,
+    /// Pressing started, but not completed or cancelled
     Pressed,
+    /// Pressing completed over the node
     Released,
+    /// Pressing cancelled by releasing outside of node
     PressCanceled,
     Disabled,
 }

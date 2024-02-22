@@ -5,6 +5,7 @@ pub mod context_menu;
 pub mod docking_zone;
 pub mod dropdown;
 pub mod floating_panel;
+pub mod icon;
 pub mod label;
 pub mod menu;
 pub mod menu_item;
@@ -21,9 +22,10 @@ use bevy::prelude::*;
 
 use self::{
     checkbox::CheckboxPlugin, context_menu::ContextMenuPlugin, docking_zone::DockingZonePlugin,
-    dropdown::DropdownPlugin, floating_panel::FloatingPanelPlugin, menu::MenuPlugin,
-    menu_item::MenuItemPlugin, radio_group::RadioGroupPlugin, scroll_view::ScrollViewPlugin,
-    slider::InputSliderPlugin, submenu::SubmenuPlugin, toggle_menu_item::ToggleMenuItemPlugin,
+    dropdown::DropdownPlugin, floating_panel::FloatingPanelPlugin, icon::IconPlugin,
+    menu::MenuPlugin, menu_item::MenuItemPlugin, radio_group::RadioGroupPlugin,
+    scroll_view::ScrollViewPlugin, slider::SliderPlugin, submenu::SubmenuPlugin,
+    toggle_menu_item::ToggleMenuItemPlugin,
 };
 
 pub mod prelude {
@@ -35,6 +37,7 @@ pub mod prelude {
         docking_zone::{DockingZoneConfig, UiDockingZoneExt},
         dropdown::UiDropdownExt,
         floating_panel::{FloatingPanelConfig, FloatingPanelLayout, UiFloatingPanelExt},
+        icon::{IconConfig, UiIconExt},
         label::{LabelConfig, SetLabelTextExt, UiLabelExt},
         menu::{
             MenuConfig, MenuItemSeparator, MenuSeparator, UiMenuExt, UiMenuItemSeparatorExt,
@@ -60,10 +63,11 @@ impl Plugin for WidgetsPlugin {
             DockingZonePlugin,
             DropdownPlugin,
             FloatingPanelPlugin,
+            IconPlugin,
             MenuPlugin,
             MenuItemPlugin,
-            InputSliderPlugin,
             RadioGroupPlugin,
+            SliderPlugin,
             ScrollViewPlugin,
             SubmenuPlugin,
             ToggleMenuItemPlugin,

@@ -12,9 +12,9 @@ use crate::{
 
 use super::prelude::{LabelConfig, UiContainerExt, UiLabelExt};
 
-pub struct InputSliderPlugin;
+pub struct SliderPlugin;
 
-impl Plugin for InputSliderPlugin {
+impl Plugin for SliderPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(
             Update,
