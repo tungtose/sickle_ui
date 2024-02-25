@@ -11,73 +11,73 @@ use crate::{
 
 use super::prelude::UiContainerExt;
 
-const MIN_DOCKING_ZONE_SIZE: f32 = 50.;
+const MIN_SIZED_ZONE_SIZE: f32 = 50.;
 
-pub struct DockingZonePlugin;
+pub struct SizedZonePlugin;
 
-impl Plugin for DockingZonePlugin {
+impl Plugin for SizedZonePlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(
             PreUpdate,
             (
-                preset_docking_zone_flex_layout,
-                preset_docking_zone_children_size,
-                preset_docking_zone_resize_handles,
-                preset_docking_zone_border,
+                preset_sized_zone_flex_layout,
+                preset_sized_zone_children_size,
+                preset_sized_zone_resize_handles,
+                preset_sized_zone_border,
             )
                 .chain()
-                .in_set(DockingZonePreUpdate)
-                .run_if(did_add_or_remove_docking_zone),
+                .in_set(SizedZonePreUpdate)
+                .run_if(did_add_or_remove_sized_zone),
         )
         .add_systems(
             Update,
             (
-                update_docking_zone_on_resize.after(DraggableUpdate),
-                update_docking_zone_style,
+                update_sized_zone_on_resize.after(DraggableUpdate),
+                update_sized_zone_style,
             )
                 .chain(),
         )
         .add_systems(
             PostUpdate,
-            fit_docking_zones_on_window_resize
-                .run_if(should_fit_docking_zones)
+            fit_sized_zones_on_window_resize
+                .run_if(should_fit_sized_zones)
                 .after(UiSystem::Layout),
         );
     }
 }
 
 #[derive(SystemSet, Clone, Eq, Debug, Hash, PartialEq)]
-pub struct DockingZonePreUpdate;
+pub struct SizedZonePreUpdate;
 
-fn did_add_or_remove_docking_zone(
-    q_added_zones: Query<Entity, Added<DockingZone>>,
-    mut q_removed_zones: RemovedComponents<DockingZone>,
+fn did_add_or_remove_sized_zone(
+    q_added_zones: Query<Entity, Added<SizedZone>>,
+    mut q_removed_zones: RemovedComponents<SizedZone>,
 ) -> bool {
     q_added_zones.iter().count() > 0 || q_removed_zones.read().count() > 0
 }
 
-fn preset_docking_zone_flex_layout(
-    q_docking_zones: Query<(Entity, &Parent), With<DockingZone>>,
-    mut q_docking_zone: Query<&mut DockingZone>,
+fn preset_sized_zone_flex_layout(
+    q_sized_zones: Query<(Entity, &Parent), With<SizedZone>>,
+    mut q_sized_zone: Query<&mut SizedZone>,
     q_children: Query<&Children>,
     q_style: Query<&Style>,
 ) {
-    let static_zones: Vec<(Entity, Entity)> = q_docking_zones
+    let static_zones: Vec<(Entity, Entity)> = q_sized_zones
         .iter()
-        .filter(|(_, parent)| q_docking_zone.get(parent.get()).is_err())
+        .filter(|(_, parent)| q_sized_zone.get(parent.get()).is_err())
         .map(|(e, p)| (e, p.get()))
         .collect();
 
-    for (docking_zone, parent) in static_zones {
+    for (sized_zone, parent) in static_zones {
         let Ok(parent_style) = q_style.get(parent) else {
-            warn!("No Style found for docking zone parent {:?}!", parent);
+            warn!("No Style found for sized zone parent {:?}!", parent);
             continue;
         };
 
         let parent_flex_direction = parent_style.flex_direction;
         preset_drop_zone_flex_direction(
-            docking_zone,
-            &mut q_docking_zone,
+            sized_zone,
+            &mut q_sized_zone,
             &q_children,
             parent_flex_direction,
         );
@@ -85,12 +85,12 @@ fn preset_docking_zone_flex_layout(
 }
 
 fn preset_drop_zone_flex_direction(
-    docking_zone: Entity,
-    q_docking_zone: &mut Query<&mut DockingZone>,
+    sized_zone: Entity,
+    q_sized_zone: &mut Query<&mut SizedZone>,
     q_children: &Query<&Children>,
     parent_flex_direction: FlexDirection,
 ) {
-    let mut zone = q_docking_zone.get_mut(docking_zone).unwrap();
+    let mut zone = q_sized_zone.get_mut(sized_zone).unwrap();
 
     zone.flex_direction = match parent_flex_direction {
         FlexDirection::Row => FlexDirection::Column,
@@ -100,31 +100,31 @@ fn preset_drop_zone_flex_direction(
     };
 
     let zone_direction = zone.flex_direction;
-    if let Ok(children) = q_children.get(docking_zone) {
+    if let Ok(children) = q_children.get(sized_zone) {
         for child in children {
-            if q_docking_zone.get(*child).is_ok() {
-                preset_drop_zone_flex_direction(*child, q_docking_zone, q_children, zone_direction);
+            if q_sized_zone.get(*child).is_ok() {
+                preset_drop_zone_flex_direction(*child, q_sized_zone, q_children, zone_direction);
             }
         }
     }
 }
 
-fn preset_docking_zone_children_size(
-    q_docking_zones: Query<Entity, With<DockingZone>>,
-    mut q_docking_zone: Query<&mut DockingZone>,
+fn preset_sized_zone_children_size(
+    q_sized_zones: Query<Entity, With<SizedZone>>,
+    mut q_sized_zone: Query<&mut SizedZone>,
     q_parents: Query<&Parent>,
 ) {
-    for mut zone in &mut q_docking_zone {
+    for mut zone in &mut q_sized_zone {
         zone.children_size = 0.;
     }
 
-    for entity in &q_docking_zones {
-        let zone = q_docking_zone.get(entity).unwrap();
+    for entity in &q_sized_zones {
+        let zone = q_sized_zone.get(entity).unwrap();
         let zone_size = zone.min_size;
         let direction = zone.flex_direction;
 
         for parent in q_parents.iter_ancestors(entity) {
-            let Ok(mut parent_zone) = q_docking_zone.get_mut(parent) else {
+            let Ok(mut parent_zone) = q_sized_zone.get_mut(parent) else {
                 continue;
             };
 
@@ -134,13 +134,13 @@ fn preset_docking_zone_children_size(
         }
     }
 
-    for mut zone in &mut q_docking_zone {
+    for mut zone in &mut q_sized_zone {
         zone.children_size = zone.children_size.max(zone.min_size);
     }
 }
 
-fn preset_docking_zone_border(mut q_docking_zones: Query<(&DockingZone, &mut Style)>) {
-    for (zone, mut style) in &mut q_docking_zones {
+fn preset_sized_zone_border(mut q_sized_zones: Query<(&SizedZone, &mut Style)>) {
+    for (zone, mut style) in &mut q_sized_zones {
         match zone.flex_direction {
             FlexDirection::Row => {
                 style.border = UiRect::vertical(Val::Px(2.));
@@ -153,19 +153,19 @@ fn preset_docking_zone_border(mut q_docking_zones: Query<(&DockingZone, &mut Sty
     }
 }
 
-fn preset_docking_zone_resize_handles(
-    q_docking_zone_parents: Query<&Parent, With<DockingZone>>,
+fn preset_sized_zone_resize_handles(
+    q_sized_zone_parents: Query<&Parent, With<SizedZone>>,
     q_children: Query<&Children>,
-    q_docking_zones: Query<&DockingZone>,
+    q_sized_zones: Query<&SizedZone>,
     q_style: Query<&Style>,
-    mut q_resize_handle: Query<&mut DockingZoneResizeHandle>,
+    mut q_resize_handle: Query<&mut SizedZoneResizeHandle>,
     mut commands: Commands,
 ) {
-    let zone_count = q_docking_zone_parents.iter().count();
+    let zone_count = q_sized_zone_parents.iter().count();
     let mut handle_visibility: Vec<(Entity, bool)> = Vec::with_capacity(zone_count * 4);
     let mut handle_neighbours: Vec<(Entity, Option<Entity>)> = Vec::with_capacity(zone_count * 4);
     let parents: Vec<Entity> =
-        q_docking_zone_parents
+        q_sized_zone_parents
             .iter()
             .fold(Vec::with_capacity(zone_count), |mut acc, parent| {
                 let entity = parent.get();
@@ -181,7 +181,7 @@ fn preset_docking_zone_resize_handles(
         let child_count = children.len();
 
         if child_count == 1 {
-            let Ok(zone) = q_docking_zones.get(children[0]) else {
+            let Ok(zone) = q_sized_zones.get(children[0]) else {
                 return;
             };
             handle_visibility.push((zone.top_handle, false));
@@ -195,13 +195,13 @@ fn preset_docking_zone_resize_handles(
             for i in 0..child_count {
                 let Ok(style) = q_style.get(children[i]) else {
                     warn!(
-                        "Missing Style detected on Node {:?} during docking zone handle update.",
+                        "Missing Style detected on Node {:?} during sized zone handle update.",
                         children[i]
                     );
                     continue;
                 };
 
-                let Ok(zone) = q_docking_zones.get(children[i]) else {
+                let Ok(zone) = q_sized_zones.get(children[i]) else {
                     if style.position_type == PositionType::Relative {
                         prev_is_zone = false;
                     }
@@ -222,7 +222,7 @@ fn preset_docking_zone_resize_handles(
                         handle_visibility.push((zone.bottom_handle, false));
                     }
                     _ => warn!(
-                        "Invalid flex_direction detected on docking zone {:?}",
+                        "Invalid flex_direction detected on sized zone {:?}",
                         children[i]
                     ),
                 }
@@ -232,14 +232,14 @@ fn preset_docking_zone_resize_handles(
             }
 
             for i in 0..zone_children.len() {
-                let zone = q_docking_zones.get(zone_children[i]).unwrap();
+                let zone = q_sized_zones.get(zone_children[i]).unwrap();
                 let Some((prev_handle, next_handle)) = (match zone.flex_direction {
                     FlexDirection::Row => (zone.top_handle, zone.bottom_handle).into(),
                     FlexDirection::Column => (zone.left_handle, zone.right_handle).into(),
                     _ => None,
                 }) else {
                     warn!(
-                        "Invalid flex_direction detected on docking zone {:?}",
+                        "Invalid flex_direction detected on sized zone {:?}",
                         zone_children[i]
                     );
                     continue;
@@ -285,9 +285,9 @@ fn preset_docking_zone_resize_handles(
     }
 }
 
-fn update_docking_zone_on_resize(
-    q_draggable: Query<(&Draggable, &ResizeHandle, &DockingZoneResizeHandle), Changed<Draggable>>,
-    mut q_docking_zone: Query<(&mut DockingZone, &Parent)>,
+fn update_sized_zone_on_resize(
+    q_draggable: Query<(&Draggable, &ResizeHandle, &SizedZoneResizeHandle), Changed<Draggable>>,
+    mut q_sized_zone: Query<(&mut SizedZone, &Parent)>,
     q_node: Query<&Node>,
 ) {
     for (draggable, handle, handle_ref) in &q_draggable {
@@ -306,18 +306,18 @@ fn update_docking_zone_on_resize(
             continue;
         };
 
-        let current_zone_id = handle_ref.docking_zone;
+        let current_zone_id = handle_ref.sized_zone;
         let neighbour_zone_id = handle_ref.neighbour.unwrap();
-        let Ok((current_zone, parent)) = q_docking_zone.get(current_zone_id) else {
+        let Ok((current_zone, parent)) = q_sized_zone.get(current_zone_id) else {
             continue;
         };
-        let Ok((neighbour_zone, other_parent)) = q_docking_zone.get(neighbour_zone_id) else {
+        let Ok((neighbour_zone, other_parent)) = q_sized_zone.get(neighbour_zone_id) else {
             continue;
         };
 
         if parent != other_parent {
             warn!(
-                "Failed to resize docking zone: Neighbouring zones have different parents: {:?} <-> {:?}",
+                "Failed to resize sized zone: Neighbouring zones have different parents: {:?} <-> {:?}",
                 parent, other_parent
             );
             continue;
@@ -334,7 +334,7 @@ fn update_docking_zone_on_resize(
 
         let Ok(node) = q_node.get(parent.get()) else {
             warn!(
-                "Cannot calculate docking zone pixel size: Entity {:?} has parent without Node!",
+                "Cannot calculate sized zone pixel size: Entity {:?} has parent without Node!",
                 current_zone
             );
             continue;
@@ -374,13 +374,13 @@ fn update_docking_zone_on_resize(
             }
         }
 
-        q_docking_zone
+        q_sized_zone
             .get_mut(current_zone_id)
             .unwrap()
             .0
             .size_percent = (current_new_size / total_size) * 100.;
 
-        q_docking_zone
+        q_sized_zone
             .get_mut(neighbour_zone_id)
             .unwrap()
             .0
@@ -388,10 +388,8 @@ fn update_docking_zone_on_resize(
     }
 }
 
-fn update_docking_zone_style(
-    mut q_docking_zones: Query<(&DockingZone, &mut Style), Changed<DockingZone>>,
-) {
-    for (zone, mut style) in &mut q_docking_zones {
+fn update_sized_zone_style(mut q_sized_zones: Query<(&SizedZone, &mut Style), Changed<SizedZone>>) {
+    for (zone, mut style) in &mut q_sized_zones {
         style.flex_direction = zone.flex_direction;
         match zone.flex_direction {
             FlexDirection::Row => {
@@ -407,21 +405,21 @@ fn update_docking_zone_style(
     }
 }
 
-fn should_fit_docking_zones(
-    q_changed_nodes: Query<Entity, (With<DockingZone>, Changed<Node>)>,
+fn should_fit_sized_zones(
+    q_changed_nodes: Query<Entity, (With<SizedZone>, Changed<Node>)>,
 ) -> bool {
     q_changed_nodes.iter().count() > 0
 }
 
-fn fit_docking_zones_on_window_resize(
+fn fit_sized_zones_on_window_resize(
     q_children: Query<&Children>,
     q_node: Query<&Node>,
-    q_docking_zone_parents: Query<&Parent, With<DockingZone>>,
-    q_non_docking: Query<(&Node, &Style), Without<DockingZone>>,
-    mut q_docking_zone: Query<(&mut DockingZone, &Node)>,
+    q_sized_zone_parents: Query<&Parent, With<SizedZone>>,
+    q_non_sized: Query<(&Node, &Style), Without<SizedZone>>,
+    mut q_sized_zone: Query<(&mut SizedZone, &Node)>,
 ) {
-    let parents: Vec<Entity> = q_docking_zone_parents.iter().fold(
-        Vec::with_capacity(q_docking_zone_parents.iter().count()),
+    let parents: Vec<Entity> = q_sized_zone_parents.iter().fold(
+        Vec::with_capacity(q_sized_zone_parents.iter().count()),
         |mut acc, parent| {
             let entity = parent.get();
             if !acc.contains(&entity) {
@@ -434,7 +432,7 @@ fn fit_docking_zones_on_window_resize(
 
     for parent in parents {
         let Ok(parent_node) = q_node.get(parent) else {
-            warn!("Docking zone parent {:?} doesn't have a Node!", parent);
+            warn!("Sized zone parent {:?} doesn't have a Node!", parent);
             continue;
         };
 
@@ -442,84 +440,73 @@ fn fit_docking_zones_on_window_resize(
             continue;
         }
 
-        let mut non_docking_size = Vec2::ZERO;
+        let mut non_sized_size = Vec2::ZERO;
         for child in q_children.get(parent).unwrap().iter() {
-            if let Ok((node, style)) = q_non_docking.get(*child) {
+            if let Ok((node, style)) = q_non_sized.get(*child) {
                 if style.position_type == PositionType::Relative {
-                    non_docking_size += node.size();
+                    non_sized_size += node.size();
                 }
             }
         }
 
         let mut sum_zone_size = Vec2::ZERO;
         for child in q_children.get(parent).unwrap().iter() {
-            if let Ok((_, node)) = q_docking_zone.get(*child) {
+            if let Ok((_, node)) = q_sized_zone.get(*child) {
                 sum_zone_size += node.size();
             };
         }
 
         for child in q_children.get(parent).unwrap().iter() {
-            let Ok((mut docking_zone, zone_node)) = q_docking_zone.get_mut(*child) else {
+            let Ok((mut sized_zone, zone_node)) = q_sized_zone.get_mut(*child) else {
                 continue;
             };
 
-            let total_size = match docking_zone.flex_direction {
+            let total_size = match sized_zone.flex_direction {
                 FlexDirection::Row => parent_node.size().y,
                 FlexDirection::Column => parent_node.size().x,
                 _ => 0.,
             };
-            let non_docking_size = match docking_zone.flex_direction {
-                FlexDirection::Row => non_docking_size.y,
-                FlexDirection::Column => non_docking_size.x,
+            let non_sized_size = match sized_zone.flex_direction {
+                FlexDirection::Row => non_sized_size.y,
+                FlexDirection::Column => non_sized_size.x,
                 _ => 0.,
             };
-            let sum_zone_size = match docking_zone.flex_direction {
+            let sum_zone_size = match sized_zone.flex_direction {
                 FlexDirection::Row => sum_zone_size.y,
                 FlexDirection::Column => sum_zone_size.x,
                 _ => 0.,
             };
 
-            let docking_size = total_size - non_docking_size;
+            let sized_size = total_size - non_sized_size;
 
-            if total_size == 0. || sum_zone_size == 0. || docking_size <= 0. {
+            if total_size == 0. || sum_zone_size == 0. || sized_size <= 0. {
                 continue;
             }
 
-            let multiplier = docking_size / sum_zone_size;
-            let own_size = match docking_zone.flex_direction {
+            let multiplier = sized_size / sum_zone_size;
+            let own_size = match sized_zone.flex_direction {
                 FlexDirection::Row => zone_node.size().y,
                 FlexDirection::Column => zone_node.size().x,
                 _ => 0.,
             };
 
-            // info!(
-            //     "{:?} | own: {}, total_size: {}, docking: {}, mul: {}, {}% -> {}%",
-            //     child,
-            //     own_size,
-            //     total_size,
-            //     docking_size,
-            //     multiplier,
-            //     docking_zone.size_percent,
-            //     (own_size.max(docking_zone.children_size) / total_size) * 100. * multiplier
-            // );
-
-            docking_zone.size_percent =
-                (own_size.max(docking_zone.children_size) / total_size) * 100. * multiplier;
+            sized_zone.size_percent =
+                (own_size.max(sized_zone.children_size) / total_size) * 100. * multiplier;
         }
     }
 }
 
 #[derive(Component, Clone, Copy, Debug, Reflect)]
 #[reflect(Component)]
-pub struct DockingZoneResizeHandle {
-    pub docking_zone: Entity,
+pub struct SizedZoneResizeHandle {
+    pub sized_zone: Entity,
     pub neighbour: Option<Entity>,
 }
 
-impl Default for DockingZoneResizeHandle {
+impl Default for SizedZoneResizeHandle {
     fn default() -> Self {
         Self {
-            docking_zone: Entity::PLACEHOLDER,
+            sized_zone: Entity::PLACEHOLDER,
             neighbour: Default::default(),
         }
     }
@@ -527,7 +514,7 @@ impl Default for DockingZoneResizeHandle {
 
 #[derive(Component, Debug, Reflect)]
 #[reflect(Component)]
-pub struct DockingZone {
+pub struct SizedZone {
     size_percent: f32,
     min_size: f32,
     children_size: f32,
@@ -538,11 +525,11 @@ pub struct DockingZone {
     left_handle: Entity,
 }
 
-impl Default for DockingZone {
+impl Default for SizedZone {
     fn default() -> Self {
         Self {
             size_percent: Default::default(),
-            min_size: MIN_DOCKING_ZONE_SIZE,
+            min_size: MIN_SIZED_ZONE_SIZE,
             children_size: Default::default(),
             flex_direction: Default::default(),
             top_handle: Entity::PLACEHOLDER,
@@ -554,13 +541,13 @@ impl Default for DockingZone {
 }
 
 #[derive(Debug, Default)]
-pub struct DockingZoneConfig {
+pub struct SizedZoneConfig {
     pub size: f32,
     pub min_size: f32,
     pub background_color: Color,
 }
 
-impl DockingZone {
+impl SizedZone {
     fn frame() -> impl Bundle {
         NodeBundle {
             style: Style {
@@ -586,35 +573,35 @@ impl DockingZone {
     }
 }
 
-pub trait UiDockingZoneExt<'w, 's> {
-    fn docking_zone<'a>(
+pub trait UiSizedZoneExt<'w, 's> {
+    fn sized_zone<'a>(
         &'a mut self,
-        config: DockingZoneConfig,
+        config: SizedZoneConfig,
         spawn_children: impl FnOnce(&mut UiBuilder),
     ) -> UiBuilder<'w, 's, 'a>;
 }
 
-impl<'w, 's> UiDockingZoneExt<'w, 's> for UiBuilder<'w, 's, '_> {
-    fn docking_zone<'a>(
+impl<'w, 's> UiSizedZoneExt<'w, 's> for UiBuilder<'w, 's, '_> {
+    fn sized_zone<'a>(
         &'a mut self,
-        config: DockingZoneConfig,
+        config: SizedZoneConfig,
         spawn_children: impl FnOnce(&mut UiBuilder),
     ) -> UiBuilder<'w, 's, 'a> {
         let size = config.size.clamp(0., 100.);
-        let min_size = config.min_size.max(MIN_DOCKING_ZONE_SIZE);
+        let min_size = config.min_size.max(MIN_SIZED_ZONE_SIZE);
         let mut left_handle = Entity::PLACEHOLDER;
         let mut right_handle = Entity::PLACEHOLDER;
         let mut top_handle = Entity::PLACEHOLDER;
         let mut bottom_handle = Entity::PLACEHOLDER;
 
         if self.entity().is_none() {
-            warn!("Docking zone as root node is not supported!");
+            warn!("Sized zone as root node is not supported!");
         }
 
-        let mut docking_zone = self.container(DockingZone::frame(), |container| {
+        let mut sized_zone = self.container(SizedZone::frame(), |container| {
             let zone_id = container.id();
-            let handle = DockingZoneResizeHandle {
-                docking_zone: zone_id,
+            let handle = SizedZoneResizeHandle {
+                sized_zone: zone_id,
                 ..default()
             };
 
@@ -671,7 +658,7 @@ impl<'w, 's> UiDockingZoneExt<'w, 's> for UiBuilder<'w, 's, '_> {
                 ResizeHandle::resize_handle_container(11),
                 |resize_container| {
                     resize_container.container(
-                        DockingZone::vertical_handles_container(),
+                        SizedZone::vertical_handles_container(),
                         |middle_row| {
                             left_handle = middle_row
                                 .spawn((ResizeHandle::resize_handle(ResizeDirection::West), handle))
@@ -689,8 +676,8 @@ impl<'w, 's> UiDockingZoneExt<'w, 's> for UiBuilder<'w, 's, '_> {
             );
         });
 
-        docking_zone
-            .insert(DockingZone {
+        sized_zone
+            .insert(SizedZone {
                 size_percent: size,
                 min_size,
                 top_handle,
@@ -702,6 +689,6 @@ impl<'w, 's> UiDockingZoneExt<'w, 's> for UiBuilder<'w, 's, '_> {
             .style()
             .background_color(config.background_color);
 
-        docking_zone
+        sized_zone
     }
 }

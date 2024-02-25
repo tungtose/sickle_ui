@@ -105,7 +105,7 @@ fn delete_closed_context_menu(
     }
 }
 
-fn generate_context_menu<'w, 's, 'a>(world: &mut World) {
+fn generate_context_menu(world: &mut World) {
     let mut q_gen_menus =
         world.query_filtered::<(Entity, &mut GenerateContextMenu), Changed<GenerateContextMenu>>();
 
@@ -128,14 +128,14 @@ fn generate_context_menu<'w, 's, 'a>(world: &mut World) {
         .archetype()
         .components()
         .filter(|component_id| {
-            let Some(type_id) = world
-                .components()
-                .get_info(*component_id)
-                .unwrap()
-                .type_id()
-            else {
+            let Some(component_info) = world.components().get_info(*component_id) else {
                 return false;
             };
+
+            let Some(type_id) = component_info.type_id() else {
+                return false;
+            };
+
             type_registry
                 .get_type_data::<ReflectContextMenuGenerator>(type_id)
                 .is_some()

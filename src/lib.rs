@@ -2,6 +2,7 @@ use bevy::prelude::*;
 
 pub mod animated_interaction;
 pub mod drag_interaction;
+pub mod drop_interaction;
 pub mod flux_interaction;
 pub mod input_extension;
 pub mod interactions;
@@ -9,10 +10,11 @@ pub mod resize_interaction;
 pub mod scroll_interaction;
 pub mod ui_builder;
 pub mod ui_commands;
-pub mod widgets;
 pub mod ui_style;
+pub mod widgets;
 
 use drag_interaction::DragInteractionPlugin;
+use drop_interaction::DropInteractionPlugin;
 pub use flux_interaction::*;
 use interactions::InteractionsPlugin;
 use resize_interaction::ResizeHandlePlugin;
@@ -28,6 +30,7 @@ impl Plugin for SickleUiPlugin {
         app.add_plugins((
             AnimatedInteractionPlugin,
             DragInteractionPlugin,
+            DropInteractionPlugin,
             FluxInteractionPlugin,
             InteractionsPlugin,
             ResizeHandlePlugin,

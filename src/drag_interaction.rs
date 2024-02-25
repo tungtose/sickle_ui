@@ -10,17 +10,17 @@ pub struct DragInteractionPlugin;
 
 impl Plugin for DragInteractionPlugin {
     fn build(&self, app: &mut App) {
-        app.configure_sets(Update, DraggableUpdate).add_systems(
-            Update,
-            (
-                update_drag_progress,
-                update_drag_state,
-                update_cursor_confinement_from_drag,
-            )
-                .chain()
-                .after(FluxInteractionUpdate)
-                .in_set(DraggableUpdate),
-        );
+        app.configure_sets(Update, DraggableUpdate.after(FluxInteractionUpdate))
+            .add_systems(
+                Update,
+                (
+                    update_drag_progress,
+                    update_drag_state,
+                    update_cursor_confinement_from_drag,
+                )
+                    .chain()
+                    .in_set(DraggableUpdate),
+            );
     }
 }
 
@@ -45,7 +45,7 @@ impl Draggable {
     }
 }
 
-#[derive(Default, Debug, PartialEq, Eq, Reflect)]
+#[derive(Clone, Copy, Default, Debug, PartialEq, Eq, Reflect)]
 #[reflect]
 pub enum DragState {
     #[default]

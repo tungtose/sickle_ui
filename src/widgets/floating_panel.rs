@@ -1,3 +1,4 @@
+use bevy::ui::FocusPolicy;
 use bevy::window::PrimaryWindow;
 use bevy::{prelude::*, window::WindowResized};
 use sickle_math::ease::Ease;
@@ -6,6 +7,7 @@ use super::icon::{IconConfig, UiIconExt};
 use super::prelude::{LabelConfig, UiContainerExt, UiLabelExt};
 use super::prelude::{SetLabelTextExt, UiScrollViewExt};
 use crate::animated_interaction::{AnimatedInteraction, AnimationConfig};
+use crate::drop_interaction::Droppable;
 use crate::interactions::InteractiveBackground;
 use crate::resize_interaction::ResizeHandle;
 use crate::ui_style::{
@@ -234,13 +236,13 @@ fn update_panel_on_title_drag(
         ),
         Changed<Draggable>,
     >,
-    mut q_panels: Query<(Entity, &mut FloatingPanel)>,
+    mut q_panels: Query<(Entity, &mut FloatingPanel, &mut FocusPolicy)>,
 ) {
-    if let Some(_) = q_panels.iter().find(|(_, p)| p.priority) {
+    if let Some(_) = q_panels.iter().find(|(_, p, _)| p.priority) {
         return;
     }
 
-    let max_index = if let Some(Some(m)) = q_panels.iter().map(|(_, p)| p.z_index).max() {
+    let max_index = if let Some(Some(m)) = q_panels.iter().map(|(_, p, _)| p.z_index).max() {
         m
     } else {
         0
@@ -250,13 +252,6 @@ fn update_panel_on_title_drag(
     let mut panel_updated = false;
 
     for (draggable, (panel_title, drag_handle)) in &q_draggable {
-        if draggable.state == DragState::Inactive
-            || draggable.state == DragState::MaybeDragged
-            || draggable.state == DragState::DragCanceled
-        {
-            continue;
-        }
-
         let panel_id = if let Some(panel_title) = panel_title {
             panel_title.panel
         } else if let Some(drag_handle) = drag_handle {
@@ -265,17 +260,27 @@ fn update_panel_on_title_drag(
             continue;
         };
 
-        let Ok((_, mut panel)) = q_panels.get_mut(panel_id) else {
-            continue;
-        };
-
-        let Some(diff) = draggable.diff else {
+        let Ok((_, mut panel, mut focus)) = q_panels.get_mut(panel_id) else {
             continue;
         };
 
         if panel.resizing {
             continue;
         }
+
+        if draggable.state == DragState::Inactive
+            || draggable.state == DragState::MaybeDragged
+            || draggable.state == DragState::DragCanceled
+        {
+            *focus = FocusPolicy::Block;
+            continue;
+        }
+
+        *focus = FocusPolicy::Pass;
+
+        let Some(diff) = draggable.diff else {
+            continue;
+        };
 
         panel.z_index = Some(max_index + offset);
         panel.position += diff;
@@ -289,12 +294,12 @@ fn update_panel_on_title_drag(
 
     let mut panel_indices: Vec<(Entity, Option<usize>)> = q_panels
         .iter()
-        .map(|(entity, panel)| (entity, panel.z_index))
+        .map(|(entity, panel, _)| (entity, panel.z_index))
         .collect();
     panel_indices.sort_by(|(_, a), (_, b)| a.cmp(b));
 
     for (i, (entity, _)) in panel_indices.iter().enumerate() {
-        if let Some((_, mut panel)) = q_panels.iter_mut().find(|(e, _)| e == entity) {
+        if let Some((_, mut panel, _)) = q_panels.iter_mut().find(|(e, _, _)| e == entity) {
             panel.z_index = (MIN_FLOATING_PANEL_Z_INDEX + i + 1).into();
         };
     }
@@ -506,20 +511,23 @@ impl FloatingPanel {
     }
 
     fn frame() -> impl Bundle {
-        NodeBundle {
-            style: Style {
-                position_type: PositionType::Absolute,
-                border: UiRect::all(Val::Px(2.)),
-                flex_direction: FlexDirection::Column,
-                align_items: AlignItems::Start,
-                overflow: Overflow::clip(),
+        (
+            NodeBundle {
+                style: Style {
+                    position_type: PositionType::Absolute,
+                    border: UiRect::all(Val::Px(2.)),
+                    flex_direction: FlexDirection::Column,
+                    align_items: AlignItems::Start,
+                    overflow: Overflow::clip(),
+                    ..default()
+                },
+                border_color: Color::BLACK.into(),
+                background_color: Color::GRAY.into(),
+                focus_policy: bevy::ui::FocusPolicy::Block,
                 ..default()
             },
-            border_color: Color::BLACK.into(),
-            background_color: Color::GRAY.into(),
-            focus_policy: bevy::ui::FocusPolicy::Block,
-            ..default()
-        }
+            Droppable,
+        )
     }
 
     fn title_container() -> impl Bundle {
