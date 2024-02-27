@@ -39,7 +39,6 @@ impl Plugin for FloatingPanelPlugin {
                 index_floating_panel.run_if(panel_added),
                 process_panel_close_pressed.after(FluxInteractionUpdate),
                 process_panel_fold_pressed.after(FluxInteractionUpdate),
-                process_panel_config_update.after(FluxInteractionUpdate),
                 update_panel_size_on_resize.after(DraggableUpdate),
                 update_panel_on_title_drag.after(DraggableUpdate),
                 handle_window_resize.run_if(window_resized),
@@ -97,52 +96,6 @@ fn process_panel_fold_pressed(
 
             config.folded = !config.folded;
         }
-    }
-}
-
-fn process_panel_config_update(
-    q_panels: Query<(&FloatingPanel, &FloatingPanelConfig), Changed<FloatingPanelConfig>>,
-    mut commands: Commands,
-) {
-    for (panel, config) in &q_panels {
-        commands
-            .style(panel.title_container)
-            .render(config.title.is_some());
-
-        if let Some(title) = config.title.clone() {
-            commands.entity(panel.title).set_label_text(title);
-            if config.draggable {
-                commands
-                    .entity(panel.title_container)
-                    .try_insert((TrackedInteraction::default(), Draggable::default()));
-            } else {
-                commands
-                    .entity(panel.title_container)
-                    .remove::<(TrackedInteraction, Draggable)>();
-            }
-        } else {
-            commands.style(panel.drag_handle).render(config.draggable);
-        }
-
-        if config.folded {
-            commands.style(panel.resize_handles.0).render(false);
-            commands.style(panel.resize_handles.1).render(false);
-        } else {
-            commands
-                .style(panel.resize_handles.0)
-                .render(config.resizable);
-            commands
-                .style(panel.resize_handles.1)
-                .render(config.resizable);
-        }
-
-        commands.style(panel.content).render(!config.folded);
-        commands
-            .style(panel.fold_button)
-            .image(match config.folded {
-                true => "sickle://icons/chevron_right.png",
-                false => "sickle://icons/chevron_down.png",
-            });
     }
 }
 
@@ -231,14 +184,12 @@ fn clip_position_change(diff: f32, min: f32, old_size: f32, new_size: f32) -> f3
 fn update_panel_on_title_drag(
     q_draggable: Query<
         (
-            Entity,
             &Draggable,
             AnyOf<(&FloatingPanelTitle, &FloatingPanelDragHandle)>,
         ),
         Changed<Draggable>,
     >,
     mut q_panels: Query<(Entity, &mut FloatingPanel)>,
-    mut commands: Commands,
 ) {
     if let Some(_) = q_panels.iter().find(|(_, p)| p.priority) {
         return;
@@ -253,7 +204,7 @@ fn update_panel_on_title_drag(
 
     let mut panel_updated = false;
 
-    for (title_id, draggable, (panel_title, drag_handle)) in &q_draggable {
+    for (draggable, (panel_title, drag_handle)) in &q_draggable {
         let panel_id = if let Some(panel_title) = panel_title {
             panel_title.panel
         } else if let Some(drag_handle) = drag_handle {
@@ -274,14 +225,11 @@ fn update_panel_on_title_drag(
             || draggable.state == DragState::MaybeDragged
             || draggable.state == DragState::DragCanceled
         {
-            commands.style(panel_id).focus_policy(FocusPolicy::Block);
-            commands.style(title_id).focus_policy(FocusPolicy::Block);
+            panel.moving = false;
             continue;
         }
 
-        commands.style(panel_id).focus_policy(FocusPolicy::Pass);
-        commands.style(title_id).focus_policy(FocusPolicy::Pass);
-
+        panel.moving = true;
         let Some(diff) = draggable.diff else {
             continue;
         };
@@ -345,12 +293,57 @@ fn handle_window_resize(
 
 fn update_panel_layout(
     q_panels: Query<
-        (Entity, &FloatingPanel, &FloatingPanelConfig),
+        (Entity, &FloatingPanel, Ref<FloatingPanelConfig>),
         Or<(Changed<FloatingPanel>, Changed<FloatingPanelConfig>)>,
     >,
     mut commands: Commands,
 ) {
     for (entity, panel, config) in &q_panels {
+        if config.is_changed() {
+            commands
+                .style(panel.title_container)
+                .render(config.title.is_some());
+
+            if let Some(title) = config.title.clone() {
+                commands.entity(panel.title).set_label_text(title);
+                if config.draggable {
+                    commands
+                        .entity(panel.title_container)
+                        .try_insert((TrackedInteraction::default(), Draggable::default()));
+                } else {
+                    commands
+                        .entity(panel.title_container)
+                        .remove::<(TrackedInteraction, Draggable)>();
+                }
+            } else {
+                commands.style(panel.drag_handle).render(config.draggable);
+            }
+
+            commands.style(panel.content).render(!config.folded);
+            commands
+                .style(panel.fold_button)
+                .image(match config.folded {
+                    true => "sickle://icons/chevron_right.png",
+                    false => "sickle://icons/chevron_down.png",
+                });
+        }
+
+        let render_resize_handles = !config.folded && config.resizable && !panel.moving;
+        commands
+            .style(panel.resize_handles.0)
+            .render(render_resize_handles);
+        commands
+            .style(panel.resize_handles.1)
+            .render(render_resize_handles);
+
+        let policy = match panel.moving {
+            true => FocusPolicy::Pass,
+            false => FocusPolicy::Block,
+        };
+        commands.style(entity).focus_policy(policy);
+        commands.style(panel.title_container).focus_policy(policy);
+        commands.style(panel.drag_handle).focus_policy(policy);
+
         commands
             .style(entity)
             .width(match config.folded {
@@ -483,6 +476,7 @@ pub struct FloatingPanel {
     content: Entity,
     resize_handles: (Entity, Entity),
     resizing: bool,
+    moving: bool,
     pub priority: bool,
 }
 
@@ -500,6 +494,7 @@ impl Default for FloatingPanel {
             content: Entity::PLACEHOLDER,
             resize_handles: (Entity::PLACEHOLDER, Entity::PLACEHOLDER),
             resizing: Default::default(),
+            moving: Default::default(),
             priority: Default::default(),
         }
     }
