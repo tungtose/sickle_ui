@@ -99,6 +99,7 @@ fn update_drag_progress(
     for (mut draggable, flux_interaction) in &mut q_draggable {
         if draggable.state == DragState::DragEnd {
             draggable.state = DragState::Inactive;
+            draggable.clear();
         } else if draggable.state == DragState::DragCanceled {
             draggable.state = DragState::Inactive;
         } else if *flux_interaction == FluxInteraction::Pressed
@@ -170,7 +171,6 @@ fn update_drag_state(
         {
             if draggable.state == DragState::DragStart || draggable.state == DragState::Dragging {
                 draggable.state = DragState::DragEnd;
-                draggable.clear();
             } else if draggable.state == DragState::MaybeDragged {
                 draggable.state = DragState::Inactive;
                 draggable.clear();

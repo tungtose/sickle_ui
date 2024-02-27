@@ -13,7 +13,7 @@ use crate::resize_interaction::ResizeHandle;
 use crate::ui_style::{
     SetBackgroundColorExt, SetEntityVisiblityExt, SetImageExt, SetNodeFlexGrowExt,
     SetNodeHeightExt, SetNodeLeftExt, SetNodeMarginExt, SetNodeShowHideExt, SetNodeTopExt,
-    SetNodeWidthExt, SetZIndexExt, UiStyleExt,
+    SetNodeWidthExt, SetSetFocusPolicyExt, SetZIndexExt, UiStyleExt,
 };
 use crate::FluxInteraction;
 use crate::{
@@ -231,18 +231,20 @@ fn clip_position_change(diff: f32, min: f32, old_size: f32, new_size: f32) -> f3
 fn update_panel_on_title_drag(
     q_draggable: Query<
         (
+            Entity,
             &Draggable,
             AnyOf<(&FloatingPanelTitle, &FloatingPanelDragHandle)>,
         ),
         Changed<Draggable>,
     >,
-    mut q_panels: Query<(Entity, &mut FloatingPanel, &mut FocusPolicy)>,
+    mut q_panels: Query<(Entity, &mut FloatingPanel)>,
+    mut commands: Commands,
 ) {
-    if let Some(_) = q_panels.iter().find(|(_, p, _)| p.priority) {
+    if let Some(_) = q_panels.iter().find(|(_, p)| p.priority) {
         return;
     }
 
-    let max_index = if let Some(Some(m)) = q_panels.iter().map(|(_, p, _)| p.z_index).max() {
+    let max_index = if let Some(Some(m)) = q_panels.iter().map(|(_, p)| p.z_index).max() {
         m
     } else {
         0
@@ -251,7 +253,7 @@ fn update_panel_on_title_drag(
 
     let mut panel_updated = false;
 
-    for (draggable, (panel_title, drag_handle)) in &q_draggable {
+    for (title_id, draggable, (panel_title, drag_handle)) in &q_draggable {
         let panel_id = if let Some(panel_title) = panel_title {
             panel_title.panel
         } else if let Some(drag_handle) = drag_handle {
@@ -260,7 +262,7 @@ fn update_panel_on_title_drag(
             continue;
         };
 
-        let Ok((_, mut panel, mut focus)) = q_panels.get_mut(panel_id) else {
+        let Ok((_, mut panel)) = q_panels.get_mut(panel_id) else {
             continue;
         };
 
@@ -272,11 +274,13 @@ fn update_panel_on_title_drag(
             || draggable.state == DragState::MaybeDragged
             || draggable.state == DragState::DragCanceled
         {
-            *focus = FocusPolicy::Block;
+            commands.style(panel_id).focus_policy(FocusPolicy::Block);
+            commands.style(title_id).focus_policy(FocusPolicy::Block);
             continue;
         }
 
-        *focus = FocusPolicy::Pass;
+        commands.style(panel_id).focus_policy(FocusPolicy::Pass);
+        commands.style(title_id).focus_policy(FocusPolicy::Pass);
 
         let Some(diff) = draggable.diff else {
             continue;
@@ -294,12 +298,12 @@ fn update_panel_on_title_drag(
 
     let mut panel_indices: Vec<(Entity, Option<usize>)> = q_panels
         .iter()
-        .map(|(entity, panel, _)| (entity, panel.z_index))
+        .map(|(entity, panel)| (entity, panel.z_index))
         .collect();
     panel_indices.sort_by(|(_, a), (_, b)| a.cmp(b));
 
     for (i, (entity, _)) in panel_indices.iter().enumerate() {
-        if let Some((_, mut panel, _)) = q_panels.iter_mut().find(|(e, _, _)| e == entity) {
+        if let Some((_, mut panel)) = q_panels.iter_mut().find(|(e, _)| e == entity) {
             panel.z_index = (MIN_FLOATING_PANEL_Z_INDEX + i + 1).into();
         };
     }
@@ -511,23 +515,20 @@ impl FloatingPanel {
     }
 
     fn frame() -> impl Bundle {
-        (
-            NodeBundle {
-                style: Style {
-                    position_type: PositionType::Absolute,
-                    border: UiRect::all(Val::Px(2.)),
-                    flex_direction: FlexDirection::Column,
-                    align_items: AlignItems::Start,
-                    overflow: Overflow::clip(),
-                    ..default()
-                },
-                border_color: Color::BLACK.into(),
-                background_color: Color::GRAY.into(),
-                focus_policy: bevy::ui::FocusPolicy::Block,
+        NodeBundle {
+            style: Style {
+                position_type: PositionType::Absolute,
+                border: UiRect::all(Val::Px(2.)),
+                flex_direction: FlexDirection::Column,
+                align_items: AlignItems::Start,
+                overflow: Overflow::clip(),
                 ..default()
             },
-            Droppable,
-        )
+            border_color: Color::BLACK.into(),
+            background_color: Color::GRAY.into(),
+            focus_policy: bevy::ui::FocusPolicy::Block,
+            ..default()
+        }
     }
 
     fn title_container() -> impl Bundle {
@@ -717,6 +718,7 @@ impl<'w, 's> UiFloatingPanelExt<'w, 's> for UiBuilder<'w, 's, '_> {
                     (
                         FloatingPanel::title_container(),
                         FloatingPanelTitle { panel },
+                        Droppable,
                     ),
                     |container| {
                         fold_button = container
@@ -801,12 +803,12 @@ impl<'w, 's> UiFloatingPanelExt<'w, 's> for UiBuilder<'w, 's, '_> {
                 .render(config.title.is_none())
                 .id();
 
-            if layout.hidden {
-                container.style().visibility(Visibility::Hidden);
-            }
-
             content = container.scroll_view(restrict_to, spawn_children).id();
         });
+
+        if layout.hidden {
+            frame.style().visibility(Visibility::Hidden);
+        }
 
         frame.insert((
             config,

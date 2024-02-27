@@ -16,14 +16,12 @@ pub struct TabContainerPlugin;
 impl Plugin for TabContainerPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(
-            PreUpdate,
-            (process_new_panels, process_removed_panels).chain(),
-        )
-        .add_systems(
             Update,
             (
-                process_new_tab_containers,
+                process_tab_container_content_change,
+                process_tab_viewport_content_change,
                 update_tab_container_on_press,
+                constrain_tab_container_active_tab,
                 update_tab_container_on_change,
             )
                 .chain(),
@@ -31,28 +29,80 @@ impl Plugin for TabContainerPlugin {
     }
 }
 
-fn process_new_tab_containers(
-    q_added_containers: Query<(Entity, &TabContainer, &Children), Added<TabContainer>>,
-    q_panels: Query<(Entity, &Panel)>,
+fn process_tab_container_content_change(
+    q_tab_containers: Query<(&TabContainer, &Children), Changed<Children>>,
+    q_panel: Query<Entity, With<Panel>>,
     mut commands: Commands,
 ) {
-    for (entity, container, children) in &q_added_containers {
+    for (container, children) in &q_tab_containers {
         for child in children {
-            let Ok((panel_entity, panel)) = q_panels.get(*child) else {
+            let Ok(panel_entity) = q_panel.get(*child) else {
                 continue;
             };
 
-            commands.entity(panel_entity).set_parent(container.panel);
-            commands
-                .ui_builder(container.bar.into())
-                .tab(panel.title(), entity, panel_entity);
-            commands.style(panel_entity).hide();
+            commands.entity(panel_entity).set_parent(container.viewport);
         }
     }
 }
 
-fn process_new_panels() {}
-fn process_removed_panels() {}
+fn process_tab_viewport_content_change(
+    q_tab_viewports: Query<(Entity, &TabViewport, &Children), Changed<Children>>,
+    q_tab_container: Query<(Entity, &TabContainer)>,
+    q_children: Query<&Children>,
+    q_tab: Query<&Tab>,
+    q_panel: Query<&Panel>,
+    mut commands: Commands,
+) {
+    for (entity, viewport, children) in &q_tab_viewports {
+        let Ok((tab_container_id, tab_container)) = q_tab_container.get(viewport.container) else {
+            error!("Missing tab container for viewport {:?}", entity);
+            continue;
+        };
+
+        let tab_to_panel_ids: Vec<(Entity, Entity)> =
+            if let Ok(tab_bar_children) = q_children.get(tab_container.bar) {
+                tab_bar_children
+                    .iter()
+                    .filter(|child| {
+                        if let Ok(_) = q_tab.get(**child) {
+                            return true;
+                        }
+                        false
+                    })
+                    .map(|child| (*child, q_tab.get(*child).unwrap().panel))
+                    .collect()
+            } else {
+                Vec::new()
+            };
+
+        let panels: Vec<(Entity, &Panel)> = children
+            .iter()
+            .filter(|child| {
+                if let Ok(_) = q_panel.get(**child) {
+                    return true;
+                }
+                false
+            })
+            .map(|child| (*child, q_panel.get(*child).unwrap()))
+            .collect();
+
+        for (panel_id, panel) in &panels {
+            if !tab_to_panel_ids.iter().any(|(_, p_id)| *p_id == *panel_id) {
+                commands.ui_builder(tab_container.bar.into()).tab(
+                    panel.title(),
+                    tab_container_id,
+                    *panel_id,
+                );
+            }
+        }
+
+        for (tab_id, panel_id) in tab_to_panel_ids {
+            if !panels.iter().any(|(p_id, _)| *p_id == panel_id) {
+                commands.entity(tab_id).despawn_recursive();
+            }
+        }
+    }
+}
 
 fn update_tab_container_on_press(
     q_tabs: Query<(Entity, &Tab, &Interaction), Changed<Interaction>>,
@@ -81,6 +131,33 @@ fn update_tab_container_on_press(
     }
 }
 
+fn constrain_tab_container_active_tab(
+    q_changed_tab_bars: Query<(Entity, &TabBar, &Children), Changed<Children>>,
+    q_tab: Query<&Tab>,
+    mut q_tab_container: Query<&mut TabContainer>,
+) {
+    for (entity, tab_bar, children) in &q_changed_tab_bars {
+        let Ok(mut container) = q_tab_container.get_mut(tab_bar.container) else {
+            error!("Missing tab container of tab bar {:?}", entity);
+            continue;
+        };
+
+        let tab_count = children
+            .iter()
+            .filter(|child| {
+                if let Ok(_) = q_tab.get(**child) {
+                    return true;
+                }
+                false
+            })
+            .count();
+
+        if container.active > tab_count {
+            container.active = tab_count;
+        }
+    }
+}
+
 fn update_tab_container_on_change(
     q_tab_containers: Query<&TabContainer, Changed<TabContainer>>,
     q_tab: Query<Entity, With<Tab>>,
@@ -89,9 +166,7 @@ fn update_tab_container_on_change(
     mut commands: Commands,
 ) {
     for tab_container in &q_tab_containers {
-        info!("Tab container changed: {:?}", tab_container);
         let Ok(tabs) = q_children.get(tab_container.bar) else {
-            info!("Tab bar has no tabs: {:?}", tab_container.bar);
             continue;
         };
 
@@ -105,7 +180,7 @@ fn update_tab_container_on_change(
             }
         }
 
-        let Ok(panels) = q_children.get(tab_container.panel) else {
+        let Ok(panels) = q_children.get(tab_container.viewport) else {
             continue;
         };
 
@@ -153,11 +228,11 @@ impl Default for TabBar {
 
 #[derive(Component, Debug, Reflect)]
 #[reflect(Component)]
-pub struct TabPanel {
+pub struct TabViewport {
     container: Entity,
 }
 
-impl Default for TabPanel {
+impl Default for TabViewport {
     fn default() -> Self {
         Self {
             container: Entity::PLACEHOLDER,
@@ -170,7 +245,7 @@ impl Default for TabPanel {
 pub struct TabContainer {
     active: usize,
     bar: Entity,
-    panel: Entity,
+    viewport: Entity,
 }
 
 impl Default for TabContainer {
@@ -178,7 +253,7 @@ impl Default for TabContainer {
         Self {
             active: 0,
             bar: Entity::PLACEHOLDER,
-            panel: Entity::PLACEHOLDER,
+            viewport: Entity::PLACEHOLDER,
         }
     }
 }
@@ -215,18 +290,6 @@ impl TabContainer {
         )
     }
 
-    fn panel() -> impl Bundle {
-        NodeBundle {
-            style: Style {
-                width: Val::Percent(100.),
-                height: Val::Percent(100.),
-                flex_direction: FlexDirection::Column,
-                ..default()
-            },
-            ..default()
-        }
-    }
-
     fn tab() -> impl Bundle {
         (
             NodeBundle {
@@ -257,7 +320,7 @@ impl<'w, 's> UiTabContainerExt<'w, 's> for UiBuilder<'w, 's, '_> {
         spawn_children: impl FnOnce(&mut UiBuilder),
     ) -> UiBuilder<'w, 's, 'a> {
         let mut bar = Entity::PLACEHOLDER;
-        let mut panel = Entity::PLACEHOLDER;
+        let mut viewport = Entity::PLACEHOLDER;
 
         let mut container = self.container(TabContainer::frame(), |container| {
             let container_id = container.id();
@@ -271,23 +334,20 @@ impl<'w, 's> UiTabContainerExt<'w, 's> for UiBuilder<'w, 's, '_> {
                 ))
                 .id();
 
-            container
-                .scroll_view(None, |scroll_view| {
-                    panel = scroll_view.id();
-                })
-                .insert((
-                    TabContainer::panel(),
-                    TabPanel {
+            container.scroll_view(None, |scroll_view| {
+                viewport = scroll_view
+                    .insert(TabViewport {
                         container: container_id,
-                    },
-                ));
+                    })
+                    .id();
+            });
 
             spawn_children(container);
         });
 
         container.insert(TabContainer {
             bar,
-            panel,
+            viewport,
             ..default()
         });
 

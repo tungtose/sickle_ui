@@ -496,6 +496,10 @@ fn fit_sized_zones_on_window_resize(
     }
 }
 
+#[derive(Component, Clone, Copy, Debug, Default, Reflect)]
+#[reflect(Component)]
+pub struct SizedZoneResizeHandleContainer;
+
 #[derive(Component, Clone, Copy, Debug, Reflect)]
 #[reflect(Component)]
 pub struct SizedZoneResizeHandle {
@@ -608,7 +612,10 @@ impl<'w, 's> UiSizedZoneExt<'w, 's> for UiBuilder<'w, 's, '_> {
             spawn_children(container);
 
             container.container(
-                ResizeHandle::resize_handle_container(10),
+                (
+                    ResizeHandle::resize_handle_container(10),
+                    SizedZoneResizeHandleContainer,
+                ),
                 |resize_container| {
                     resize_container.container(
                         NodeBundle {
@@ -655,7 +662,10 @@ impl<'w, 's> UiSizedZoneExt<'w, 's> for UiBuilder<'w, 's, '_> {
             );
 
             container.container(
-                ResizeHandle::resize_handle_container(11),
+                (
+                    ResizeHandle::resize_handle_container(11),
+                    SizedZoneResizeHandleContainer,
+                ),
                 |resize_container| {
                     resize_container.container(
                         SizedZone::vertical_handles_container(),

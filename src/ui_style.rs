@@ -1,6 +1,7 @@
 use bevy::{
     ecs::system::{EntityCommand, EntityCommands},
     prelude::*,
+    ui::FocusPolicy,
 };
 use sickle_macros::StyleCommand;
 
@@ -324,6 +325,38 @@ pub trait SetZIndexExt<'a> {
 impl<'a> SetZIndexExt<'a> for UiStyle<'a> {
     fn z_index(&'a mut self, z_index: ZIndex) -> &mut UiStyle<'a> {
         self.commands.add(SetZIndex { z_index });
+        self
+    }
+}
+
+struct SetFocusPolicy {
+    focus_policy: FocusPolicy,
+}
+
+impl EntityCommand for SetFocusPolicy {
+    fn apply(self, entity: Entity, world: &mut World) {
+        let mut q_focus_policy = world.query::<&mut FocusPolicy>();
+        let Ok(mut focus_policy) = q_focus_policy.get_mut(world, entity) else {
+            warn!(
+                "Failed to set focus policy on entity {:?}: No FocusPolicy component found!",
+                entity
+            );
+            return;
+        };
+
+        if *focus_policy != self.focus_policy {
+            *focus_policy = self.focus_policy;
+        }
+    }
+}
+
+pub trait SetSetFocusPolicyExt<'a> {
+    fn focus_policy(&'a mut self, focus_policy: FocusPolicy) -> &mut UiStyle<'a>;
+}
+
+impl<'a> SetSetFocusPolicyExt<'a> for UiStyle<'a> {
+    fn focus_policy(&'a mut self, focus_policy: FocusPolicy) -> &mut UiStyle<'a> {
+        self.commands.add(SetFocusPolicy { focus_policy });
         self
     }
 }

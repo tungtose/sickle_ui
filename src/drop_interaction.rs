@@ -1,5 +1,4 @@
 use bevy::prelude::*;
-use bevy_reflect::reflect_trait;
 
 use crate::drag_interaction::{DragState, Draggable, DraggableUpdate};
 
@@ -8,67 +7,125 @@ pub struct DropInteractionPlugin;
 impl Plugin for DropInteractionPlugin {
     fn build(&self, app: &mut App) {
         app.configure_sets(Update, DroppableUpdate.after(DraggableUpdate))
-            .add_systems(Update, update_droppables.in_set(DroppableUpdate));
+            .add_systems(Update, update_drop_zones.chain().in_set(DroppableUpdate));
     }
 }
 
 #[derive(SystemSet, Clone, Eq, Debug, Hash, PartialEq)]
 pub struct DroppableUpdate;
 
-fn update_droppables(world: &mut World) {
-    let mut q_droppables =
-        world.query_filtered::<(Entity, &Draggable), (With<Droppable>, Changed<Draggable>)>();
-
-    let droppable_count = q_droppables.iter(world).count();
-    if droppable_count == 0 {
+fn update_drop_zones(
+    q_droppables: Query<(Entity, &Draggable), (With<Droppable>, Changed<Draggable>)>,
+    mut q_drop_zones: Query<(Ref<Interaction>, &mut DropZone)>,
+) {
+    if !q_droppables
+        .iter()
+        .any(|(_, Draggable { state, .. })| *state != DragState::MaybeDragged)
+    {
         return;
     }
 
-    let changed_zones: Vec<(Entity, Interaction)> = world
-        .query_filtered::<(Entity, &Interaction), (With<DropZone>, Changed<Interaction>)>()
-        .iter(world)
-        .map(|(entity, interaction)| (entity, *interaction))
-        .collect();
-
-    let hovered_zones: Vec<Entity> = world
-        .query::<(Entity, Ref<Interaction>)>()
-        .iter(world)
-        .filter(|(_, interaction)| {
-            **interaction == Interaction::Hovered && !interaction.is_changed()
-        })
-        .map(|(entity, _)| entity)
-        .collect();
-
-    if changed_zones.len() == 0 && hovered_zones.len() == 0 {
-        return;
+    for (interaction, mut drop_zone) in &mut q_drop_zones {
+        if drop_zone.drop_phase == DropPhase::Dropped
+            || drop_zone.drop_phase == DropPhase::DropCanceled
+        {
+            drop_zone.drop_phase = DropPhase::Inactive;
+            drop_zone.incoming_droppable = None;
+            drop_zone.position = None;
+        } else if *interaction == Interaction::None {
+            if drop_zone.drop_phase == DropPhase::DroppableHover {
+                drop_zone.drop_phase = DropPhase::DroppableLeft;
+            } else if drop_zone.drop_phase == DropPhase::DroppableLeft {
+                drop_zone.drop_phase = DropPhase::Inactive;
+                drop_zone.incoming_droppable = None;
+                drop_zone.position = None;
+            }
+        } else if *interaction == Interaction::Hovered {
+            if drop_zone.drop_phase == DropPhase::Inactive {
+                drop_zone.drop_phase = DropPhase::DroppableEntered;
+            } else if drop_zone.drop_phase == DropPhase::DroppableEntered {
+                drop_zone.drop_phase = DropPhase::DroppableHover;
+            }
+        }
     }
 
-    let active_droppables: Vec<(Entity, DragState, Vec2)> = q_droppables
-        .iter(world)
-        .filter(|(_, draggable)| {
-            draggable.state != DragState::MaybeDragged && draggable.position.is_some()
-        })
-        .map(|(entity, draggable)| (entity, draggable.state.clone(), draggable.position.unwrap()))
-        .collect();
+    for (entity, draggable) in &q_droppables {
+        if draggable.state == DragState::Inactive || draggable.state == DragState::MaybeDragged {
+            continue;
+        }
 
-    if active_droppables.len() == 0 {
-        return;
+        if draggable.state == DragState::DragStart || draggable.state == DragState::Dragging {
+            for (interaction, mut drop_zone) in &mut q_drop_zones {
+                if interaction.is_changed() {
+                    if *interaction == Interaction::Hovered {
+                        drop_zone.drop_phase = DropPhase::DroppableEntered;
+                        drop_zone.incoming_droppable = entity.into();
+                        drop_zone.position = draggable.position;
+                    } else if *interaction == Interaction::None {
+                        drop_zone.drop_phase = DropPhase::DroppableLeft;
+                        drop_zone.incoming_droppable = None;
+                        drop_zone.position = None;
+                    }
+                } else if *interaction == Interaction::Hovered {
+                    if drop_zone.drop_phase == DropPhase::Inactive {
+                        drop_zone.drop_phase = DropPhase::DroppableEntered;
+                        drop_zone.incoming_droppable = entity.into();
+                    }
+                    drop_zone.position = draggable.position;
+                }
+            }
+        } else if draggable.state == DragState::DragEnd {
+            for (interaction, mut drop_zone) in &mut q_drop_zones {
+                if *interaction == Interaction::Hovered {
+                    drop_zone.drop_phase = DropPhase::Dropped;
+                    drop_zone.incoming_droppable = entity.into();
+                    drop_zone.position = draggable.position;
+                }
+            }
+        } else {
+            for (interaction, mut drop_zone) in &mut q_drop_zones {
+                if *interaction == Interaction::Hovered {
+                    drop_zone.drop_phase = DropPhase::DropCanceled;
+                    drop_zone.incoming_droppable = None;
+                    drop_zone.position = None;
+                }
+            }
+        }
     }
+}
 
-    
+#[derive(Clone, Copy, Default, Debug, PartialEq, Eq, Reflect)]
+#[reflect]
+pub enum DropPhase {
+    #[default]
+    Inactive,
+    DroppableEntered,
+    DroppableHover,
+    DroppableLeft,
+    Dropped,
+    DropCanceled,
 }
 
 #[derive(Component, Debug, Default, Reflect)]
 pub struct Droppable;
 
 #[derive(Component, Debug, Default, Reflect)]
-pub struct DropZone;
+pub struct DropZone {
+    drop_phase: DropPhase,
+    incoming_droppable: Option<Entity>,
+    position: Option<Vec2>,
+}
 
-#[reflect_trait]
-pub trait DropInteraction {
-    fn can_accept(&self, droppable: Entity, world: &mut World) -> bool;
-    fn on_enter(&self, droppable: Entity, world: &mut World);
-    fn on_over(&self, droppable: Entity, world: &mut World);
-    fn on_exit(&self, droppable: Entity, world: &mut World);
-    fn on_drop(&self, droppable: Entity, world: &mut World);
+impl DropZone {
+    pub fn drop_phase(&self) -> DropPhase {
+        self.drop_phase
+    }
+
+    pub fn incoming_droppable(&self) -> Option<Entity> {
+        self.incoming_droppable
+    }
+
+    pub fn position(&self) -> Option<Vec2> {
+        self.position
+    }
 }

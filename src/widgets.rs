@@ -2,6 +2,7 @@ pub mod checkbox;
 pub mod column;
 pub mod container;
 pub mod context_menu;
+pub mod docking_zone;
 pub mod dropdown;
 pub mod floating_panel;
 pub mod icon;
@@ -21,11 +22,12 @@ pub mod toggle_menu_item;
 use bevy::prelude::*;
 
 use self::{
-    checkbox::CheckboxPlugin, context_menu::ContextMenuPlugin, dropdown::DropdownPlugin,
-    floating_panel::FloatingPanelPlugin, icon::IconPlugin, menu::MenuPlugin,
-    menu_item::MenuItemPlugin, radio_group::RadioGroupPlugin, scroll_view::ScrollViewPlugin,
-    sized_zone::SizedZonePlugin, slider::SliderPlugin, submenu::SubmenuPlugin,
-    tab_container::TabContainerPlugin, toggle_menu_item::ToggleMenuItemPlugin,
+    checkbox::CheckboxPlugin, context_menu::ContextMenuPlugin, docking_zone::DockingZonePlugin,
+    dropdown::DropdownPlugin, floating_panel::FloatingPanelPlugin, icon::IconPlugin,
+    menu::MenuPlugin, menu_item::MenuItemPlugin, radio_group::RadioGroupPlugin,
+    scroll_view::ScrollViewPlugin, sized_zone::SizedZonePlugin, slider::SliderPlugin,
+    submenu::SubmenuPlugin, tab_container::TabContainerPlugin,
+    toggle_menu_item::ToggleMenuItemPlugin,
 };
 
 pub mod prelude {
@@ -34,6 +36,7 @@ pub mod prelude {
         column::{ColumnConfig, UiColumnExt},
         container::UiContainerExt,
         context_menu::{ContextMenuGenerator, GenerateContextMenu, ReflectContextMenuGenerator},
+        docking_zone::UiDockingZoneExt,
         dropdown::UiDropdownExt,
         floating_panel::{FloatingPanelConfig, FloatingPanelLayout, UiFloatingPanelExt},
         icon::{IconConfig, UiIconExt},
@@ -63,6 +66,7 @@ impl Plugin for WidgetsPlugin {
             CheckboxPlugin,
             ContextMenuPlugin,
             SizedZonePlugin,
+            DockingZonePlugin,
             DropdownPlugin,
             FloatingPanelPlugin,
             IconPlugin,
