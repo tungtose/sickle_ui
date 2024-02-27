@@ -96,6 +96,10 @@ fn update_flux_interaction(
     >,
 ) {
     for (prev, curr, mut flux) in &mut q_interaction {
+        if *flux == FluxInteraction::Disabled {
+            continue;
+        }
+
         if *prev == PrevInteraction::None && *curr == Interaction::Hovered {
             *flux = FluxInteraction::PointerEnter;
         } else if *prev == PrevInteraction::None && *curr == Interaction::Pressed

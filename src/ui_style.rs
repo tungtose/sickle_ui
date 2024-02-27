@@ -5,6 +5,8 @@ use bevy::{
 };
 use sickle_macros::StyleCommand;
 
+use crate::FluxInteraction;
+
 pub struct UiStyle<'a> {
     commands: EntityCommands<'a>,
 }
@@ -350,13 +352,65 @@ impl EntityCommand for SetFocusPolicy {
     }
 }
 
-pub trait SetSetFocusPolicyExt<'a> {
+pub trait SetFocusPolicyExt<'a> {
     fn focus_policy(&'a mut self, focus_policy: FocusPolicy) -> &mut UiStyle<'a>;
 }
 
-impl<'a> SetSetFocusPolicyExt<'a> for UiStyle<'a> {
+impl<'a> SetFocusPolicyExt<'a> for UiStyle<'a> {
     fn focus_policy(&'a mut self, focus_policy: FocusPolicy) -> &mut UiStyle<'a> {
         self.commands.add(SetFocusPolicy { focus_policy });
+        self
+    }
+}
+
+struct SetFluxInteractionEnabled {
+    enabled: bool,
+}
+
+impl EntityCommand for SetFluxInteractionEnabled {
+    fn apply(self, entity: Entity, world: &mut World) {
+        let mut q_flux_interaction = world.query::<&mut FluxInteraction>();
+        let Ok(mut flux_interaction) = q_flux_interaction.get_mut(world, entity) else {
+            warn!(
+                "Failed to set flux interaction on entity {:?}: No FluxInteraction component found!",
+                entity
+            );
+            return;
+        };
+
+        if self.enabled {
+            if *flux_interaction == FluxInteraction::Disabled {
+                *flux_interaction = FluxInteraction::None;
+            }
+        } else {
+            if *flux_interaction != FluxInteraction::Disabled {
+                *flux_interaction = FluxInteraction::Disabled;
+            }
+        }
+    }
+}
+
+pub trait SetFluxInteractionExt<'a> {
+    fn disable_flux_interaction(&'a mut self) -> &mut UiStyle<'a>;
+    fn enable_flux_interaction(&'a mut self) -> &mut UiStyle<'a>;
+    fn flux_interaction_enabled(&'a mut self, enabled: bool) -> &mut UiStyle<'a>;
+}
+
+impl<'a> SetFluxInteractionExt<'a> for UiStyle<'a> {
+    fn disable_flux_interaction(&'a mut self) -> &mut UiStyle<'a> {
+        self.commands
+            .add(SetFluxInteractionEnabled { enabled: false });
+        self
+    }
+
+    fn enable_flux_interaction(&'a mut self) -> &mut UiStyle<'a> {
+        self.commands
+            .add(SetFluxInteractionEnabled { enabled: true });
+        self
+    }
+
+    fn flux_interaction_enabled(&'a mut self, enabled: bool) -> &mut UiStyle<'a> {
+        self.commands.add(SetFluxInteractionEnabled { enabled });
         self
     }
 }

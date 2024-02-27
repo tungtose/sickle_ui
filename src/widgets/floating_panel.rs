@@ -11,9 +11,9 @@ use crate::drop_interaction::Droppable;
 use crate::interactions::InteractiveBackground;
 use crate::resize_interaction::ResizeHandle;
 use crate::ui_style::{
-    SetBackgroundColorExt, SetEntityVisiblityExt, SetImageExt, SetNodeFlexGrowExt,
-    SetNodeHeightExt, SetNodeLeftExt, SetNodeMarginExt, SetNodeShowHideExt, SetNodeTopExt,
-    SetNodeWidthExt, SetSetFocusPolicyExt, SetZIndexExt, UiStyleExt,
+    SetBackgroundColorExt, SetEntityVisiblityExt, SetFluxInteractionExt, SetFocusPolicyExt,
+    SetImageExt, SetNodeFlexGrowExt, SetNodeHeightExt, SetNodeLeftExt, SetNodeMarginExt,
+    SetNodeShowHideExt, SetNodeTopExt, SetNodeWidthExt, SetZIndexExt, UiStyleExt,
 };
 use crate::FluxInteraction;
 use crate::{
@@ -340,9 +340,23 @@ fn update_panel_layout(
             true => FocusPolicy::Pass,
             false => FocusPolicy::Block,
         };
+
         commands.style(entity).focus_policy(policy);
-        commands.style(panel.title_container).focus_policy(policy);
-        commands.style(panel.drag_handle).focus_policy(policy);
+        commands
+            .style(panel.title_container)
+            .focus_policy(policy)
+            .flux_interaction_enabled(!panel.resizing);
+        commands
+            .style(panel.drag_handle)
+            .focus_policy(policy)
+            .flux_interaction_enabled(!panel.resizing);
+
+        commands
+            .style(panel.fold_button)
+            .flux_interaction_enabled(!(panel.moving || panel.resizing));
+        commands
+            .style(panel.close_button)
+            .flux_interaction_enabled(!(panel.moving || panel.resizing));
 
         commands
             .style(entity)

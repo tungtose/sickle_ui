@@ -14,6 +14,7 @@ use super::{
     floating_panel::FloatingPanelTitle,
     prelude::{SizedZoneConfig, UiSizedZoneExt, UiTabContainerExt},
     sized_zone::SizedZoneResizeHandleContainer,
+    tab_container::TabContainer,
 };
 
 pub struct DockingZonePlugin;
@@ -57,10 +58,28 @@ fn update_docking_zone_resize_handles(
 fn update_docking_zone_highlight(
     q_docking_zones: Query<(&DockingZone, &DropZone, &Node, &GlobalTransform), Changed<DropZone>>,
     q_accepted_types: Query<Entity, With<FloatingPanelTitle>>,
+    q_tab_container: Query<&TabContainer>,
+    q_tab_bar: Query<(&Node, &Interaction)>,
     mut commands: Commands,
 ) {
     for (docking_zone, drop_zone, node, transform) in &q_docking_zones {
-        if drop_zone.drop_phase() == DropPhase::DroppableLeft
+        let center = transform.translation().truncate();
+        let (tab_bar_height, is_over_tab_bar) =
+            if let Ok(tab_container) = q_tab_container.get(docking_zone.tab_container) {
+                if let Ok((tab_bar_node, bar_interaction)) = q_tab_bar.get(tab_container.bar_id()) {
+                    (
+                        tab_bar_node.size().y,
+                        *bar_interaction == Interaction::Hovered,
+                    )
+                } else {
+                    (0., false)
+                }
+            } else {
+                (0., false)
+            };
+
+        if is_over_tab_bar
+            || drop_zone.drop_phase() == DropPhase::DroppableLeft
             || drop_zone.drop_phase() == DropPhase::DropCanceled
             || drop_zone.drop_phase() == DropPhase::Inactive
             || drop_zone.incoming_droppable().is_none()
@@ -79,16 +98,14 @@ fn update_docking_zone_highlight(
             continue;
         }
 
-        if drop_zone.drop_phase() == DropPhase::DroppableEntered {
-            commands
-                .style(docking_zone.zone_highlight)
-                .background_color(Color::rgba(0.7, 0.8, 0.9, 0.2));
-        }
-
         if drop_zone.drop_phase() == DropPhase::DroppableEntered
             || drop_zone.drop_phase() == DropPhase::DroppableHover
         {
-            let center = transform.translation().truncate();
+            // We can leave to the tabs and re-enter the main panel without triggering DroppableEntered
+            commands
+                .style(docking_zone.zone_highlight)
+                .background_color(Color::rgba(0.7, 0.8, 0.9, 0.2));
+
             // How else would the droppable be over the zone?
             let position = drop_zone.position().unwrap();
             let sixth_width = node.size().x / 6.;
@@ -113,7 +130,12 @@ fn update_docking_zone_highlight(
                     Val::Auto,
                 )
             } else {
-                (Val::Percent(100.), Val::Percent(100.), Val::Auto, Val::Auto)
+                (
+                    Val::Percent(100.),
+                    Val::Px(node.size().y - tab_bar_height),
+                    Val::Px(tab_bar_height),
+                    Val::Auto,
+                )
             };
 
             commands

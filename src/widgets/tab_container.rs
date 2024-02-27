@@ -259,6 +259,12 @@ impl Default for TabContainer {
 }
 
 impl TabContainer {
+    pub fn bar_id(&self) -> Entity {
+        self.bar
+    }
+}
+
+impl TabContainer {
     fn frame() -> impl Bundle {
         (
             NodeBundle {
