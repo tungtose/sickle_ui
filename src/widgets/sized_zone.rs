@@ -1,7 +1,7 @@
 use bevy::{prelude::*, ui::UiSystem};
 
 use crate::{
-    drag_interaction::{DragState, Draggable, DraggableUpdate},
+    drag_interaction::{DragState, Draggable},
     resize_interaction::{ResizeDirection, ResizeHandle},
     ui_builder::*,
     ui_style::{
@@ -9,7 +9,7 @@ use crate::{
     },
 };
 
-use super::prelude::UiContainerExt;
+use super::{docking_zone::DockingZoneUpdate, prelude::UiContainerExt};
 
 const MIN_SIZED_ZONE_SIZE: f32 = 50.;
 
@@ -31,10 +31,8 @@ impl Plugin for SizedZonePlugin {
         )
         .add_systems(
             Update,
-            (
-                update_sized_zone_on_resize.after(DraggableUpdate),
-                update_sized_zone_style,
-            )
+            (update_sized_zone_on_resize, update_sized_zone_style)
+                .after(DockingZoneUpdate)
                 .chain(),
         )
         .add_systems(
@@ -552,6 +550,22 @@ pub struct SizedZoneConfig {
 }
 
 impl SizedZone {
+    pub fn direction(&self) -> FlexDirection {
+        self.flex_direction
+    }
+
+    pub fn size(&self) -> f32 {
+        self.size_percent
+    }
+
+    pub fn set_size(&mut self, size: f32) {
+        self.size_percent = size.clamp(0., 100.);
+    }
+
+    pub fn min_size(&self) -> f32 {
+        self.min_size
+    }
+
     fn frame() -> impl Bundle {
         NodeBundle {
             style: Style {

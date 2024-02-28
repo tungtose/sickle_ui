@@ -292,6 +292,7 @@ impl<'w, 's> UiDropdownExt<'w, 's> for UiBuilder<'w, 's, '_> {
                             size: Vec2 { x: 200., y: 100. },
                             position: None,
                             hidden: true,
+                            ..default()
                         },
                         |container| {
                             for (index, label) in string_options.iter().enumerate() {

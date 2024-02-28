@@ -22,11 +22,20 @@ pub mod toggle_menu_item;
 use bevy::prelude::*;
 
 use self::{
-    checkbox::CheckboxPlugin, context_menu::ContextMenuPlugin, docking_zone::DockingZonePlugin,
-    dropdown::DropdownPlugin, floating_panel::FloatingPanelPlugin, icon::IconPlugin,
-    menu::MenuPlugin, menu_item::MenuItemPlugin, radio_group::RadioGroupPlugin,
-    scroll_view::ScrollViewPlugin, sized_zone::SizedZonePlugin, slider::SliderPlugin,
-    submenu::SubmenuPlugin, tab_container::TabContainerPlugin,
+    checkbox::CheckboxPlugin,
+    context_menu::ContextMenuPlugin,
+    docking_zone::DockingZonePlugin,
+    dropdown::DropdownPlugin,
+    floating_panel::{FloatingPanelPlugin, FloatingPanelUpdate},
+    icon::IconPlugin,
+    menu::MenuPlugin,
+    menu_item::MenuItemPlugin,
+    radio_group::RadioGroupPlugin,
+    scroll_view::ScrollViewPlugin,
+    sized_zone::SizedZonePlugin,
+    slider::SliderPlugin,
+    submenu::SubmenuPlugin,
+    tab_container::TabContainerPlugin,
     toggle_menu_item::ToggleMenuItemPlugin,
 };
 
@@ -62,22 +71,26 @@ pub struct WidgetsPlugin;
 
 impl Plugin for WidgetsPlugin {
     fn build(&self, app: &mut App) {
-        app.add_plugins((
-            CheckboxPlugin,
-            ContextMenuPlugin,
-            SizedZonePlugin,
-            DockingZonePlugin,
-            DropdownPlugin,
-            FloatingPanelPlugin,
-            IconPlugin,
-            MenuPlugin,
-            MenuItemPlugin,
-            RadioGroupPlugin,
-            SliderPlugin,
-            ScrollViewPlugin,
-            SubmenuPlugin,
-            TabContainerPlugin,
-            ToggleMenuItemPlugin,
-        ));
+        app.configure_sets(Update, WidgetLibraryUpdate.after(FloatingPanelUpdate))
+            .add_plugins((
+                CheckboxPlugin,
+                ContextMenuPlugin,
+                SizedZonePlugin,
+                DockingZonePlugin,
+                DropdownPlugin,
+                FloatingPanelPlugin,
+                IconPlugin,
+                MenuPlugin,
+                MenuItemPlugin,
+                RadioGroupPlugin,
+                SliderPlugin,
+                ScrollViewPlugin,
+                SubmenuPlugin,
+                TabContainerPlugin,
+                ToggleMenuItemPlugin,
+            ));
     }
 }
+
+#[derive(SystemSet, Clone, Eq, Debug, Hash, PartialEq)]
+pub struct WidgetLibraryUpdate;

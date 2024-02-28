@@ -7,7 +7,7 @@ use super::icon::{IconConfig, UiIconExt};
 use super::prelude::{LabelConfig, UiContainerExt, UiLabelExt};
 use super::prelude::{SetLabelTextExt, UiScrollViewExt};
 use crate::animated_interaction::{AnimatedInteraction, AnimationConfig};
-use crate::drop_interaction::Droppable;
+use crate::drop_interaction::{Droppable, DroppableUpdate};
 use crate::interactions::InteractiveBackground;
 use crate::resize_interaction::ResizeHandle;
 use crate::ui_style::{
@@ -17,11 +17,11 @@ use crate::ui_style::{
 };
 use crate::FluxInteraction;
 use crate::{
-    drag_interaction::{DragState, Draggable, DraggableUpdate},
+    drag_interaction::{DragState, Draggable},
     resize_interaction::ResizeDirection,
     scroll_interaction::ScrollAxis,
     ui_builder::UiBuilder,
-    FluxInteractionUpdate, TrackedInteraction,
+    TrackedInteraction,
 };
 
 const MIN_PANEL_SIZE: Vec2 = Vec2 { x: 150., y: 100. };
@@ -33,21 +33,26 @@ pub struct FloatingPanelPlugin;
 
 impl Plugin for FloatingPanelPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(
-            Update,
-            (
-                index_floating_panel.run_if(panel_added),
-                process_panel_close_pressed.after(FluxInteractionUpdate),
-                process_panel_fold_pressed.after(FluxInteractionUpdate),
-                update_panel_size_on_resize.after(DraggableUpdate),
-                update_panel_on_title_drag.after(DraggableUpdate),
-                handle_window_resize.run_if(window_resized),
-                update_panel_layout,
-            )
-                .chain(),
-        );
+        app.configure_sets(Update, FloatingPanelUpdate.after(DroppableUpdate))
+            .add_systems(
+                Update,
+                (
+                    index_floating_panel.run_if(panel_added),
+                    process_panel_close_pressed,
+                    process_panel_fold_pressed,
+                    update_panel_size_on_resize,
+                    update_panel_on_title_drag,
+                    handle_window_resize.run_if(window_resized),
+                    update_panel_layout,
+                )
+                    .chain()
+                    .in_set(FloatingPanelUpdate),
+            );
     }
 }
+
+#[derive(SystemSet, Clone, Eq, Debug, Hash, PartialEq)]
+pub struct FloatingPanelUpdate;
 
 fn panel_added(q_panels: Query<Entity, Added<FloatingPanel>>) -> bool {
     q_panels.iter().count() > 0
@@ -319,7 +324,7 @@ fn update_panel_layout(
                 commands.style(panel.drag_handle).render(config.draggable);
             }
 
-            commands.style(panel.content).render(!config.folded);
+            commands.style(panel.content_view).render(!config.folded);
             commands
                 .style(panel.fold_button)
                 .image(match config.folded {
@@ -409,6 +414,12 @@ impl Default for FloatingPanelTitle {
     }
 }
 
+impl FloatingPanelTitle {
+    pub fn panel(&self) -> Entity {
+        self.panel
+    }
+}
+
 #[derive(Component, Debug, Reflect)]
 #[reflect(Component)]
 pub struct FloatingPanelDragHandle {
@@ -476,6 +487,12 @@ impl Default for FloatingPanelConfig {
     }
 }
 
+impl FloatingPanelConfig {
+    pub fn title(&self) -> Option<String> {
+        self.title.clone()
+    }
+}
+
 #[derive(Component, Debug, Reflect)]
 #[reflect(Component)]
 pub struct FloatingPanel {
@@ -487,7 +504,8 @@ pub struct FloatingPanel {
     title_container: Entity,
     title: Entity,
     close_button: Entity,
-    content: Entity,
+    content_view: Entity,
+    content_inner: Entity,
     resize_handles: (Entity, Entity),
     resizing: bool,
     moving: bool,
@@ -505,7 +523,8 @@ impl Default for FloatingPanel {
             title_container: Entity::PLACEHOLDER,
             title: Entity::PLACEHOLDER,
             close_button: Entity::PLACEHOLDER,
-            content: Entity::PLACEHOLDER,
+            content_view: Entity::PLACEHOLDER,
+            content_inner: Entity::PLACEHOLDER,
             resize_handles: (Entity::PLACEHOLDER, Entity::PLACEHOLDER),
             resizing: Default::default(),
             moving: Default::default(),
@@ -515,6 +534,10 @@ impl Default for FloatingPanel {
 }
 
 impl FloatingPanel {
+    pub fn content_container_id(&self) -> Entity {
+        self.content_inner
+    }
+
     fn base_tween() -> AnimationConfig {
         AnimationConfig {
             duration: 0.1,
@@ -592,6 +615,7 @@ pub struct FloatingPanelLayout {
     pub size: Vec2,
     pub position: Option<Vec2>,
     pub hidden: bool,
+    pub droppable: bool,
 }
 
 impl Default for FloatingPanelLayout {
@@ -600,6 +624,7 @@ impl Default for FloatingPanelLayout {
             size: Vec2 { x: 300., y: 500. },
             position: Default::default(),
             hidden: Default::default(),
+            droppable: false,
         }
     }
 }
@@ -638,7 +663,8 @@ impl<'w, 's> UiFloatingPanelExt<'w, 's> for UiBuilder<'w, 's, '_> {
         let mut fold_button = Entity::PLACEHOLDER;
         let mut close_button = Entity::PLACEHOLDER;
         let mut drag_handle = Entity::PLACEHOLDER;
-        let mut content = Entity::PLACEHOLDER;
+        let mut content_view = Entity::PLACEHOLDER;
+        let mut content_inner = Entity::PLACEHOLDER;
         let mut frame = self.container(FloatingPanel::frame(), |container| {
             let panel = container.id();
 
@@ -722,86 +748,88 @@ impl<'w, 's> UiFloatingPanelExt<'w, 's> for UiBuilder<'w, 's, '_> {
                 .render(config.resizable)
                 .id();
 
-            title_container = container
-                .container(
-                    (
-                        FloatingPanel::title_container(),
-                        FloatingPanelTitle { panel },
-                        Droppable,
-                    ),
-                    |container| {
-                        fold_button = container
-                            .icon(IconConfig {
-                                path: match config.folded {
-                                    true => "sickle://icons/chevron_right.png",
-                                    false => "sickle://icons/chevron_down.png",
-                                }
-                                .into(),
+            let mut title_builder = container.container(
+                (
+                    FloatingPanel::title_container(),
+                    FloatingPanelTitle { panel },
+                ),
+                |container| {
+                    fold_button = container
+                        .icon(IconConfig {
+                            path: match config.folded {
+                                true => "sickle://icons/chevron_right.png",
+                                false => "sickle://icons/chevron_down.png",
+                            }
+                            .into(),
+                            ..default()
+                        })
+                        .insert((
+                            Interaction::default(),
+                            TrackedInteraction::default(),
+                            InteractiveBackground {
+                                highlight: Color::rgba(0., 1., 1., 1.).into(),
                                 ..default()
-                            })
-                            .insert((
-                                Interaction::default(),
-                                TrackedInteraction::default(),
-                                InteractiveBackground {
-                                    highlight: Color::rgba(0., 1., 1., 1.).into(),
-                                    ..default()
-                                },
-                                AnimatedInteraction::<InteractiveBackground> {
-                                    tween: FloatingPanel::base_tween(),
-                                    ..default()
-                                },
-                                FloatingPanelFoldButton { panel },
-                            ))
-                            .style()
-                            .margin(UiRect::px(3., 0., 3., 3.))
-                            .background_color(Color::GRAY)
-                            .render(config.foldable)
-                            .id();
-
-                        title = container
-                            .label(LabelConfig {
-                                label: title_text,
-                                margin: UiRect::px(5., 29., 5., 2.),
-                                color: Color::WHITE,
-                                ..default()
-                            })
-                            .style()
-                            .flex_grow(1.)
-                            .id();
-
-                        container.container(
-                            FloatingPanel::close_button_container(),
-                            |close_button_container| {
-                                close_button = close_button_container
-                                    .icon(IconConfig {
-                                        path: "sickle://icons/close.png".into(),
-                                        ..default()
-                                    })
-                                    .insert((
-                                        Interaction::default(),
-                                        TrackedInteraction::default(),
-                                        InteractiveBackground {
-                                            highlight: Color::rgba(0., 1., 1., 1.).into(),
-                                            ..default()
-                                        },
-                                        AnimatedInteraction::<InteractiveBackground> {
-                                            tween: FloatingPanel::base_tween(),
-                                            ..default()
-                                        },
-                                        FloatingPanelCloseButton { panel },
-                                    ))
-                                    .style()
-                                    .margin(UiRect::px(3., 2., 2., 3.))
-                                    .background_color(Color::DARK_GRAY)
-                                    .render(config.closable)
-                                    .id();
                             },
-                        );
-                    },
-                )
-                .style()
-                .render(config.title.is_some())
-                .id();
+                            AnimatedInteraction::<InteractiveBackground> {
+                                tween: FloatingPanel::base_tween(),
+                                ..default()
+                            },
+                            FloatingPanelFoldButton { panel },
+                        ))
+                        .style()
+                        .margin(UiRect::px(3., 0., 3., 3.))
+                        .background_color(Color::GRAY)
+                        .render(config.foldable)
+                        .id();
+
+                    title = container
+                        .label(LabelConfig {
+                            label: title_text,
+                            margin: UiRect::px(5., 29., 5., 2.),
+                            color: Color::WHITE,
+                            ..default()
+                        })
+                        .style()
+                        .flex_grow(1.)
+                        .id();
+
+                    container.container(
+                        FloatingPanel::close_button_container(),
+                        |close_button_container| {
+                            close_button = close_button_container
+                                .icon(IconConfig {
+                                    path: "sickle://icons/close.png".into(),
+                                    ..default()
+                                })
+                                .insert((
+                                    Interaction::default(),
+                                    TrackedInteraction::default(),
+                                    InteractiveBackground {
+                                        highlight: Color::rgba(0., 1., 1., 1.).into(),
+                                        ..default()
+                                    },
+                                    AnimatedInteraction::<InteractiveBackground> {
+                                        tween: FloatingPanel::base_tween(),
+                                        ..default()
+                                    },
+                                    FloatingPanelCloseButton { panel },
+                                ))
+                                .style()
+                                .margin(UiRect::px(3., 2., 2., 3.))
+                                .background_color(Color::DARK_GRAY)
+                                .render(config.closable)
+                                .id();
+                        },
+                    );
+                },
+            );
+            title_builder.style().render(config.title.is_some());
+
+            if layout.droppable {
+                title_builder.insert(Droppable);
+            }
+
+            title_container = title_builder.id();
 
             drag_handle = container
                 .spawn((
@@ -812,7 +840,12 @@ impl<'w, 's> UiFloatingPanelExt<'w, 's> for UiBuilder<'w, 's, '_> {
                 .render(config.title.is_none())
                 .id();
 
-            content = container.scroll_view(restrict_to, spawn_children).id();
+            content_view = container
+                .scroll_view(restrict_to, |scroll_view| {
+                    content_inner = scroll_view.id();
+                    spawn_children(scroll_view);
+                })
+                .id();
         });
 
         if layout.hidden {
@@ -830,7 +863,8 @@ impl<'w, 's> UiFloatingPanelExt<'w, 's> for UiBuilder<'w, 's, '_> {
                 title_container,
                 title,
                 close_button,
-                content,
+                content_view,
+                content_inner,
                 resize_handles: (horizontal_resize_handles, vertical_resize_handles),
                 priority: false,
                 ..default()

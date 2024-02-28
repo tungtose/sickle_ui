@@ -152,8 +152,12 @@ fn constrain_tab_container_active_tab(
             })
             .count();
 
-        if container.active > tab_count {
-            container.active = tab_count;
+        if container.tab_count != tab_count {
+            container.tab_count = tab_count;
+        }
+
+        if container.active >= tab_count {
+            container.active = tab_count - 1;
         }
     }
 }
@@ -246,12 +250,14 @@ pub struct TabContainer {
     active: usize,
     bar: Entity,
     viewport: Entity,
+    tab_count: usize,
 }
 
 impl Default for TabContainer {
     fn default() -> Self {
         Self {
             active: 0,
+            tab_count: 0,
             bar: Entity::PLACEHOLDER,
             viewport: Entity::PLACEHOLDER,
         }
@@ -261,6 +267,14 @@ impl Default for TabContainer {
 impl TabContainer {
     pub fn bar_id(&self) -> Entity {
         self.bar
+    }
+
+    pub fn tab_count(&self) -> usize {
+        self.tab_count
+    }
+
+    pub fn set_active(&mut self, active: usize) {
+        self.active = active;
     }
 }
 
