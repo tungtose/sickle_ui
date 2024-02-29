@@ -4,9 +4,7 @@ use crate::{
     drag_interaction::{DragState, Draggable},
     resize_interaction::{ResizeDirection, ResizeHandle},
     ui_builder::*,
-    ui_style::{
-        SetBackgroundColorExt, SetEntityVisiblityExt, SetNodeLeftExt, SetNodeTopExt, UiStyleExt,
-    },
+    ui_style::{SetEntityVisiblityExt, SetNodeLeftExt, SetNodeTopExt, UiStyleExt},
 };
 
 use super::{docking_zone::DockingZoneUpdate, prelude::UiContainerExt};
@@ -546,7 +544,6 @@ impl Default for SizedZone {
 pub struct SizedZoneConfig {
     pub size: f32,
     pub min_size: f32,
-    pub background_color: Color,
 }
 
 impl SizedZone {
@@ -700,18 +697,15 @@ impl<'w, 's> UiSizedZoneExt<'w, 's> for UiBuilder<'w, 's, '_> {
             );
         });
 
-        sized_zone
-            .insert(SizedZone {
-                size_percent: size,
-                min_size,
-                top_handle,
-                right_handle,
-                bottom_handle,
-                left_handle,
-                ..default()
-            })
-            .style()
-            .background_color(config.background_color);
+        sized_zone.insert(SizedZone {
+            size_percent: size,
+            min_size,
+            top_handle,
+            right_handle,
+            bottom_handle,
+            left_handle,
+            ..default()
+        });
 
         sized_zone
     }

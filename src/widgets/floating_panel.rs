@@ -3,7 +3,7 @@ use bevy::window::PrimaryWindow;
 use bevy::{prelude::*, window::WindowResized};
 use sickle_math::ease::Ease;
 
-use super::icon::{IconConfig, UiIconExt};
+use super::icon::UiIconExt;
 use super::prelude::{LabelConfig, UiContainerExt, UiLabelExt};
 use super::prelude::{SetLabelTextExt, UiScrollViewExt};
 use crate::animated_interaction::{AnimatedInteraction, AnimationConfig};
@@ -755,13 +755,9 @@ impl<'w, 's> UiFloatingPanelExt<'w, 's> for UiBuilder<'w, 's, '_> {
                 ),
                 |container| {
                     fold_button = container
-                        .icon(IconConfig {
-                            path: match config.folded {
-                                true => "sickle://icons/chevron_right.png",
-                                false => "sickle://icons/chevron_down.png",
-                            }
-                            .into(),
-                            ..default()
+                        .icon(match config.folded {
+                            true => "sickle://icons/chevron_right.png",
+                            false => "sickle://icons/chevron_down.png",
                         })
                         .insert((
                             Interaction::default(),
@@ -797,10 +793,7 @@ impl<'w, 's> UiFloatingPanelExt<'w, 's> for UiBuilder<'w, 's, '_> {
                         FloatingPanel::close_button_container(),
                         |close_button_container| {
                             close_button = close_button_container
-                                .icon(IconConfig {
-                                    path: "sickle://icons/close.png".into(),
-                                    ..default()
-                                })
+                                .icon("sickle://icons/close.png")
                                 .insert((
                                     Interaction::default(),
                                     TrackedInteraction::default(),

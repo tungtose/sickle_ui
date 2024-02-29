@@ -1,21 +1,12 @@
 use bevy::prelude::*;
 
-use crate::{
-    ui_builder::*,
-    ui_style::{SetBackgroundColorExt, SetNodeHeightExt},
-};
+use crate::ui_builder::*;
 
 use super::prelude::UiContainerExt;
 
 #[derive(Component, Debug, Default, Reflect)]
 #[reflect(Component)]
 pub struct Row;
-
-#[derive(Debug, Default)]
-pub struct RowConfig {
-    pub height: Val,
-    pub background_color: Color,
-}
 
 impl Row {
     fn frame() -> impl Bundle {
@@ -31,25 +22,11 @@ impl Row {
 }
 
 pub trait UiRowExt<'w, 's> {
-    fn row<'a>(
-        &'a mut self,
-        config: RowConfig,
-        spawn_children: impl FnOnce(&mut UiBuilder),
-    ) -> UiBuilder<'w, 's, 'a>;
+    fn row<'a>(&'a mut self, spawn_children: impl FnOnce(&mut UiBuilder)) -> UiBuilder<'w, 's, 'a>;
 }
 
 impl<'w, 's> UiRowExt<'w, 's> for UiBuilder<'w, 's, '_> {
-    fn row<'a>(
-        &'a mut self,
-        config: RowConfig,
-        spawn_children: impl FnOnce(&mut UiBuilder),
-    ) -> UiBuilder<'w, 's, 'a> {
-        let mut row = self.container((Row::frame(), Row), spawn_children);
-
-        row.style()
-            .height(config.height)
-            .background_color(config.background_color);
-
-        row
+    fn row<'a>(&'a mut self, spawn_children: impl FnOnce(&mut UiBuilder)) -> UiBuilder<'w, 's, 'a> {
+        self.container((Row::frame(), Row), spawn_children)
     }
 }

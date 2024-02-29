@@ -1,12 +1,17 @@
 use bevy::prelude::*;
 
 use crate::{
+    drag_interaction::{DragState, Draggable, DraggableUpdate},
     ui_builder::{UiBuilder, UiBuilderExt},
-    ui_style::{SetBackgroundColorExt, SetNodeShowHideExt, UiStyleExt},
+    ui_style::{
+        SetBackgroundColorExt, SetNodeLeftExt, SetNodePositionTypeExt, SetNodeShowHideExt,
+        SetZIndexExt, UiStyleExt,
+    },
     TrackedInteraction,
 };
 
 use super::{
+    floating_panel::FloatingPanelUpdate,
     panel::Panel,
     prelude::{LabelConfig, UiContainerExt, UiLabelExt, UiScrollViewExt},
 };
@@ -15,7 +20,13 @@ pub struct TabContainerPlugin;
 
 impl Plugin for TabContainerPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(
+        app.configure_sets(
+            Update,
+            TabContainerUpdate
+                .after(DraggableUpdate)
+                .before(FloatingPanelUpdate),
+        )
+        .add_systems(
             Update,
             (
                 process_tab_container_content_change,
@@ -23,11 +34,16 @@ impl Plugin for TabContainerPlugin {
                 update_tab_container_on_press,
                 constrain_tab_container_active_tab,
                 update_tab_container_on_change,
+                handle_tab_dragging,
             )
-                .chain(),
+                .chain()
+                .in_set(TabContainerUpdate),
         );
     }
 }
+
+#[derive(SystemSet, Clone, Eq, Debug, Hash, PartialEq)]
+pub struct TabContainerUpdate;
 
 fn process_tab_container_content_change(
     q_tab_containers: Query<(&TabContainer, &Children), Changed<Children>>,
@@ -164,9 +180,8 @@ fn constrain_tab_container_active_tab(
 
 fn update_tab_container_on_change(
     q_tab_containers: Query<&TabContainer, Changed<TabContainer>>,
-    q_tab: Query<Entity, With<Tab>>,
+    q_tab: Query<(Entity, &Tab), With<Tab>>,
     q_children: Query<&Children>,
-    q_panel: Query<Entity, With<Panel>>,
     mut commands: Commands,
 ) {
     for tab_container in &q_tab_containers {
@@ -175,27 +190,187 @@ fn update_tab_container_on_change(
         };
 
         for (i, id) in tabs.iter().enumerate() {
-            if let Ok(tab) = q_tab.get(*id) {
+            if let Ok((tab_entity, tab)) = q_tab.get(*id) {
                 if i == tab_container.active {
-                    commands.style(tab).background_color(Color::GRAY);
+                    commands.style(tab_entity).background_color(Color::GRAY);
+                    commands.style(tab.panel).show();
                 } else {
-                    commands.style(tab).background_color(Color::NONE);
+                    commands.style(tab_entity).background_color(Color::NONE);
+                    commands.style(tab.panel).hide();
                 }
             }
         }
+    }
+}
 
-        let Ok(panels) = q_children.get(tab_container.viewport) else {
+fn handle_tab_dragging(
+    q_tabs: Query<(Entity, &Draggable, &Node, &Transform), (With<Tab>, Changed<Draggable>)>,
+    q_tab_container: Query<&TabContainer>,
+    q_tab_bar: Query<(&Interaction, &Node), With<TabBar>>,
+    q_children: Query<&Children>,
+    mut q_tab: Query<(&mut Tab, &Transform)>,
+    mut commands: Commands,
+) {
+    for (entity, draggable, node, transform) in &q_tabs {
+        let (tab, _) = q_tab.get(entity).unwrap();
+
+        let Ok(container) = q_tab_container.get(tab.container) else {
+            warn!("Tried to drag orphan Tab {:?}", entity);
             continue;
         };
 
-        for (i, id) in panels.iter().enumerate() {
-            if let Ok(panel) = q_panel.get(*id) {
-                if i == tab_container.active {
-                    commands.style(panel).show();
-                } else {
-                    commands.style(panel).hide();
-                }
+        let Ok((_bar_interaction, bar_node)) = q_tab_bar.get(container.bar) else {
+            error!("Tab container {:?} doesn't have a tab bar", tab.container);
+            continue;
+        };
+
+        let Ok(children) = q_children.get(container.bar) else {
+            error!("Tab container has no tabs {:?}", tab.container);
+            continue;
+        };
+
+        let bar_half_width = bar_node.size().x / 2.;
+
+        match draggable.state {
+            DragState::DragStart => {
+                let Some(tab_index) = children
+                    .iter()
+                    .filter(|child| q_tab.get(**child).is_ok())
+                    .position(|child| *child == entity)
+                else {
+                    error!("Tab {:?} isn't a child of its tab container bar", entity);
+                    continue;
+                };
+
+                let left =
+                    transform.translation.truncate().x - (node.size().x / 2.) + bar_half_width;
+                let placeholder = commands
+                    .ui_builder(container.bar.into())
+                    .spawn(NodeBundle {
+                        style: Style {
+                            width: Val::Px(node.size().x * 1.1),
+                            height: Val::Px(node.size().y),
+                            ..default()
+                        },
+                        background_color: Color::NAVY.into(),
+                        ..default()
+                    })
+                    .id();
+
+                commands
+                    .entity(container.bar)
+                    .insert_children(tab_index, &[placeholder]);
+
+                commands
+                    .ui_builder(entity.into())
+                    .style()
+                    .position_type(PositionType::Absolute)
+                    .left(Val::Px(left))
+                    .z_index(ZIndex::Local(100));
+
+                let (mut tab, _) = q_tab.get_mut(entity).unwrap();
+                tab.placeholder = placeholder.into();
+                tab.original_index = tab_index.into();
             }
+            DragState::Dragging => {
+                let Some(diff) = draggable.diff else {
+                    continue;
+                };
+
+                let Some(placeholder) = tab.placeholder else {
+                    warn!("Tab {:?} missing placeholder", entity);
+                    continue;
+                };
+
+                let new_x = transform.translation.truncate().x + diff.x + bar_half_width;
+                let left = new_x - (node.size().x / 2.);
+                // TODO: Use GlobalTransform and cursor position to calculate split
+                let children_before = children
+                    .iter()
+                    .filter(|child| {
+                        if **child == entity {
+                            return true;
+                        }
+                        let Ok((_, transform)) = q_tab.get(**child) else {
+                            return true;
+                        };
+
+                        (transform.translation.x + bar_half_width) < new_x
+                    })
+                    .count();
+
+                let new_index = if children_before == 0 {
+                    0
+                } else {
+                    children_before - 1
+                };
+
+                commands
+                    .entity(container.bar)
+                    .insert_children(new_index, &[placeholder]);
+
+                commands
+                    .ui_builder(entity.into())
+                    .style()
+                    .left(Val::Px(left));
+            }
+            DragState::DragEnd => {
+                let Some(placeholder) = tab.placeholder else {
+                    warn!("Tab {:?} missing placeholder", entity);
+                    continue;
+                };
+
+                let Some(placeholder_index) =
+                    children.iter().position(|child| *child == placeholder)
+                else {
+                    error!(
+                        "Tab placeholder {:?} isn't a child of its tab container bar",
+                        entity
+                    );
+                    continue;
+                };
+
+                commands
+                    .style(entity)
+                    .position_type(PositionType::Relative)
+                    .left(Val::Auto)
+                    .z_index(ZIndex::Local(0));
+
+                commands
+                    .entity(container.bar)
+                    .insert_children(placeholder_index, &[entity]);
+
+                commands.entity(placeholder).despawn_recursive();
+
+                let (mut tab, _) = q_tab.get_mut(entity).unwrap();
+                tab.placeholder = None;
+                tab.original_index = None;
+            }
+            DragState::DragCanceled => {
+                let Some(placeholder) = tab.placeholder else {
+                    warn!("Tab {:?} missing placeholder", entity);
+                    continue;
+                };
+
+                let original_index = tab.original_index.unwrap_or(0);
+
+                commands
+                    .style(entity)
+                    .position_type(PositionType::Relative)
+                    .left(Val::Auto)
+                    .z_index(ZIndex::Local(0));
+
+                commands
+                    .entity(container.bar)
+                    .insert_children(original_index, &[entity]);
+
+                commands.entity(placeholder).despawn_recursive();
+
+                let (mut tab, _) = q_tab.get_mut(entity).unwrap();
+                tab.placeholder = None;
+                tab.original_index = None;
+            }
+            _ => continue,
         }
     }
 }
@@ -205,6 +380,8 @@ fn update_tab_container_on_change(
 pub struct Tab {
     container: Entity,
     panel: Entity,
+    placeholder: Option<Entity>,
+    original_index: Option<usize>,
 }
 
 impl Default for Tab {
@@ -212,6 +389,8 @@ impl Default for Tab {
         Self {
             container: Entity::PLACEHOLDER,
             panel: Entity::PLACEHOLDER,
+            placeholder: None,
+            original_index: None,
         }
     }
 }
@@ -323,6 +502,7 @@ impl TabContainer {
             },
             Interaction::default(),
             TrackedInteraction::default(),
+            Draggable::default(),
         )
     }
 }
@@ -397,6 +577,7 @@ impl<'w, 's> UiTabExt<'w, 's> for UiBuilder<'w, 's, '_> {
                 Tab {
                     container: tab_container,
                     panel,
+                    ..default()
                 },
             ),
             |container| {

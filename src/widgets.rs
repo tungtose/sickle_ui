@@ -42,13 +42,13 @@ use self::{
 pub mod prelude {
     pub use super::{
         checkbox::{Checkbox, UiCheckboxExt},
-        column::{ColumnConfig, UiColumnExt},
+        column::UiColumnExt,
         container::UiContainerExt,
         context_menu::{ContextMenuGenerator, GenerateContextMenu, ReflectContextMenuGenerator},
         docking_zone::UiDockingZoneExt,
         dropdown::UiDropdownExt,
         floating_panel::{FloatingPanelConfig, FloatingPanelLayout, UiFloatingPanelExt},
-        icon::{IconConfig, UiIconExt},
+        icon::UiIconExt,
         label::{LabelConfig, SetLabelTextExt, UiLabelExt},
         menu::{
             MenuConfig, MenuItemSeparator, MenuSeparator, UiMenuExt, UiMenuItemSeparatorExt,
@@ -57,7 +57,7 @@ pub mod prelude {
         menu_item::{MenuItem, MenuItemConfig, MenuItemUpdate, UiMenuItemExt},
         panel::UiPanelExt,
         radio_group::{RadioGroup, UiRadioGroupExt},
-        row::{RowConfig, UiRowExt},
+        row::UiRowExt,
         scroll_view::{ScrollThrough, UiScrollViewExt},
         sized_zone::{SizedZoneConfig, UiSizedZoneExt},
         slider::{SliderConfig, UiSliderExt},
