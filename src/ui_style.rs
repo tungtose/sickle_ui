@@ -5,7 +5,10 @@ use bevy::{
 };
 use sickle_macros::StyleCommand;
 
-use crate::FluxInteraction;
+use crate::{
+    interactions::{InteractionState, InteractiveBackgroundState},
+    FluxInteraction,
+};
 
 pub struct UiStyle<'a> {
     commands: EntityCommands<'a>,
@@ -276,6 +279,14 @@ impl EntityCommand for SetBackgroundColor {
         if background_color.0 != self.color.into() {
             background_color.0 = self.color.into();
         }
+
+        // TODO: Make this CFG optional
+        let mut q_interactive_state = world.query::<&mut InteractiveBackgroundState>();
+        let Ok(mut interactive_state) = q_interactive_state.get_mut(world, entity) else {
+            return;
+        };
+
+        interactive_state.set_original(self.color);
     }
 }
 

@@ -27,7 +27,7 @@ impl Plugin for DragInteractionPlugin {
 #[derive(SystemSet, Clone, Eq, Debug, Hash, PartialEq)]
 pub struct DraggableUpdate;
 
-#[derive(Component, Default, Debug, Reflect)]
+#[derive(Component, Clone, Copy, Default, Debug, Reflect)]
 #[reflect(Component)]
 pub struct Draggable {
     pub state: DragState,
@@ -57,7 +57,7 @@ pub enum DragState {
     DragCanceled,
 }
 
-#[derive(Default, Debug, PartialEq, Eq, Reflect)]
+#[derive(Clone, Copy, Default, Debug, PartialEq, Eq, Reflect)]
 #[reflect]
 pub enum DragSource {
     #[default]

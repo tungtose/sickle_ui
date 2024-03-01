@@ -50,6 +50,7 @@ pub trait InteractionState {
 
     fn original(&self) -> Self::TargetType;
     fn transition_base(&self) -> Self::TargetType;
+    fn set_original(&mut self, from: Self::TargetType);
     fn set_transition_base(&mut self, from: Self::TargetType);
 }
 

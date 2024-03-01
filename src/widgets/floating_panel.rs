@@ -4,6 +4,7 @@ use bevy::{prelude::*, window::WindowResized};
 use sickle_math::ease::Ease;
 
 use super::icon::UiIconExt;
+use super::panel::Panel;
 use super::prelude::{LabelConfig, UiContainerExt, UiLabelExt};
 use super::prelude::{SetLabelTextExt, UiScrollViewExt};
 use crate::animated_interaction::{AnimatedInteraction, AnimationConfig};
@@ -301,6 +302,8 @@ fn update_panel_layout(
         (Entity, &FloatingPanel, Ref<FloatingPanelConfig>),
         Or<(Changed<FloatingPanel>, Changed<FloatingPanelConfig>)>,
     >,
+    q_children: Query<&Children>,
+    mut q_panel: Query<&mut Panel>,
     mut commands: Commands,
 ) {
     for (entity, panel, config) in &q_panels {
@@ -313,12 +316,12 @@ fn update_panel_layout(
                 commands.entity(panel.title).set_label_text(title);
                 if config.draggable {
                     commands
-                        .entity(panel.title_container)
-                        .try_insert((TrackedInteraction::default(), Draggable::default()));
+                        .style(panel.title_container)
+                        .enable_flux_interaction();
                 } else {
                     commands
-                        .entity(panel.title_container)
-                        .remove::<(TrackedInteraction, Draggable)>();
+                        .style(panel.title_container)
+                        .disable_flux_interaction();
                 }
             } else {
                 commands.style(panel.drag_handle).render(config.draggable);
@@ -331,6 +334,16 @@ fn update_panel_layout(
                     true => "sickle://icons/chevron_right.png",
                     false => "sickle://icons/chevron_down.png",
                 });
+
+            if let Ok(children) = q_children.get(panel.content_inner) {
+                for child in children {
+                    if let Ok(mut panel) = q_panel.get_mut(*child) {
+                        if panel.visible == config.folded {
+                            panel.visible = !config.folded;
+                        }
+                    }
+                }
+            }
         }
 
         let render_resize_handles = !config.folded && config.resizable && !panel.moving;
@@ -536,6 +549,10 @@ impl Default for FloatingPanel {
 impl FloatingPanel {
     pub fn content_container_id(&self) -> Entity {
         self.content_inner
+    }
+
+    pub fn title_container_id(&self) -> Entity {
+        self.title_container
     }
 
     fn base_tween() -> AnimationConfig {
@@ -752,6 +769,8 @@ impl<'w, 's> UiFloatingPanelExt<'w, 's> for UiBuilder<'w, 's, '_> {
                 (
                     FloatingPanel::title_container(),
                     FloatingPanelTitle { panel },
+                    TrackedInteraction::default(),
+                    Draggable::default(),
                 ),
                 |container| {
                     fold_button = container

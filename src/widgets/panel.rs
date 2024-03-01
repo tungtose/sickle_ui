@@ -8,11 +8,15 @@ use super::prelude::UiContainerExt;
 #[reflect(Component)]
 pub struct Panel {
     title: String,
+    pub visible: bool,
 }
 
 impl Default for Panel {
     fn default() -> Self {
-        Self { title: "".into() }
+        Self {
+            title: "".into(),
+            visible: true,
+        }
     }
 }
 
@@ -48,6 +52,9 @@ impl<'w, 's> UiPanelExt<'w, 's> for UiBuilder<'w, 's, '_> {
         title: String,
         spawn_children: impl FnOnce(&mut UiBuilder),
     ) -> UiBuilder<'w, 's, 'a> {
-        self.container((Panel::frame(), Panel { title }), spawn_children)
+        self.container(
+            (Panel::frame(), Panel { title, ..default() }),
+            spawn_children,
+        )
     }
 }

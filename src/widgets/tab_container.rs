@@ -1,19 +1,30 @@
-use bevy::prelude::*;
+use bevy::{
+    ecs::system::{Command, CommandQueue},
+    prelude::*,
+};
+use sickle_math::ease::Ease;
 
 use crate::{
+    animated_interaction::{AnimatedInteraction, AnimationConfig},
     drag_interaction::{DragState, Draggable, DraggableUpdate},
+    interactions::InteractiveBackground,
     ui_builder::{UiBuilder, UiBuilderExt},
     ui_style::{
-        SetBackgroundColorExt, SetNodeLeftExt, SetNodePositionTypeExt, SetNodeShowHideExt,
-        SetZIndexExt, UiStyleExt,
+        SetBackgroundColorExt, SetFluxInteractionExt, SetNodeLeftExt, SetNodePositionTypeExt,
+        SetNodeShowHideExt, SetZIndexExt, UiStyleExt,
     },
-    TrackedInteraction,
+    FluxInteraction, PrevInteraction, TrackedInteraction,
 };
 
 use super::{
-    floating_panel::FloatingPanelUpdate,
+    context_menu::ContextMenuUpdate,
+    floating_panel::{FloatingPanel, FloatingPanelUpdate},
     panel::Panel,
-    prelude::{LabelConfig, UiContainerExt, UiLabelExt, UiScrollViewExt},
+    prelude::{
+        ContextMenuGenerator, FloatingPanelConfig, FloatingPanelLayout, GenerateContextMenu,
+        LabelConfig, MenuItem, MenuItemConfig, MenuItemUpdate, ReflectContextMenuGenerator,
+        UiContainerExt, UiFloatingPanelExt, UiLabelExt, UiMenuItemExt, UiScrollViewExt,
+    },
 };
 
 pub struct TabContainerPlugin;
@@ -25,6 +36,17 @@ impl Plugin for TabContainerPlugin {
             TabContainerUpdate
                 .after(DraggableUpdate)
                 .before(FloatingPanelUpdate),
+        )
+        .register_type::<Tab>()
+        .add_systems(
+            Update,
+            (
+                close_tab_on_context_menu_press,
+                popout_tab_on_context_menu_press,
+            )
+                .after(MenuItemUpdate)
+                .before(ContextMenuUpdate)
+                .before(TabContainerUpdate),
         )
         .add_systems(
             Update,
@@ -45,6 +67,61 @@ impl Plugin for TabContainerPlugin {
 #[derive(SystemSet, Clone, Eq, Debug, Hash, PartialEq)]
 pub struct TabContainerUpdate;
 
+fn close_tab_on_context_menu_press(
+    q_menu_items: Query<(Entity, &CloseTabContextMenu, &MenuItem), Changed<MenuItem>>,
+    q_tab: Query<&Tab>,
+    mut commands: Commands,
+) {
+    for (entity, tab_ref, menu_item) in &q_menu_items {
+        if menu_item.interacted() {
+            let Ok(tab) = q_tab.get(tab_ref.tab) else {
+                warn!(
+                    "Context menu tab reference {:?} refers to missing tab {:?}",
+                    entity, tab_ref.tab
+                );
+                continue;
+            };
+
+            commands.entity(tab.panel).despawn_recursive();
+        }
+    }
+}
+
+fn popout_tab_on_context_menu_press(
+    q_menu_items: Query<(Entity, &PopoutTabContextMenu, &MenuItem), Changed<MenuItem>>,
+    q_tab: Query<(&Tab, &GlobalTransform)>,
+    q_node: Query<&Node>,
+    mut commands: Commands,
+) {
+    for (entity, tab_ref, menu_item) in &q_menu_items {
+        if menu_item.interacted() {
+            let Ok((tab, transform)) = q_tab.get(tab_ref.tab) else {
+                warn!(
+                    "Context menu tab reference {:?} refers to missing tab {:?}",
+                    entity, tab_ref.tab
+                );
+                continue;
+            };
+
+            let Ok(container) = q_node.get(tab.container) else {
+                warn!(
+                    "Context menu tab reference {:?} refers to a tab without a container {:?}",
+                    entity, tab_ref.tab
+                );
+                continue;
+            };
+
+            let size = container.size() * 0.8;
+            let position = transform.translation().truncate();
+            commands.add(PopoutPanelFromTabContainer {
+                tab: tab_ref.tab,
+                size,
+                position,
+            });
+        }
+    }
+}
+
 fn process_tab_container_content_change(
     q_tab_containers: Query<(&TabContainer, &Children), Changed<Children>>,
     q_panel: Query<Entity, With<Panel>>,
@@ -60,6 +137,9 @@ fn process_tab_container_content_change(
         }
     }
 }
+
+// TODO: Handle removed children
+// TODO: Optionally destroy docking zone when tab container empties out
 
 fn process_tab_viewport_content_change(
     q_tab_viewports: Query<(Entity, &TabViewport, &Children), Changed<Children>>,
@@ -79,12 +159,7 @@ fn process_tab_viewport_content_change(
             if let Ok(tab_bar_children) = q_children.get(tab_container.bar) {
                 tab_bar_children
                     .iter()
-                    .filter(|child| {
-                        if let Ok(_) = q_tab.get(**child) {
-                            return true;
-                        }
-                        false
-                    })
+                    .filter(|child| q_tab.get(**child).is_ok())
                     .map(|child| (*child, q_tab.get(*child).unwrap().panel))
                     .collect()
             } else {
@@ -93,12 +168,7 @@ fn process_tab_viewport_content_change(
 
         let panels: Vec<(Entity, &Panel)> = children
             .iter()
-            .filter(|child| {
-                if let Ok(_) = q_panel.get(**child) {
-                    return true;
-                }
-                false
-            })
+            .filter(|child| q_panel.get(**child).is_ok())
             .map(|child| (*child, q_panel.get(*child).unwrap()))
             .collect();
 
@@ -173,7 +243,11 @@ fn constrain_tab_container_active_tab(
         }
 
         if container.active >= tab_count {
-            container.active = tab_count - 1;
+            if tab_count > 0 {
+                container.active = tab_count - 1;
+            } else {
+                container.active = 0;
+            }
         }
     }
 }
@@ -182,6 +256,7 @@ fn update_tab_container_on_change(
     q_tab_containers: Query<&TabContainer, Changed<TabContainer>>,
     q_tab: Query<(Entity, &Tab), With<Tab>>,
     q_children: Query<&Children>,
+    mut q_panel: Query<&mut Panel>,
     mut commands: Commands,
 ) {
     for tab_container in &q_tab_containers {
@@ -189,14 +264,33 @@ fn update_tab_container_on_change(
             continue;
         };
 
+        let flux_enabled = tabs.iter().filter(|tab| q_tab.get(**tab).is_ok()).count() > 1;
         for (i, id) in tabs.iter().enumerate() {
             if let Ok((tab_entity, tab)) = q_tab.get(*id) {
+                commands
+                    .style(tab_entity)
+                    .flux_interaction_enabled(flux_enabled);
+
                 if i == tab_container.active {
                     commands.style(tab_entity).background_color(Color::GRAY);
                     commands.style(tab.panel).show();
+
+                    let Ok(mut panel) = q_panel.get_mut(tab.panel) else {
+                        continue;
+                    };
+                    if !panel.visible {
+                        panel.visible = true;
+                    }
                 } else {
                     commands.style(tab_entity).background_color(Color::NONE);
                     commands.style(tab.panel).hide();
+
+                    let Ok(mut panel) = q_panel.get_mut(tab.panel) else {
+                        continue;
+                    };
+                    if panel.visible {
+                        panel.visible = false;
+                    }
                 }
             }
         }
@@ -230,10 +324,24 @@ fn handle_tab_dragging(
             continue;
         };
 
-        let bar_half_width = bar_node.size().x / 2.;
+        if children
+            .iter()
+            .filter(|child| q_tab.get(**child).is_ok())
+            .count()
+            < 2
+        {
+            continue;
+        }
 
+        let bar_half_width = bar_node.size().x / 2.;
         match draggable.state {
             DragState::DragStart => {
+                children.iter().for_each(|child| {
+                    if *child != entity && q_tab.get(*child).is_ok() {
+                        commands.style(*child).disable_flux_interaction();
+                    }
+                });
+
                 let Some(tab_index) = children
                     .iter()
                     .filter(|child| q_tab.get(**child).is_ok())
@@ -338,6 +446,12 @@ fn handle_tab_dragging(
                     .left(Val::Px(left));
             }
             DragState::DragEnd => {
+                children.iter().for_each(|child| {
+                    if *child != entity && q_tab.get(*child).is_ok() {
+                        commands.style(*child).enable_flux_interaction();
+                    }
+                });
+
                 let Some(placeholder) = tab.placeholder else {
                     warn!("Tab {:?} missing placeholder", entity);
                     continue;
@@ -370,6 +484,12 @@ fn handle_tab_dragging(
                 tab.original_index = None;
             }
             DragState::DragCanceled => {
+                children.iter().for_each(|child| {
+                    if *child != entity && q_tab.get(*child).is_ok() {
+                        commands.style(*child).enable_flux_interaction();
+                    }
+                });
+
                 let Some(placeholder) = tab.placeholder else {
                     warn!("Tab {:?} missing placeholder", entity);
                     continue;
@@ -383,11 +503,11 @@ fn handle_tab_dragging(
                     .left(Val::Auto)
                     .z_index(ZIndex::Local(0));
 
+                commands.entity(placeholder).despawn_recursive();
+
                 commands
                     .entity(container.bar)
                     .insert_children(original_index, &[entity]);
-
-                commands.entity(placeholder).despawn_recursive();
 
                 let mut tab = q_tab.get_mut(entity).unwrap();
                 tab.placeholder = None;
@@ -400,6 +520,34 @@ fn handle_tab_dragging(
 
 #[derive(Component, Debug, Reflect)]
 #[reflect(Component)]
+pub struct CloseTabContextMenu {
+    tab: Entity,
+}
+
+impl Default for CloseTabContextMenu {
+    fn default() -> Self {
+        Self {
+            tab: Entity::PLACEHOLDER,
+        }
+    }
+}
+
+#[derive(Component, Debug, Reflect)]
+#[reflect(Component)]
+pub struct PopoutTabContextMenu {
+    tab: Entity,
+}
+
+impl Default for PopoutTabContextMenu {
+    fn default() -> Self {
+        Self {
+            tab: Entity::PLACEHOLDER,
+        }
+    }
+}
+
+#[derive(Component, Debug, Reflect)]
+#[reflect(Component, ContextMenuGenerator)]
 pub struct Tab {
     container: Entity,
     panel: Entity,
@@ -415,6 +563,104 @@ impl Default for Tab {
             placeholder: None,
             original_index: None,
         }
+    }
+}
+
+impl ContextMenuGenerator for Tab {
+    fn build_context_menu(&self, context: Entity, container: &mut UiBuilder) {
+        container
+            .menu_item(MenuItemConfig {
+                name: "Close Tab".into(),
+                ..default()
+            })
+            .insert(CloseTabContextMenu { tab: context });
+        container
+            .menu_item(MenuItemConfig {
+                name: "Popout Tab".into(),
+                ..default()
+            })
+            .insert(PopoutTabContextMenu { tab: context });
+    }
+
+    fn placement_index(&self) -> usize {
+        0
+    }
+}
+
+struct PopoutPanelFromTabContainer {
+    tab: Entity,
+    size: Vec2,
+    position: Vec2,
+}
+
+impl Command for PopoutPanelFromTabContainer {
+    fn apply(self, world: &mut World) {
+        let Ok(tab) = world.query::<&Tab>().get(world, self.tab) else {
+            warn!("Cannot pop out panel from tab {:?}: Not a Tab", self.tab);
+            return;
+        };
+
+        let panel_id = tab.panel;
+        let Ok(panel) = world.query::<&Panel>().get(world, panel_id) else {
+            warn!("Cannot pop out panel {:?}: Not a Panel", panel_id);
+            return;
+        };
+
+        let title = panel.title();
+        let mut queue = CommandQueue::default();
+        let mut commands = Commands::new(&mut queue, world);
+
+        let mut container_id = Entity::PLACEHOLDER;
+        let floating_panel_id = commands
+            .ui_builder(None)
+            .floating_panel(
+                FloatingPanelConfig {
+                    title: title.into(),
+                    ..default()
+                },
+                FloatingPanelLayout {
+                    size: self.size,
+                    position: self.position.into(),
+                    droppable: true,
+                    ..default()
+                },
+                |container| {
+                    container_id = container.id();
+                },
+            )
+            .id();
+
+        commands.entity(panel_id).set_parent(container_id);
+        commands.entity(self.tab).despawn_recursive();
+        queue.apply(world);
+
+        let Ok(floating_panel) = world
+            .query::<&FloatingPanel>()
+            .get(world, floating_panel_id)
+        else {
+            error!(
+                "Cannot find newly created floating panel {:?}",
+                floating_panel_id
+            );
+            return;
+        };
+
+        let panel_title = floating_panel.title_container_id();
+        let Ok((prev, flux, draggable, interaction)) = world
+            .query::<(&PrevInteraction, &FluxInteraction, &Draggable, &Interaction)>()
+            .get(world, self.tab)
+        else {
+            warn!("Failed to copy interaction states from {:?}", self.tab);
+            return;
+        };
+
+        let bundle = (
+            prev.clone(),
+            flux.clone(),
+            draggable.clone(),
+            interaction.clone(),
+        );
+        world.entity_mut(panel_title).insert(bundle);
     }
 }
 
@@ -481,6 +727,14 @@ impl TabContainer {
 }
 
 impl TabContainer {
+    fn base_tween() -> AnimationConfig {
+        AnimationConfig {
+            duration: 0.1,
+            easing: Ease::OutExpo,
+            ..default()
+        }
+    }
+
     fn frame() -> impl Bundle {
         (
             NodeBundle {
@@ -525,7 +779,16 @@ impl TabContainer {
             },
             Interaction::default(),
             TrackedInteraction::default(),
+            InteractiveBackground {
+                highlight: Color::rgba(0.9, 0.8, 0.7, 0.5).into(),
+                ..default()
+            },
+            AnimatedInteraction::<InteractiveBackground> {
+                tween: TabContainer::base_tween(),
+                ..default()
+            },
             Draggable::default(),
+            GenerateContextMenu::default(),
         )
     }
 }

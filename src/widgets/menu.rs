@@ -201,7 +201,7 @@ impl Menu {
             },
             TrackedInteraction::default(),
             InteractiveBackground {
-                highlight: Color::rgba(9., 8., 7., 0.5).into(),
+                highlight: Color::rgba(0.9, 0.8, 0.7, 0.5).into(),
                 ..default()
             },
             AnimatedInteraction::<InteractiveBackground> {
