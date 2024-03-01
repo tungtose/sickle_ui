@@ -208,11 +208,12 @@ fn handle_tab_dragging(
     q_tab_container: Query<&TabContainer>,
     q_tab_bar: Query<(&Interaction, &Node), With<TabBar>>,
     q_children: Query<&Children>,
-    mut q_tab: Query<(&mut Tab, &Transform)>,
+    q_transform: Query<(&GlobalTransform, &Interaction)>,
+    mut q_tab: Query<&mut Tab>,
     mut commands: Commands,
 ) {
     for (entity, draggable, node, transform) in &q_tabs {
-        let (tab, _) = q_tab.get(entity).unwrap();
+        let tab = q_tab.get(entity).unwrap();
 
         let Ok(container) = q_tab_container.get(tab.container) else {
             warn!("Tried to drag orphan Tab {:?}", entity);
@@ -268,12 +269,15 @@ fn handle_tab_dragging(
                     .left(Val::Px(left))
                     .z_index(ZIndex::Local(100));
 
-                let (mut tab, _) = q_tab.get_mut(entity).unwrap();
+                let mut tab = q_tab.get_mut(entity).unwrap();
                 tab.placeholder = placeholder.into();
                 tab.original_index = tab_index.into();
             }
             DragState::Dragging => {
                 let Some(diff) = draggable.diff else {
+                    continue;
+                };
+                let Some(position) = draggable.position else {
                     continue;
                 };
 
@@ -284,30 +288,49 @@ fn handle_tab_dragging(
 
                 let new_x = transform.translation.truncate().x + diff.x + bar_half_width;
                 let left = new_x - (node.size().x / 2.);
-                // TODO: Use GlobalTransform and cursor position to calculate split
-                let children_before = children
-                    .iter()
-                    .filter(|child| {
-                        if **child == entity {
-                            return true;
+                let mut new_index: Option<usize> = None;
+                let mut placeholder_index = children.len();
+                for (i, child) in children.iter().enumerate() {
+                    if *child == entity {
+                        continue;
+                    }
+                    if *child == placeholder {
+                        placeholder_index = i;
+                        continue;
+                    }
+                    let Ok(_) = q_tab.get(entity) else {
+                        continue;
+                    };
+                    let Ok((transform, interaction)) = q_transform.get(*child) else {
+                        continue;
+                    };
+
+                    if *interaction == Interaction::Hovered {
+                        if position.x < transform.translation().truncate().x {
+                            if i < placeholder_index {
+                                new_index = i.into();
+                            } else {
+                                // placeholder is between 0 and children.len or less
+                                new_index = (i - 1).into();
+                            }
+                        } else {
+                            if i + 1 < placeholder_index {
+                                new_index = (i + 1).into();
+                            } else {
+                                // placeholder is between 0 and children.len or less
+                                new_index = i.into();
+                            }
                         }
-                        let Ok((_, transform)) = q_tab.get(**child) else {
-                            return true;
-                        };
 
-                        (transform.translation.x + bar_half_width) < new_x
-                    })
-                    .count();
+                        break;
+                    }
+                }
 
-                let new_index = if children_before == 0 {
-                    0
-                } else {
-                    children_before - 1
-                };
-
-                commands
-                    .entity(container.bar)
-                    .insert_children(new_index, &[placeholder]);
+                if let Some(new_index) = new_index {
+                    commands
+                        .entity(container.bar)
+                        .insert_children(new_index, &[placeholder]);
+                }
 
                 commands
                     .ui_builder(entity.into())
@@ -342,7 +365,7 @@ fn handle_tab_dragging(
 
                 commands.entity(placeholder).despawn_recursive();
 
-                let (mut tab, _) = q_tab.get_mut(entity).unwrap();
+                let mut tab = q_tab.get_mut(entity).unwrap();
                 tab.placeholder = None;
                 tab.original_index = None;
             }
@@ -366,7 +389,7 @@ fn handle_tab_dragging(
 
                 commands.entity(placeholder).despawn_recursive();
 
-                let (mut tab, _) = q_tab.get_mut(entity).unwrap();
+                let mut tab = q_tab.get_mut(entity).unwrap();
                 tab.placeholder = None;
                 tab.original_index = None;
             }
