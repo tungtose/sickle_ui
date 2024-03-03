@@ -1,8 +1,8 @@
 use bevy::{
     ecs::system::{Command, CommandQueue},
     prelude::*,
+    ui::UiSystem,
 };
-use floating_panel::FloatingPanelConfig;
 
 use crate::{
     drag_interaction::{DragState, Draggable},
@@ -15,15 +15,15 @@ use crate::{
 };
 
 use super::{
-    floating_panel::{self, FloatingPanel, FloatingPanelTitle},
+    floating_panel::{FloatingPanel, FloatingPanelConfig, FloatingPanelTitle},
     panel::Panel,
     prelude::{SizedZoneConfig, UiPanelExt, UiSizedZoneExt, UiTabContainerExt},
     sized_zone::{SizedZone, SizedZoneResizeHandleContainer},
-    tab_container::{TabBar, TabContainer},
+    tab_container::{Tab, TabBar, TabContainer},
 };
 
 pub struct DockingZonePlugin;
-
+// TODO: Un-split docking zones once there is only one child
 impl Plugin for DockingZonePlugin {
     fn build(&self, app: &mut App) {
         app.configure_sets(Update, DockingZoneUpdate.after(DroppableUpdate))
@@ -34,12 +34,50 @@ impl Plugin for DockingZonePlugin {
                     handle_docking_zone_drop_zone_change,
                 )
                     .in_set(DockingZoneUpdate),
+            )
+            .add_systems(
+                PostUpdate,
+                remove_empty_docking_zones
+                    .run_if(should_process_empty_docking_zones)
+                    .after(UiSystem::Layout),
             );
     }
 }
 
 #[derive(SystemSet, Clone, Eq, Debug, Hash, PartialEq)]
 pub struct DockingZoneUpdate;
+
+fn should_process_empty_docking_zones(q_removed_tabs: RemovedComponents<Tab>) -> bool {
+    q_removed_tabs.len() > 0
+}
+
+fn remove_empty_docking_zones(
+    q_empty_tab_bars: Query<&TabBar, Without<Children>>,
+    q_tab_bars: Query<(&TabBar, &Children)>,
+    q_tab: Query<&Tab>,
+    q_tab_container_to_remove: Query<&RemoveEmptyDockingZone>,
+    mut commands: Commands,
+) {
+    for tab_bar in &q_empty_tab_bars {
+        let Ok(to_remove) = q_tab_container_to_remove.get(tab_bar.container_id()) else {
+            continue;
+        };
+
+        commands.entity(to_remove.zone).despawn_recursive();
+    }
+
+    for (tab_bar, children) in &q_tab_bars {
+        let Ok(to_remove) = q_tab_container_to_remove.get(tab_bar.container_id()) else {
+            continue;
+        };
+
+        if children.iter().any(|child| q_tab.get(*child).is_ok()) {
+            continue;
+        }
+
+        commands.entity(to_remove.zone).despawn_recursive();
+    }
+}
 
 fn should_update_resize_handles(
     q_accepted_types: Query<&Draggable, (With<FloatingPanelTitle>, Changed<Draggable>)>,
@@ -308,6 +346,7 @@ impl Command for DockingZoneSplit {
                     min_size: current_min_size,
                     ..default()
                 },
+                self.panel_to_dock.is_some(),
                 |tab_container| {
                     new_container = tab_container.id();
                 },
@@ -458,6 +497,20 @@ impl Default for DockingZoneHighlight {
     }
 }
 
+#[derive(Component, Debug, Reflect)]
+#[reflect(Component)]
+pub struct RemoveEmptyDockingZone {
+    zone: Entity,
+}
+
+impl Default for RemoveEmptyDockingZone {
+    fn default() -> Self {
+        Self {
+            zone: Entity::PLACEHOLDER,
+        }
+    }
+}
+
 impl DockingZone {
     fn zone_highlight() -> impl Bundle {
         NodeBundle {
@@ -478,6 +531,7 @@ pub trait UiDockingZoneExt<'w, 's> {
     fn docking_zone<'a>(
         &'a mut self,
         config: SizedZoneConfig,
+        remove_empty: bool,
         spawn_children: impl FnOnce(&mut UiBuilder),
     ) -> UiBuilder<'w, 's, 'a>;
 }
@@ -486,6 +540,7 @@ impl<'w, 's> UiDockingZoneExt<'w, 's> for UiBuilder<'w, 's, '_> {
     fn docking_zone<'a>(
         &'a mut self,
         config: SizedZoneConfig,
+        remove_empty: bool,
         spawn_children: impl FnOnce(&mut UiBuilder),
     ) -> UiBuilder<'w, 's, 'a> {
         let mut tab_container = Entity::PLACEHOLDER;
@@ -493,7 +548,13 @@ impl<'w, 's> UiDockingZoneExt<'w, 's> for UiBuilder<'w, 's, '_> {
 
         let mut docking_zone = self.sized_zone(config, |zone| {
             let zone_id = zone.id();
-            tab_container = zone.tab_container(spawn_children).id();
+
+            let mut new_tab_container = zone.tab_container(spawn_children);
+            if remove_empty {
+                new_tab_container.insert(RemoveEmptyDockingZone { zone: zone_id });
+            }
+            tab_container = new_tab_container.id();
+
             zone_highlight = zone
                 .spawn((
                     DockingZone::zone_highlight(),

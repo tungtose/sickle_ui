@@ -51,6 +51,9 @@ impl Plugin for TabContainerPlugin {
         .add_systems(
             Update,
             (
+                apply_deferred,
+                process_tab_viewport_content_removed
+                    .run_if(should_process_tab_viewport_content_removed),
                 process_tab_container_content_change,
                 process_tab_viewport_content_change,
                 update_tab_container_on_press,
@@ -122,6 +125,36 @@ fn popout_tab_on_context_menu_press(
     }
 }
 
+fn should_process_tab_viewport_content_removed(
+    q_removed_children: RemovedComponents<Children>,
+) -> bool {
+    q_removed_children.len() > 0
+}
+
+fn process_tab_viewport_content_removed(
+    q_tab_viewports: Query<(Entity, &TabViewport), Without<Children>>,
+    q_tab_container: Query<&TabContainer>,
+    q_children: Query<&Children>,
+    q_tab: Query<&Tab>,
+    mut commands: Commands,
+) {
+    for (entity, viewport) in &q_tab_viewports {
+        let Ok(tab_container) = q_tab_container.get(viewport.container) else {
+            error!("Missing tab container for viewport {:?}", entity);
+            continue;
+        };
+
+        let Ok(tab_bar_children) = q_children.get(tab_container.bar) else {
+            continue;
+        };
+
+        tab_bar_children
+            .iter()
+            .filter(|child| q_tab.get(**child).is_ok())
+            .for_each(|child| commands.entity(*child).despawn_recursive());
+    }
+}
+
 fn process_tab_container_content_change(
     q_tab_containers: Query<(&TabContainer, &Children), Changed<Children>>,
     q_panel: Query<Entity, With<Panel>>,
@@ -137,9 +170,6 @@ fn process_tab_container_content_change(
         }
     }
 }
-
-// TODO: Handle removed children
-// TODO: Optionally destroy docking zone when tab container empties out
 
 fn process_tab_viewport_content_change(
     q_tab_viewports: Query<(Entity, &TabViewport, &Children), Changed<Children>>,
@@ -599,20 +629,41 @@ impl Command for PopoutPanelFromTabContainer {
             warn!("Cannot pop out panel from tab {:?}: Not a Tab", self.tab);
             return;
         };
+        let tab_contaier_id = tab.container;
 
         let panel_id = tab.panel;
         let Ok(panel) = world.query::<&Panel>().get(world, panel_id) else {
             warn!("Cannot pop out panel {:?}: Not a Panel", panel_id);
             return;
         };
-
         let title = panel.title();
+
+        let Ok((prev, flux, draggable, interaction)) = world
+            .query::<(&PrevInteraction, &FluxInteraction, &Draggable, &Interaction)>()
+            .get(world, self.tab)
+        else {
+            warn!("Failed to copy interaction states from {:?}", self.tab);
+            return;
+        };
+
+        let bundle = (
+            prev.clone(),
+            flux.clone(),
+            draggable.clone(),
+            interaction.clone(),
+        );
+
+        let mut root_node = tab_contaier_id;
+        while let Ok(parent) = world.query::<&Parent>().get(world, root_node) {
+            root_node = parent.get();
+        }
+
         let mut queue = CommandQueue::default();
         let mut commands = Commands::new(&mut queue, world);
 
         let mut container_id = Entity::PLACEHOLDER;
         let floating_panel_id = commands
-            .ui_builder(None)
+            .ui_builder(root_node.into())
             .floating_panel(
                 FloatingPanelConfig {
                     title: title.into(),
@@ -646,20 +697,6 @@ impl Command for PopoutPanelFromTabContainer {
         };
 
         let panel_title = floating_panel.title_container_id();
-        let Ok((prev, flux, draggable, interaction)) = world
-            .query::<(&PrevInteraction, &FluxInteraction, &Draggable, &Interaction)>()
-            .get(world, self.tab)
-        else {
-            warn!("Failed to copy interaction states from {:?}", self.tab);
-            return;
-        };
-
-        let bundle = (
-            prev.clone(),
-            flux.clone(),
-            draggable.clone(),
-            interaction.clone(),
-        );
         world.entity_mut(panel_title).insert(bundle);
     }
 }
@@ -675,6 +712,12 @@ impl Default for TabBar {
         Self {
             container: Entity::PLACEHOLDER,
         }
+    }
+}
+
+impl TabBar {
+    pub fn container_id(&self) -> Entity {
+        self.container
     }
 }
 

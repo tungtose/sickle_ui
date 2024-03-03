@@ -55,6 +55,9 @@ impl Plugin for FloatingPanelPlugin {
 #[derive(SystemSet, Clone, Eq, Debug, Hash, PartialEq)]
 pub struct FloatingPanelUpdate;
 
+// TODO: Disable resizing when a panel is dragged or resized
+// TODO: Fix dropzone bug
+
 fn panel_added(q_panels: Query<Entity, Added<FloatingPanel>>) -> bool {
     q_panels.iter().count() > 0
 }

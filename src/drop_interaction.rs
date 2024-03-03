@@ -14,9 +14,10 @@ impl Plugin for DropInteractionPlugin {
 #[derive(SystemSet, Clone, Eq, Debug, Hash, PartialEq)]
 pub struct DroppableUpdate;
 
+// TODO: Use node stack index to only interact with the topmost zone
 fn update_drop_zones(
     q_droppables: Query<(Entity, &Draggable), (With<Droppable>, Changed<Draggable>)>,
-    mut q_drop_zones: Query<(Ref<Interaction>, &mut DropZone)>,
+    mut q_drop_zones: Query<(Ref<Interaction>, &mut DropZone, &Node)>,
 ) {
     if !q_droppables
         .iter()
@@ -25,7 +26,7 @@ fn update_drop_zones(
         return;
     }
 
-    for (interaction, mut drop_zone) in &mut q_drop_zones {
+    for (interaction, mut drop_zone, _) in &mut q_drop_zones {
         if drop_zone.drop_phase == DropPhase::Dropped
             || drop_zone.drop_phase == DropPhase::DropCanceled
         {
@@ -55,7 +56,7 @@ fn update_drop_zones(
         }
 
         if draggable.state == DragState::DragStart || draggable.state == DragState::Dragging {
-            for (interaction, mut drop_zone) in &mut q_drop_zones {
+            for (interaction, mut drop_zone, _) in &mut q_drop_zones {
                 if interaction.is_changed() {
                     if *interaction == Interaction::Hovered {
                         drop_zone.drop_phase = DropPhase::DroppableEntered;
@@ -75,15 +76,24 @@ fn update_drop_zones(
                 }
             }
         } else if draggable.state == DragState::DragEnd {
-            for (interaction, mut drop_zone) in &mut q_drop_zones {
+            let mut dropped = false;
+            for (interaction, mut drop_zone, _) in &mut q_drop_zones {
                 if *interaction == Interaction::Hovered {
-                    drop_zone.drop_phase = DropPhase::Dropped;
-                    drop_zone.incoming_droppable = entity.into();
-                    drop_zone.position = draggable.position;
+                    if !dropped {
+                        drop_zone.drop_phase = DropPhase::Dropped;
+                        drop_zone.incoming_droppable = entity.into();
+                        drop_zone.position = draggable.position;
+                        // An entity can be dropped on one drop zone only
+                        dropped = true;
+                    } else {
+                        drop_zone.drop_phase = DropPhase::DroppableLeft;
+                        drop_zone.incoming_droppable = None;
+                        drop_zone.position = None;
+                    }
                 }
             }
         } else {
-            for (interaction, mut drop_zone) in &mut q_drop_zones {
+            for (interaction, mut drop_zone, _) in &mut q_drop_zones {
                 if *interaction == Interaction::Hovered {
                     drop_zone.drop_phase = DropPhase::DropCanceled;
                     drop_zone.incoming_droppable = None;

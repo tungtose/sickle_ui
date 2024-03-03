@@ -47,9 +47,9 @@ pub struct SizedZonePreUpdate;
 
 fn did_add_or_remove_sized_zone(
     q_added_zones: Query<Entity, Added<SizedZone>>,
-    mut q_removed_zones: RemovedComponents<SizedZone>,
+    q_removed_zones: RemovedComponents<SizedZone>,
 ) -> bool {
-    q_added_zones.iter().count() > 0 || q_removed_zones.read().count() > 0
+    q_added_zones.iter().count() > 0 || q_removed_zones.len() > 0
 }
 
 fn preset_sized_zone_flex_layout(
@@ -403,8 +403,9 @@ fn update_sized_zone_style(mut q_sized_zones: Query<(&SizedZone, &mut Style), Ch
 
 fn should_fit_sized_zones(
     q_changed_nodes: Query<Entity, (With<SizedZone>, Changed<Node>)>,
+    q_removed_zones: RemovedComponents<SizedZone>,
 ) -> bool {
-    q_changed_nodes.iter().count() > 0
+    q_changed_nodes.iter().count() > 0 || q_removed_zones.len() > 0
 }
 
 fn fit_sized_zones_on_window_resize(
