@@ -547,16 +547,16 @@ pub trait UiScrollViewExt<'w, 's> {
     fn scroll_view<'a>(
         &'a mut self,
         restrict_to: Option<ScrollAxis>,
-        spawn_children: impl FnOnce(&mut UiBuilder),
-    ) -> UiBuilder<'w, 's, 'a>;
+        spawn_children: impl FnOnce(&mut UiBuilder<Entity>),
+    ) -> UiBuilder<'w, 's, 'a, Entity>;
 }
 
-impl<'w, 's> UiScrollViewExt<'w, 's> for UiBuilder<'w, 's, '_> {
+impl<'w, 's> UiScrollViewExt<'w, 's> for UiBuilder<'w, 's, '_, Entity> {
     fn scroll_view<'a>(
         &'a mut self,
         restrict_to: Option<ScrollAxis>,
-        spawn_children: impl FnOnce(&mut UiBuilder),
-    ) -> UiBuilder<'w, 's, 'a> {
+        spawn_children: impl FnOnce(&mut UiBuilder<Entity>),
+    ) -> UiBuilder<'w, 's, 'a, Entity> {
         let mut viewport = Entity::PLACEHOLDER;
         let mut content_container = Entity::PLACEHOLDER;
         let mut horizontal_scroll_id: Option<Entity> = None;

@@ -26,11 +26,11 @@ impl Icon {
 }
 
 pub trait UiIconExt<'w, 's> {
-    fn icon<'a>(&'a mut self, path: impl Into<String>) -> UiBuilder<'w, 's, 'a>;
+    fn icon<'a>(&'a mut self, path: impl Into<String>) -> UiBuilder<'w, 's, 'a, Entity>;
 }
 
-impl<'w, 's> UiIconExt<'w, 's> for UiBuilder<'w, 's, '_> {
-    fn icon<'a>(&'a mut self, path: impl Into<String>) -> UiBuilder<'w, 's, 'a> {
+impl<'w, 's> UiIconExt<'w, 's> for UiBuilder<'w, 's, '_, Entity> {
+    fn icon<'a>(&'a mut self, path: impl Into<String>) -> UiBuilder<'w, 's, 'a, Entity> {
         let mut icon = self.spawn((Icon::bundle(), Icon));
 
         icon.style().image(path);

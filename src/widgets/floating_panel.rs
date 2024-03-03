@@ -509,7 +509,7 @@ impl FloatingPanelConfig {
     }
 }
 
-#[derive(Component, Debug, Reflect)]
+#[derive(Component, Clone, Copy, Debug, Reflect)]
 #[reflect(Component)]
 pub struct FloatingPanel {
     size: Vec2,
@@ -658,22 +658,28 @@ impl FloatingPanelLayout {
     }
 }
 
+// impl<'w, 's> UiBuilder<'w, 's, '_, FloatingPanel> {
+//     fn floating_panel<'a>(&'a mut self) -> UiBuilder<'w, 's, 'a, FloatingPanel> {
+//         self.commands().ui_builder(FloatingPanel::default())
+//     }
+// }
+
 pub trait UiFloatingPanelExt<'w, 's> {
     fn floating_panel<'a>(
         &'a mut self,
         config: FloatingPanelConfig,
         layout: FloatingPanelLayout,
-        spawn_children: impl FnOnce(&mut UiBuilder),
-    ) -> UiBuilder<'w, 's, 'a>;
+        spawn_children: impl FnOnce(&mut UiBuilder<Entity>),
+    ) -> UiBuilder<'w, 's, 'a, Entity>;
 }
 
-impl<'w, 's> UiFloatingPanelExt<'w, 's> for UiBuilder<'w, 's, '_> {
+impl<'w, 's> UiFloatingPanelExt<'w, 's> for UiBuilder<'w, 's, '_, Entity> {
     fn floating_panel<'a>(
         &'a mut self,
         config: FloatingPanelConfig,
         layout: FloatingPanelLayout,
-        spawn_children: impl FnOnce(&mut UiBuilder),
-    ) -> UiBuilder<'w, 's, 'a> {
+        spawn_children: impl FnOnce(&mut UiBuilder<Entity>),
+    ) -> UiBuilder<'w, 's, 'a, Entity> {
         let restrict_to = config.restrict_scroll;
 
         let mut vertical_resize_handles = Entity::PLACEHOLDER;

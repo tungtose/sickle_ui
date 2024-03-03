@@ -1,7 +1,7 @@
 use bevy::{ecs::system::CommandQueue, prelude::*, window::PrimaryWindow};
 
 use crate::{
-    ui_builder::{UiBuilder, UiBuilderExt},
+    ui_builder::{UiBuilder, UiBuilderExt, UiRoot},
     FluxInteractionUpdate,
 };
 
@@ -188,20 +188,18 @@ fn generate_context_menu(world: &mut World) {
     let mut commands = Commands::new(&mut queue, world);
 
     let container_id = commands
-        .ui_builder(None)
+        .ui_builder(UiRoot)
         .spawn((ContextMenu::frame(), ContextMenu { context: entity }))
         .id();
 
     let mut last_index = 0;
     for generator in generators {
         if generator.placement_index() > last_index + 1 {
-            commands
-                .ui_builder(container_id.into())
-                .menu_item_separator();
+            commands.ui_builder(container_id).menu_item_separator();
         }
         last_index = generator.placement_index();
 
-        generator.build_context_menu(entity, &mut commands.ui_builder(container_id.into()));
+        generator.build_context_menu(entity, &mut commands.ui_builder(container_id));
     }
 
     queue.apply(world);
@@ -289,7 +287,7 @@ pub struct ContextMenuUpdate;
 
 #[reflect_trait]
 pub trait ContextMenuGenerator {
-    fn build_context_menu(&self, context: Entity, container: &mut UiBuilder);
+    fn build_context_menu(&self, context: Entity, container: &mut UiBuilder<Entity>);
     fn placement_index(&self) -> usize;
 }
 

@@ -42,16 +42,16 @@ pub trait UiPanelExt<'w, 's> {
     fn panel<'a>(
         &'a mut self,
         title: String,
-        spawn_children: impl FnOnce(&mut UiBuilder),
-    ) -> UiBuilder<'w, 's, 'a>;
+        spawn_children: impl FnOnce(&mut UiBuilder<Entity>),
+    ) -> UiBuilder<'w, 's, 'a, Entity>;
 }
 
-impl<'w, 's> UiPanelExt<'w, 's> for UiBuilder<'w, 's, '_> {
+impl<'w, 's> UiPanelExt<'w, 's> for UiBuilder<'w, 's, '_, Entity> {
     fn panel<'a>(
         &'a mut self,
         title: String,
-        spawn_children: impl FnOnce(&mut UiBuilder),
-    ) -> UiBuilder<'w, 's, 'a> {
+        spawn_children: impl FnOnce(&mut UiBuilder<Entity>),
+    ) -> UiBuilder<'w, 's, 'a, Entity> {
         self.container(
             (Panel::frame(), Panel { title, ..default() }),
             spawn_children,

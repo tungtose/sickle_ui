@@ -24,15 +24,24 @@ impl Column {
 pub trait UiColumnExt<'w, 's> {
     fn column<'a>(
         &'a mut self,
-        spawn_children: impl FnOnce(&mut UiBuilder),
-    ) -> UiBuilder<'w, 's, 'a>;
+        spawn_children: impl FnOnce(&mut UiBuilder<Entity>),
+    ) -> UiBuilder<'w, 's, 'a, Entity>;
 }
 
-impl<'w, 's> UiColumnExt<'w, 's> for UiBuilder<'w, 's, '_> {
+impl<'w, 's> UiColumnExt<'w, 's> for UiBuilder<'w, 's, '_, UiRoot> {
     fn column<'a>(
         &'a mut self,
-        spawn_children: impl FnOnce(&mut UiBuilder),
-    ) -> UiBuilder<'w, 's, 'a> {
+        spawn_children: impl FnOnce(&mut UiBuilder<Entity>),
+    ) -> UiBuilder<'w, 's, 'a, Entity> {
+        self.container((Column::frame(), Column), spawn_children)
+    }
+}
+
+impl<'w, 's> UiColumnExt<'w, 's> for UiBuilder<'w, 's, '_, Entity> {
+    fn column<'a>(
+        &'a mut self,
+        spawn_children: impl FnOnce(&mut UiBuilder<Entity>),
+    ) -> UiBuilder<'w, 's, 'a, Entity> {
         self.container((Column::frame(), Column), spawn_children)
     }
 }

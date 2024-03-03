@@ -331,22 +331,22 @@ pub trait UiSubmenuExt<'w, 's> {
     fn submenu<'a>(
         &'a mut self,
         config: SubmenuConfig,
-        spawn_items: impl FnOnce(&mut UiBuilder),
-    ) -> UiBuilder<'w, 's, 'a>;
+        spawn_items: impl FnOnce(&mut UiBuilder<Entity>),
+    ) -> UiBuilder<'w, 's, 'a, Entity>;
 }
 
-impl<'w, 's> UiSubmenuExt<'w, 's> for UiBuilder<'w, 's, '_> {
+impl<'w, 's> UiSubmenuExt<'w, 's> for UiBuilder<'w, 's, '_, Entity> {
     fn submenu<'a>(
         &'a mut self,
         config: SubmenuConfig,
-        spawn_items: impl FnOnce(&mut UiBuilder),
-    ) -> UiBuilder<'w, 's, 'a> {
-        let external_container = self.entity();
+        spawn_items: impl FnOnce(&mut UiBuilder<Entity>),
+    ) -> UiBuilder<'w, 's, 'a, Entity> {
+        let external_container = Some(self.context());
 
         let menu_id = self.menu_item(config.clone().into()).id();
         let container = self
             .commands()
-            .ui_builder(menu_id.into())
+            .ui_builder(menu_id)
             .container(
                 (
                     SubmenuContainer::frame(),
@@ -360,7 +360,7 @@ impl<'w, 's> UiSubmenuExt<'w, 's> for UiBuilder<'w, 's, '_> {
             )
             .id();
 
-        self.commands().ui_builder(menu_id.into()).insert((
+        self.commands().ui_builder(menu_id).insert((
             Submenu {
                 container,
                 external_container,
@@ -369,6 +369,6 @@ impl<'w, 's> UiSubmenuExt<'w, 's> for UiBuilder<'w, 's, '_> {
             config,
         ));
 
-        self.commands().ui_builder(menu_id.into())
+        self.commands().ui_builder(menu_id)
     }
 }

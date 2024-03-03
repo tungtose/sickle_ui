@@ -22,11 +22,17 @@ impl Row {
 }
 
 pub trait UiRowExt<'w, 's> {
-    fn row<'a>(&'a mut self, spawn_children: impl FnOnce(&mut UiBuilder)) -> UiBuilder<'w, 's, 'a>;
+    fn row<'a>(&'a mut self, spawn_children: impl FnOnce(&mut UiBuilder<Entity>)) -> UiBuilder<'w, 's, 'a, Entity>;
 }
 
-impl<'w, 's> UiRowExt<'w, 's> for UiBuilder<'w, 's, '_> {
-    fn row<'a>(&'a mut self, spawn_children: impl FnOnce(&mut UiBuilder)) -> UiBuilder<'w, 's, 'a> {
+impl<'w, 's> UiRowExt<'w, 's> for UiBuilder<'w, 's, '_, UiRoot> {
+    fn row<'a>(&'a mut self, spawn_children: impl FnOnce(&mut UiBuilder<Entity>)) -> UiBuilder<'w, 's, 'a, Entity> {
+        self.container((Row::frame(), Row), spawn_children)
+    }
+}
+
+impl<'w, 's> UiRowExt<'w, 's> for UiBuilder<'w, 's, '_, Entity> {
+    fn row<'a>(&'a mut self, spawn_children: impl FnOnce(&mut UiBuilder<Entity>)) -> UiBuilder<'w, 's, 'a, Entity> {
         self.container((Row::frame(), Row), spawn_children)
     }
 }

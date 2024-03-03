@@ -321,7 +321,7 @@ impl Command for DockingZoneSplit {
 
         if inject_container {
             let new_parent_id = commands
-                .ui_builder(parent_id.into())
+                .ui_builder(parent_id)
                 .sized_zone(
                     SizedZoneConfig {
                         size: current_size,
@@ -339,7 +339,7 @@ impl Command for DockingZoneSplit {
         }
 
         let new_docking_zone_id = commands
-            .ui_builder(parent_id.into())
+            .ui_builder(parent_id)
             .docking_zone(
                 SizedZoneConfig {
                     size: new_container_size,
@@ -441,7 +441,7 @@ impl Command for MoveFloatingPanelToDockingZone {
 
         if panel_to_move == Entity::PLACEHOLDER {
             commands
-                .ui_builder(self.target_container_id.into())
+                .ui_builder(self.target_container_id)
                 .panel(title, |_| {})
                 .entity_commands()
                 .insert_children(0, &children_ids);
@@ -532,17 +532,17 @@ pub trait UiDockingZoneExt<'w, 's> {
         &'a mut self,
         config: SizedZoneConfig,
         remove_empty: bool,
-        spawn_children: impl FnOnce(&mut UiBuilder),
-    ) -> UiBuilder<'w, 's, 'a>;
+        spawn_children: impl FnOnce(&mut UiBuilder<Entity>),
+    ) -> UiBuilder<'w, 's, 'a, Entity>;
 }
 
-impl<'w, 's> UiDockingZoneExt<'w, 's> for UiBuilder<'w, 's, '_> {
+impl<'w, 's> UiDockingZoneExt<'w, 's> for UiBuilder<'w, 's, '_, Entity> {
     fn docking_zone<'a>(
         &'a mut self,
         config: SizedZoneConfig,
         remove_empty: bool,
-        spawn_children: impl FnOnce(&mut UiBuilder),
-    ) -> UiBuilder<'w, 's, 'a> {
+        spawn_children: impl FnOnce(&mut UiBuilder<Entity>),
+    ) -> UiBuilder<'w, 's, 'a, Entity> {
         let mut tab_container = Entity::PLACEHOLDER;
         let mut zone_highlight = Entity::PLACEHOLDER;
 

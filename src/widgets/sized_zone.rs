@@ -593,26 +593,22 @@ pub trait UiSizedZoneExt<'w, 's> {
     fn sized_zone<'a>(
         &'a mut self,
         config: SizedZoneConfig,
-        spawn_children: impl FnOnce(&mut UiBuilder),
-    ) -> UiBuilder<'w, 's, 'a>;
+        spawn_children: impl FnOnce(&mut UiBuilder<Entity>),
+    ) -> UiBuilder<'w, 's, 'a, Entity>;
 }
 
-impl<'w, 's> UiSizedZoneExt<'w, 's> for UiBuilder<'w, 's, '_> {
+impl<'w, 's> UiSizedZoneExt<'w, 's> for UiBuilder<'w, 's, '_, Entity> {
     fn sized_zone<'a>(
         &'a mut self,
         config: SizedZoneConfig,
-        spawn_children: impl FnOnce(&mut UiBuilder),
-    ) -> UiBuilder<'w, 's, 'a> {
+        spawn_children: impl FnOnce(&mut UiBuilder<Entity>),
+    ) -> UiBuilder<'w, 's, 'a, Entity> {
         let size = config.size.clamp(0., 100.);
         let min_size = config.min_size.max(MIN_SIZED_ZONE_SIZE);
         let mut left_handle = Entity::PLACEHOLDER;
         let mut right_handle = Entity::PLACEHOLDER;
         let mut top_handle = Entity::PLACEHOLDER;
         let mut bottom_handle = Entity::PLACEHOLDER;
-
-        if self.entity().is_none() {
-            warn!("Sized zone as root node is not supported!");
-        }
 
         let mut sized_zone = self.container(SizedZone::frame(), |container| {
             let zone_id = container.id();

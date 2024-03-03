@@ -241,16 +241,16 @@ pub trait UiMenuExt<'w, 's> {
     fn menu<'a>(
         &'a mut self,
         config: MenuConfig,
-        spawn_items: impl FnOnce(&mut UiBuilder),
-    ) -> UiBuilder<'w, 's, 'a>;
+        spawn_items: impl FnOnce(&mut UiBuilder<Entity>),
+    ) -> UiBuilder<'w, 's, 'a, Entity>;
 }
 
-impl<'w, 's> UiMenuExt<'w, 's> for UiBuilder<'w, 's, '_> {
+impl<'w, 's> UiMenuExt<'w, 's> for UiBuilder<'w, 's, '_, Entity> {
     fn menu<'a>(
         &'a mut self,
         config: MenuConfig,
-        spawn_items: impl FnOnce(&mut UiBuilder),
-    ) -> UiBuilder<'w, 's, 'a> {
+        spawn_items: impl FnOnce(&mut UiBuilder<Entity>),
+    ) -> UiBuilder<'w, 's, 'a, Entity> {
         let mut container = Entity::PLACEHOLDER;
         let mut menu = self.container(Menu::button(), |menu_button| {
             container = menu_button.container(Menu::container(), spawn_items).id();
@@ -292,11 +292,11 @@ impl MenuSeparator {
 }
 
 pub trait UiMenuSeparatorExt<'w, 's> {
-    fn menu_separator<'a>(&'a mut self) -> UiBuilder<'w, 's, 'a>;
+    fn menu_separator<'a>(&'a mut self) -> UiBuilder<'w, 's, 'a, Entity>;
 }
 
-impl<'w, 's> UiMenuSeparatorExt<'w, 's> for UiBuilder<'w, 's, '_> {
-    fn menu_separator<'a>(&'a mut self) -> UiBuilder<'w, 's, 'a> {
+impl<'w, 's> UiMenuSeparatorExt<'w, 's> for UiBuilder<'w, 's, '_, Entity> {
+    fn menu_separator<'a>(&'a mut self) -> UiBuilder<'w, 's, 'a, Entity> {
         self.spawn(MenuSeparator::separator())
     }
 }
@@ -321,11 +321,11 @@ impl MenuItemSeparator {
 }
 
 pub trait UiMenuItemSeparatorExt<'w, 's> {
-    fn menu_item_separator<'a>(&'a mut self) -> UiBuilder<'w, 's, 'a>;
+    fn menu_item_separator<'a>(&'a mut self) -> UiBuilder<'w, 's, 'a, Entity>;
 }
 
-impl<'w, 's> UiMenuItemSeparatorExt<'w, 's> for UiBuilder<'w, 's, '_> {
-    fn menu_item_separator<'a>(&'a mut self) -> UiBuilder<'w, 's, 'a> {
+impl<'w, 's> UiMenuItemSeparatorExt<'w, 's> for UiBuilder<'w, 's, '_, Entity> {
+    fn menu_item_separator<'a>(&'a mut self) -> UiBuilder<'w, 's, 'a, Entity> {
         self.spawn(MenuItemSeparator::separator())
     }
 }

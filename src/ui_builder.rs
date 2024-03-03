@@ -9,22 +9,35 @@ use bevy::{
 
 use crate::ui_style::{UiStyle, UiStyleExt};
 
-pub struct UiBuilder<'w, 's, 'a> {
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub struct UiRoot;
+
+pub struct UiBuilder<'w, 's, 'a, T> {
     commands: &'a mut Commands<'w, 's>,
-    entity: Option<Entity>,
+    context: T,
 }
 
-impl<'w, 's> UiBuilder<'w, 's, '_> {
-    pub fn id(&self) -> Entity {
-        self.entity.unwrap()
-    }
-
-    pub fn entity(&self) -> Option<Entity> {
-        self.entity
+impl<'w, 's, T: Copy> UiBuilder<'w, 's, '_, T> {
+    pub fn context(&self) -> T {
+        self.context
     }
 
     pub fn commands(&mut self) -> &mut Commands<'w, 's> {
         self.commands
+    }
+}
+
+impl<'w, 's> UiBuilder<'w, 's, '_, UiRoot> {
+    pub fn spawn<'a>(&'a mut self, bundle: impl Bundle) -> UiBuilder<'w, 's, 'a, Entity> {
+        let new_entity = self.commands().spawn(bundle).id();
+
+        self.commands().ui_builder(new_entity)
+    }
+}
+
+impl<'w, 's> UiBuilder<'w, 's, '_, Entity> {
+    pub fn id(&self) -> Entity {
+        self.context()
     }
 
     pub fn entity_commands(&mut self) -> EntityCommands<'_> {
@@ -37,18 +50,15 @@ impl<'w, 's> UiBuilder<'w, 's, '_> {
         self.commands().style(entity)
     }
 
-    pub fn spawn<'a>(&'a mut self, bundle: impl Bundle) -> UiBuilder<'w, 's, 'a> {
+    pub fn spawn<'a>(&'a mut self, bundle: impl Bundle) -> UiBuilder<'w, 's, 'a, Entity> {
         let mut new_entity = Entity::PLACEHOLDER;
 
-        if let Some(entity) = self.entity {
-            self.commands().entity(entity).with_children(|parent| {
-                new_entity = parent.spawn(bundle).id();
-            });
-        } else {
-            new_entity = self.commands().spawn(bundle).id();
-        }
+        let entity = self.id();
+        self.commands().entity(entity).with_children(|parent| {
+            new_entity = parent.spawn(bundle).id();
+        });
 
-        self.commands().ui_builder(new_entity.into())
+        self.commands().ui_builder(new_entity)
     }
 
     pub fn insert(&mut self, bundle: impl Bundle) -> &mut Self {
@@ -58,14 +68,14 @@ impl<'w, 's> UiBuilder<'w, 's, '_> {
 }
 
 pub trait UiBuilderExt<'w, 's> {
-    fn ui_builder<'a>(&'a mut self, entity: Option<Entity>) -> UiBuilder<'w, 's, 'a>;
+    fn ui_builder<'a, T>(&'a mut self, context: T) -> UiBuilder<'w, 's, 'a, T>;
 }
 
 impl<'w, 's> UiBuilderExt<'w, 's> for Commands<'w, 's> {
-    fn ui_builder<'a>(&'a mut self, entity: Option<Entity>) -> UiBuilder<'w, 's, 'a> {
+    fn ui_builder<'a, T>(&'a mut self, context: T) -> UiBuilder<'w, 's, 'a, T> {
         UiBuilder {
             commands: self,
-            entity,
+            context,
         }
     }
 }

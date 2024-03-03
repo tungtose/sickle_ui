@@ -70,11 +70,17 @@ impl Into<MenuItemConfig> for ToggleMenuItemConfig {
 }
 
 pub trait UiToggleMenuItemExt<'w, 's> {
-    fn toggle_menu_item<'a>(&'a mut self, config: ToggleMenuItemConfig) -> UiBuilder<'w, 's, 'a>;
+    fn toggle_menu_item<'a>(
+        &'a mut self,
+        config: ToggleMenuItemConfig,
+    ) -> UiBuilder<'w, 's, 'a, Entity>;
 }
 
-impl<'w, 's> UiToggleMenuItemExt<'w, 's> for UiBuilder<'w, 's, '_> {
-    fn toggle_menu_item<'a>(&'a mut self, config: ToggleMenuItemConfig) -> UiBuilder<'w, 's, 'a> {
+impl<'w, 's> UiToggleMenuItemExt<'w, 's> for UiBuilder<'w, 's, '_, Entity> {
+    fn toggle_menu_item<'a>(
+        &'a mut self,
+        config: ToggleMenuItemConfig,
+    ) -> UiBuilder<'w, 's, 'a, Entity> {
         let mut item = self.menu_item(config.clone().into());
         item.insert((
             ToggleMenuItem {

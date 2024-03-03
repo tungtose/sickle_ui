@@ -219,15 +219,15 @@ pub trait UiRadioGroupExt<'w, 's> {
         &'a mut self,
         options: Vec<impl Into<String>>,
         unselectable: bool,
-    ) -> UiBuilder<'w, 's, 'a>;
+    ) -> UiBuilder<'w, 's, 'a, Entity>;
 }
 
-impl<'w, 's> UiRadioGroupExt<'w, 's> for UiBuilder<'w, 's, '_> {
+impl<'w, 's> UiRadioGroupExt<'w, 's> for UiBuilder<'w, 's, '_, Entity> {
     fn radio_group<'a>(
         &'a mut self,
         options: Vec<impl Into<String>>,
         unselectable: bool,
-    ) -> UiBuilder<'w, 's, 'a> {
+    ) -> UiBuilder<'w, 's, 'a, Entity> {
         let option_count = options.len();
         let mut queue = VecDeque::from(options);
         self.container(
@@ -235,7 +235,7 @@ impl<'w, 's> UiRadioGroupExt<'w, 's> for UiBuilder<'w, 's, '_> {
             |radio_group| {
                 for i in 0..option_count {
                     let label = queue.pop_front().unwrap();
-                    let id = radio_group.entity();
+                    let id = radio_group.context();
                     let mut check_node: Entity = Entity::PLACEHOLDER;
                     radio_group
                         .container(RadioButton::button(), |button| {
@@ -257,7 +257,7 @@ impl<'w, 's> UiRadioGroupExt<'w, 's> for UiBuilder<'w, 's, '_> {
                             checked: false,
                             unselectable,
                             check_node,
-                            group: id,
+                            group: id.into(),
                         });
                 }
             },

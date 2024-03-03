@@ -204,7 +204,7 @@ fn process_tab_viewport_content_change(
 
         for (panel_id, panel) in &panels {
             if !tab_to_panel_ids.iter().any(|(_, p_id)| *p_id == *panel_id) {
-                commands.ui_builder(tab_container.bar.into()).tab(
+                commands.ui_builder(tab_container.bar).tab(
                     panel.title(),
                     tab_container_id,
                     *panel_id,
@@ -384,7 +384,7 @@ fn handle_tab_dragging(
                 let left =
                     transform.translation.truncate().x - (node.size().x / 2.) + bar_half_width;
                 let placeholder = commands
-                    .ui_builder(container.bar.into())
+                    .ui_builder(container.bar)
                     .spawn(NodeBundle {
                         style: Style {
                             width: Val::Px(node.size().x * 1.1),
@@ -401,7 +401,7 @@ fn handle_tab_dragging(
                     .insert_children(tab_index, &[placeholder]);
 
                 commands
-                    .ui_builder(entity.into())
+                    .ui_builder(entity)
                     .style()
                     .position_type(PositionType::Absolute)
                     .left(Val::Px(left))
@@ -470,10 +470,7 @@ fn handle_tab_dragging(
                         .insert_children(new_index, &[placeholder]);
                 }
 
-                commands
-                    .ui_builder(entity.into())
-                    .style()
-                    .left(Val::Px(left));
+                commands.ui_builder(entity).style().left(Val::Px(left));
             }
             DragState::DragEnd => {
                 children.iter().for_each(|child| {
@@ -597,7 +594,7 @@ impl Default for Tab {
 }
 
 impl ContextMenuGenerator for Tab {
-    fn build_context_menu(&self, context: Entity, container: &mut UiBuilder) {
+    fn build_context_menu(&self, context: Entity, container: &mut UiBuilder<Entity>) {
         container
             .menu_item(MenuItemConfig {
                 name: "Close Tab".into(),
@@ -663,7 +660,7 @@ impl Command for PopoutPanelFromTabContainer {
 
         let mut container_id = Entity::PLACEHOLDER;
         let floating_panel_id = commands
-            .ui_builder(root_node.into())
+            .ui_builder(root_node)
             .floating_panel(
                 FloatingPanelConfig {
                     title: title.into(),
@@ -839,15 +836,15 @@ impl TabContainer {
 pub trait UiTabContainerExt<'w, 's> {
     fn tab_container<'a>(
         &'a mut self,
-        spawn_children: impl FnOnce(&mut UiBuilder),
-    ) -> UiBuilder<'w, 's, 'a>;
+        spawn_children: impl FnOnce(&mut UiBuilder<Entity>),
+    ) -> UiBuilder<'w, 's, 'a, Entity>;
 }
 
-impl<'w, 's> UiTabContainerExt<'w, 's> for UiBuilder<'w, 's, '_> {
+impl<'w, 's> UiTabContainerExt<'w, 's> for UiBuilder<'w, 's, '_, Entity> {
     fn tab_container<'a>(
         &'a mut self,
-        spawn_children: impl FnOnce(&mut UiBuilder),
-    ) -> UiBuilder<'w, 's, 'a> {
+        spawn_children: impl FnOnce(&mut UiBuilder<Entity>),
+    ) -> UiBuilder<'w, 's, 'a, Entity> {
         let mut bar = Entity::PLACEHOLDER;
         let mut viewport = Entity::PLACEHOLDER;
 
@@ -890,16 +887,16 @@ trait UiTabExt<'w, 's> {
         title: String,
         tab_container: Entity,
         panel: Entity,
-    ) -> UiBuilder<'w, 's, 'a>;
+    ) -> UiBuilder<'w, 's, 'a, Entity>;
 }
 
-impl<'w, 's> UiTabExt<'w, 's> for UiBuilder<'w, 's, '_> {
+impl<'w, 's> UiTabExt<'w, 's> for UiBuilder<'w, 's, '_, Entity> {
     fn tab<'a>(
         &'a mut self,
         title: String,
         tab_container: Entity,
         panel: Entity,
-    ) -> UiBuilder<'w, 's, 'a> {
+    ) -> UiBuilder<'w, 's, 'a, Entity> {
         self.container(
             (
                 TabContainer::tab(),
