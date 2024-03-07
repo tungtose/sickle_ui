@@ -5,7 +5,7 @@ use sickle_math::ease::Ease;
 
 use super::icon::UiIconExt;
 use super::panel::Panel;
-use super::prelude::{LabelConfig, UiContainerExt, UiLabelExt};
+use super::prelude::{LabelConfig, UiContainerExt, UiLabelExt, UiPanelExt};
 use super::prelude::{SetLabelTextExt, UiScrollViewExt};
 use crate::animated_interaction::{AnimatedInteraction, AnimationConfig};
 use crate::drop_interaction::{Droppable, DroppableUpdate};
@@ -338,7 +338,7 @@ fn update_panel_layout(
                     false => "sickle://icons/chevron_down.png",
                 });
 
-            if let Ok(children) = q_children.get(panel.content_inner) {
+            if let Ok(children) = q_children.get(panel.content_panel) {
                 for child in children {
                     if let Ok(mut panel) = q_panel.get_mut(*child) {
                         if panel.visible == config.folded {
@@ -521,7 +521,8 @@ pub struct FloatingPanel {
     title: Entity,
     close_button: Entity,
     content_view: Entity,
-    content_inner: Entity,
+    content_panel_container: Entity,
+    content_panel: Entity,
     resize_handles: (Entity, Entity),
     resizing: bool,
     moving: bool,
@@ -540,7 +541,8 @@ impl Default for FloatingPanel {
             title: Entity::PLACEHOLDER,
             close_button: Entity::PLACEHOLDER,
             content_view: Entity::PLACEHOLDER,
-            content_inner: Entity::PLACEHOLDER,
+            content_panel_container: Entity::PLACEHOLDER,
+            content_panel: Entity::PLACEHOLDER,
             resize_handles: (Entity::PLACEHOLDER, Entity::PLACEHOLDER),
             resizing: Default::default(),
             moving: Default::default(),
@@ -550,8 +552,8 @@ impl Default for FloatingPanel {
 }
 
 impl FloatingPanel {
-    pub fn content_container_id(&self) -> Entity {
-        self.content_inner
+    pub fn content_panel_id(&self) -> Entity {
+        self.content_panel
     }
 
     pub fn title_container_id(&self) -> Entity {
@@ -658,12 +660,6 @@ impl FloatingPanelLayout {
     }
 }
 
-// impl<'w, 's> UiBuilder<'w, 's, '_, FloatingPanel> {
-//     fn floating_panel<'a>(&'a mut self) -> UiBuilder<'w, 's, 'a, FloatingPanel> {
-//         self.commands().ui_builder(FloatingPanel::default())
-//     }
-// }
-
 pub trait UiFloatingPanelExt<'w, 's> {
     fn floating_panel<'a>(
         &'a mut self,
@@ -690,14 +686,15 @@ impl<'w, 's> UiFloatingPanelExt<'w, 's> for UiBuilder<'w, 's, '_, Entity> {
         let mut close_button = Entity::PLACEHOLDER;
         let mut drag_handle = Entity::PLACEHOLDER;
         let mut content_view = Entity::PLACEHOLDER;
-        let mut content_inner = Entity::PLACEHOLDER;
+        let mut content_panel_container = Entity::PLACEHOLDER;
+        let mut content_panel = Entity::PLACEHOLDER;
         let mut frame = self.container(FloatingPanel::frame(), |container| {
             let panel = container.id();
 
             let title_text = if let Some(text) = config.title.clone() {
                 text
             } else {
-                "".into()
+                "Untitled".into()
             };
 
             vertical_resize_handles = container
@@ -808,7 +805,7 @@ impl<'w, 's> UiFloatingPanelExt<'w, 's> for UiBuilder<'w, 's, '_, Entity> {
 
                     title = container
                         .label(LabelConfig {
-                            label: title_text,
+                            label: title_text.clone(),
                             margin: UiRect::px(5., 29., 5., 2.),
                             color: Color::WHITE,
                             ..default()
@@ -863,8 +860,8 @@ impl<'w, 's> UiFloatingPanelExt<'w, 's> for UiBuilder<'w, 's, '_, Entity> {
 
             content_view = container
                 .scroll_view(restrict_to, |scroll_view| {
-                    content_inner = scroll_view.id();
-                    spawn_children(scroll_view);
+                    content_panel_container = scroll_view.id();
+                    content_panel = scroll_view.panel(title_text, spawn_children).id();
                 })
                 .id();
         });
@@ -885,7 +882,8 @@ impl<'w, 's> UiFloatingPanelExt<'w, 's> for UiBuilder<'w, 's, '_, Entity> {
                 title,
                 close_button,
                 content_view,
-                content_inner,
+                content_panel_container,
+                content_panel,
                 resize_handles: (horizontal_resize_handles, vertical_resize_handles),
                 priority: false,
                 ..default()

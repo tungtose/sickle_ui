@@ -23,7 +23,7 @@ use super::{
     prelude::{
         ContextMenuGenerator, FloatingPanelConfig, FloatingPanelLayout, GenerateContextMenu,
         LabelConfig, MenuItem, MenuItemConfig, MenuItemUpdate, ReflectContextMenuGenerator,
-        UiContainerExt, UiFloatingPanelExt, UiLabelExt, UiMenuItemExt, UiScrollViewExt,
+        UiContainerExt, UiFloatingPanelExt, UiLabelExt, UiMenuItemExt, UiPanelExt, UiScrollViewExt,
     },
 };
 
@@ -51,13 +51,7 @@ impl Plugin for TabContainerPlugin {
         .add_systems(
             Update,
             (
-                apply_deferred,
-                process_tab_viewport_content_removed
-                    .run_if(should_process_tab_viewport_content_removed),
-                process_tab_container_content_change,
-                process_tab_viewport_content_change,
                 update_tab_container_on_press,
-                constrain_tab_container_active_tab,
                 update_tab_container_on_change,
                 handle_tab_dragging,
             )
@@ -73,19 +67,28 @@ pub struct TabContainerUpdate;
 fn close_tab_on_context_menu_press(
     q_menu_items: Query<(Entity, &CloseTabContextMenu, &MenuItem), Changed<MenuItem>>,
     q_tab: Query<&Tab>,
+    q_tab_container: Query<&TabContainer>,
     mut commands: Commands,
 ) {
-    for (entity, tab_ref, menu_item) in &q_menu_items {
+    for (entity, tab, menu_item) in &q_menu_items {
         if menu_item.interacted() {
-            let Ok(tab) = q_tab.get(tab_ref.tab) else {
+            let Ok(tab_data) = q_tab.get(tab.tab) else {
                 warn!(
-                    "Context menu tab reference {:?} refers to missing tab {:?}",
-                    entity, tab_ref.tab
+                    "Context menu {:?} refers to missing tab {:?}",
+                    entity, tab.tab
                 );
                 continue;
             };
 
-            commands.entity(tab.panel).despawn_recursive();
+            let Ok(container) = q_tab_container.get(tab_data.container) else {
+                warn!(
+                    "Context menu {:?} tab {:?} refers to missing tab container {:?}",
+                    entity, tab.tab, tab_data.container
+                );
+                continue;
+            };
+
+            commands.ui_builder(*container).remove_tab(tab.tab);
         }
     }
 }
@@ -125,101 +128,6 @@ fn popout_tab_on_context_menu_press(
     }
 }
 
-fn should_process_tab_viewport_content_removed(
-    q_removed_children: RemovedComponents<Children>,
-) -> bool {
-    q_removed_children.len() > 0
-}
-
-fn process_tab_viewport_content_removed(
-    q_tab_viewports: Query<(Entity, &TabViewport), Without<Children>>,
-    q_tab_container: Query<&TabContainer>,
-    q_children: Query<&Children>,
-    q_tab: Query<&Tab>,
-    mut commands: Commands,
-) {
-    for (entity, viewport) in &q_tab_viewports {
-        let Ok(tab_container) = q_tab_container.get(viewport.container) else {
-            error!("Missing tab container for viewport {:?}", entity);
-            continue;
-        };
-
-        let Ok(tab_bar_children) = q_children.get(tab_container.bar) else {
-            continue;
-        };
-
-        tab_bar_children
-            .iter()
-            .filter(|child| q_tab.get(**child).is_ok())
-            .for_each(|child| commands.entity(*child).despawn_recursive());
-    }
-}
-
-fn process_tab_container_content_change(
-    q_tab_containers: Query<(&TabContainer, &Children), Changed<Children>>,
-    q_panel: Query<Entity, With<Panel>>,
-    mut commands: Commands,
-) {
-    for (container, children) in &q_tab_containers {
-        for child in children {
-            let Ok(panel_entity) = q_panel.get(*child) else {
-                continue;
-            };
-
-            commands.entity(panel_entity).set_parent(container.viewport);
-        }
-    }
-}
-
-fn process_tab_viewport_content_change(
-    q_tab_viewports: Query<(Entity, &TabViewport, &Children), Changed<Children>>,
-    q_tab_container: Query<(Entity, &TabContainer)>,
-    q_children: Query<&Children>,
-    q_tab: Query<&Tab>,
-    q_panel: Query<&Panel>,
-    mut commands: Commands,
-) {
-    for (entity, viewport, children) in &q_tab_viewports {
-        let Ok((tab_container_id, tab_container)) = q_tab_container.get(viewport.container) else {
-            error!("Missing tab container for viewport {:?}", entity);
-            continue;
-        };
-
-        let tab_to_panel_ids: Vec<(Entity, Entity)> =
-            if let Ok(tab_bar_children) = q_children.get(tab_container.bar) {
-                tab_bar_children
-                    .iter()
-                    .filter(|child| q_tab.get(**child).is_ok())
-                    .map(|child| (*child, q_tab.get(*child).unwrap().panel))
-                    .collect()
-            } else {
-                Vec::new()
-            };
-
-        let panels: Vec<(Entity, &Panel)> = children
-            .iter()
-            .filter(|child| q_panel.get(**child).is_ok())
-            .map(|child| (*child, q_panel.get(*child).unwrap()))
-            .collect();
-
-        for (panel_id, panel) in &panels {
-            if !tab_to_panel_ids.iter().any(|(_, p_id)| *p_id == *panel_id) {
-                commands.ui_builder(tab_container.bar).tab(
-                    panel.title(),
-                    tab_container_id,
-                    *panel_id,
-                );
-            }
-        }
-
-        for (tab_id, panel_id) in tab_to_panel_ids {
-            if !panels.iter().any(|(p_id, _)| *p_id == panel_id) {
-                commands.entity(tab_id).despawn_recursive();
-            }
-        }
-    }
-}
-
 fn update_tab_container_on_press(
     q_tabs: Query<(Entity, &Tab, &Interaction), Changed<Interaction>>,
     q_tab: Query<Entity, With<Tab>>,
@@ -242,41 +150,6 @@ fn update_tab_container_on_press(
                         tab_container.active = i;
                     }
                 }
-            }
-        }
-    }
-}
-
-fn constrain_tab_container_active_tab(
-    q_changed_tab_bars: Query<(Entity, &TabBar, &Children), Changed<Children>>,
-    q_tab: Query<&Tab>,
-    mut q_tab_container: Query<&mut TabContainer>,
-) {
-    for (entity, tab_bar, children) in &q_changed_tab_bars {
-        let Ok(mut container) = q_tab_container.get_mut(tab_bar.container) else {
-            error!("Missing tab container of tab bar {:?}", entity);
-            continue;
-        };
-
-        let tab_count = children
-            .iter()
-            .filter(|child| {
-                if let Ok(_) = q_tab.get(**child) {
-                    return true;
-                }
-                false
-            })
-            .count();
-
-        if container.tab_count != tab_count {
-            container.tab_count = tab_count;
-        }
-
-        if container.active >= tab_count {
-            if tab_count > 0 {
-                container.active = tab_count - 1;
-            } else {
-                container.active = 0;
             }
         }
     }
@@ -577,6 +450,7 @@ impl Default for PopoutTabContextMenu {
 #[reflect(Component, ContextMenuGenerator)]
 pub struct Tab {
     container: Entity,
+    bar: Entity,
     panel: Entity,
     placeholder: Option<Entity>,
     original_index: Option<usize>,
@@ -586,6 +460,7 @@ impl Default for Tab {
     fn default() -> Self {
         Self {
             container: Entity::PLACEHOLDER,
+            bar: Entity::PLACEHOLDER,
             panel: Entity::PLACEHOLDER,
             placeholder: None,
             original_index: None,
@@ -627,6 +502,7 @@ impl Command for PopoutPanelFromTabContainer {
             return;
         };
         let tab_contaier_id = tab.container;
+        let tab_bar_id = tab.bar;
 
         let panel_id = tab.panel;
         let Ok(panel) = world.query::<&Panel>().get(world, panel_id) else {
@@ -677,9 +553,12 @@ impl Command for PopoutPanelFromTabContainer {
                 },
             )
             .id();
-
+        // TODO: Manage floating panel -> replace builder, make content optional, replace panel
         commands.entity(panel_id).set_parent(container_id);
-        commands.entity(self.tab).despawn_recursive();
+        commands.add(RemovePanel {
+            tab_bar: tab_bar_id,
+            panel: panel_id,
+        });
         queue.apply(world);
 
         let Ok(floating_panel) = world
@@ -695,6 +574,163 @@ impl Command for PopoutPanelFromTabContainer {
 
         let panel_title = floating_panel.title_container_id();
         world.entity_mut(panel_title).insert(bundle);
+    }
+}
+
+struct RemoveTab {
+    tab: Entity,
+    despawn_panel: bool,
+}
+
+impl Command for RemoveTab {
+    fn apply(self, world: &mut World) {
+        let Ok(tab_data) = world.query::<&Tab>().get(world, self.tab) else {
+            warn!("Failed to remove Tab {:?}: Not a Tab!", self.tab);
+            return;
+        };
+
+        let container_id = tab_data.container;
+        let panel_id = tab_data.panel;
+
+        let Ok(mut container) = world
+            .query::<&mut TabContainer>()
+            .get_mut(world, container_id)
+        else {
+            warn!(
+                "Failed to remove Tab {:?}: {:?} is not a TabContainer!",
+                self.tab, container_id,
+            );
+            return;
+        };
+
+        container.tab_count = if container.tab_count > 1 {
+            container.tab_count - 1
+        } else {
+            0
+        };
+
+        if container.active >= container.tab_count && container.tab_count > 0 {
+            container.active = container.tab_count - 1;
+        }
+
+        let mut queue = CommandQueue::default();
+        let mut commands = Commands::new(&mut queue, world);
+
+        commands.entity(self.tab).despawn_recursive();
+
+        if self.despawn_panel {
+            commands.entity(panel_id).despawn_recursive();
+        }
+
+        queue.apply(world);
+    }
+}
+
+struct IncrementTabCount {
+    container: Entity,
+}
+
+impl Command for IncrementTabCount {
+    fn apply(self, world: &mut World) {
+        let Ok(mut container) = world
+            .query::<&mut TabContainer>()
+            .get_mut(world, self.container)
+        else {
+            warn!(
+                "Failed to increment tab count: {:?} is not a TabContainer!",
+                self.container,
+            );
+            return;
+        };
+
+        container.tab_count += 1;
+    }
+}
+
+struct RemovePanel {
+    tab_bar: Entity,
+    panel: Entity,
+}
+
+impl Command for RemovePanel {
+    fn apply(self, world: &mut World) {
+        let Ok(tab_bar_children) = world.query::<&Children>().get(world, self.tab_bar) else {
+            warn!(
+                "Failed to remove panel from tab container: Tab bar {:?} has no tabs",
+                self.tab_bar,
+            );
+            return;
+        };
+
+        let candidates: Vec<Entity> = tab_bar_children.iter().map(|child| *child).collect();
+        let Some(tab) = candidates.iter().find(|child| {
+            let Ok(tab) = world.query::<&Tab>().get(world, **child) else {
+                return false;
+            };
+
+            tab.panel == self.panel
+        }) else {
+            warn!(
+                "Failed to remove panel from tab container: No tab found for panel {:?}",
+                self.panel,
+            );
+            return;
+        };
+
+        let mut queue = CommandQueue::default();
+        let mut commands = Commands::new(&mut queue, world);
+
+        commands.add(RemoveTab {
+            tab: *tab,
+            despawn_panel: false,
+        });
+
+        queue.apply(world);
+    }
+}
+
+struct DockFloatingPanel {
+    container: Entity,
+    floating_panel: Entity,
+}
+
+impl Command for DockFloatingPanel {
+    fn apply(self, world: &mut World) {
+        let Ok(floating_panel) = world
+            .query::<&FloatingPanel>()
+            .get(world, self.floating_panel)
+        else {
+            warn!(
+                "Failed to dock floating panel {:?}: Not a FloatingPanel",
+                self.floating_panel
+            );
+            return;
+        };
+
+        let panel_id = floating_panel.content_panel_id();
+        let Ok(panel) = world.query::<&Panel>().get(world, panel_id) else {
+            warn!(
+                "Failed to dock floating panel {:?}: Missing Panel {:?}",
+                self.floating_panel, panel_id
+            );
+            return;
+        };
+        let panel = panel.clone();
+
+        let Ok(container) = world.query::<&TabContainer>().get(world, self.container) else {
+            warn!(
+                "Failed to dock floating panel {:?}: Target is not a TabContainer {:?}",
+                self.floating_panel, self.container
+            );
+            return;
+        };
+
+        let mut queue = CommandQueue::default();
+        let mut commands = Commands::new(&mut queue, world);
+
+        commands.ui_builder(*container).add_panel(panel);
+        commands.entity(self.floating_panel).despawn_recursive();
+        queue.apply(world);
     }
 }
 
@@ -732,9 +768,10 @@ impl Default for TabViewport {
     }
 }
 
-#[derive(Component, Debug, Reflect)]
+#[derive(Component, Clone, Copy, Debug, Reflect)]
 #[reflect(Component)]
 pub struct TabContainer {
+    own_id: Entity,
     active: usize,
     bar: Entity,
     viewport: Entity,
@@ -744,6 +781,7 @@ pub struct TabContainer {
 impl Default for TabContainer {
     fn default() -> Self {
         Self {
+            own_id: Entity::PLACEHOLDER,
             active: 0,
             tab_count: 0,
             bar: Entity::PLACEHOLDER,
@@ -836,14 +874,14 @@ impl TabContainer {
 pub trait UiTabContainerExt<'w, 's> {
     fn tab_container<'a>(
         &'a mut self,
-        spawn_children: impl FnOnce(&mut UiBuilder<Entity>),
+        spawn_children: impl FnOnce(&mut UiBuilder<TabContainer>),
     ) -> UiBuilder<'w, 's, 'a, Entity>;
 }
 
 impl<'w, 's> UiTabContainerExt<'w, 's> for UiBuilder<'w, 's, '_, Entity> {
     fn tab_container<'a>(
         &'a mut self,
-        spawn_children: impl FnOnce(&mut UiBuilder<Entity>),
+        spawn_children: impl FnOnce(&mut UiBuilder<TabContainer>),
     ) -> UiBuilder<'w, 's, 'a, Entity> {
         let mut bar = Entity::PLACEHOLDER;
         let mut viewport = Entity::PLACEHOLDER;
@@ -867,41 +905,66 @@ impl<'w, 's> UiTabContainerExt<'w, 's> for UiBuilder<'w, 's, '_, Entity> {
                     })
                     .id();
             });
-
-            spawn_children(container);
         });
 
-        container.insert(TabContainer {
+        let container_id = container.id();
+        let tab_container = TabContainer {
+            own_id: container_id,
             bar,
             viewport,
             ..default()
-        });
+        };
+        container.insert(tab_container);
 
-        container
+        let mut builder = self.commands().ui_builder(tab_container);
+        spawn_children(&mut builder);
+
+        self.commands().ui_builder(container_id)
     }
 }
 
-trait UiTabExt<'w, 's> {
-    fn tab<'a>(
+pub trait UiTabContainerSubExt<'w, 's> {
+    fn id(&self) -> Entity;
+
+    fn add_tab<'a>(
         &'a mut self,
         title: String,
-        tab_container: Entity,
-        panel: Entity,
-    ) -> UiBuilder<'w, 's, 'a, Entity>;
+        spawn_children: impl FnOnce(&mut UiBuilder<Entity>),
+    ) -> UiBuilder<'w, 's, 'a, TabContainer>;
+
+    fn remove_tab<'a>(&'a mut self, tab: Entity) -> UiBuilder<'w, 's, 'a, TabContainer>;
+
+    fn add_panel<'a>(&'a mut self, panel: Panel) -> UiBuilder<'w, 's, 'a, TabContainer>;
+
+    fn dock_panel<'a>(&'a mut self, floating_panel: Entity) -> UiBuilder<'w, 's, 'a, TabContainer>;
 }
 
-impl<'w, 's> UiTabExt<'w, 's> for UiBuilder<'w, 's, '_, Entity> {
-    fn tab<'a>(
+impl<'w, 's> UiTabContainerSubExt<'w, 's> for UiBuilder<'w, 's, '_, TabContainer> {
+    fn id(&self) -> Entity {
+        self.context().own_id
+    }
+
+    fn add_tab<'a>(
         &'a mut self,
         title: String,
-        tab_container: Entity,
-        panel: Entity,
-    ) -> UiBuilder<'w, 's, 'a, Entity> {
-        self.container(
+        spawn_children: impl FnOnce(&mut UiBuilder<Entity>),
+    ) -> UiBuilder<'w, 's, 'a, TabContainer> {
+        let context = self.context();
+        let container_id = context.own_id;
+        let bar_id = context.bar;
+        let viewport_id = context.viewport;
+        let panel = self
+            .commands()
+            .ui_builder(viewport_id)
+            .panel(title.clone(), spawn_children)
+            .id();
+
+        self.commands().ui_builder(bar_id).container(
             (
                 TabContainer::tab(),
                 Tab {
-                    container: tab_container,
+                    container: container_id,
+                    bar: bar_id,
                     panel,
                     ..default()
                 },
@@ -912,6 +975,72 @@ impl<'w, 's> UiTabExt<'w, 's> for UiBuilder<'w, 's, '_, Entity> {
                     ..default()
                 });
             },
-        )
+        );
+
+        self.commands().add(IncrementTabCount {
+            container: container_id,
+        });
+        self.commands().ui_builder(context)
+    }
+
+    fn remove_tab<'a>(&'a mut self, tab: Entity) -> UiBuilder<'w, 's, 'a, TabContainer> {
+        let context = self.context();
+
+        self.commands().add(RemoveTab {
+            tab,
+            despawn_panel: true,
+        });
+        self.commands().ui_builder(context)
+    }
+
+    fn add_panel<'a>(&'a mut self, panel: Panel) -> UiBuilder<'w, 's, 'a, TabContainer> {
+        let context = self.context();
+
+        if panel.own_id() == Entity::PLACEHOLDER {
+            error!(
+                "Panel {:?} needs a valid ID before it can be added to a tab container!",
+                panel.title()
+            );
+            return self.commands().ui_builder(context);
+        }
+
+        let container_id = context.own_id;
+        let bar_id = context.bar;
+        let viewport_id = context.viewport;
+        let panel_id = panel.own_id();
+
+        self.commands().ui_builder(bar_id).container(
+            (
+                TabContainer::tab(),
+                Tab {
+                    container: container_id,
+                    bar: bar_id,
+                    panel: panel_id,
+                    ..default()
+                },
+            ),
+            |container| {
+                container.label(LabelConfig {
+                    label: panel.title(),
+                    ..default()
+                });
+            },
+        );
+
+        self.commands().entity(viewport_id).add_child(panel_id);
+        self.commands().add(IncrementTabCount {
+            container: container_id,
+        });
+        self.commands().ui_builder(context)
+    }
+
+    fn dock_panel<'a>(&'a mut self, floating_panel: Entity) -> UiBuilder<'w, 's, 'a, TabContainer> {
+        let context = self.context();
+
+        self.commands().add(DockFloatingPanel {
+            container: context.own_id,
+            floating_panel,
+        });
+        self.commands().ui_builder(context)
     }
 }

@@ -4,9 +4,10 @@ use crate::ui_builder::UiBuilder;
 
 use super::prelude::UiContainerExt;
 
-#[derive(Component, Debug, Reflect)]
+#[derive(Component, Clone, Debug, Reflect)]
 #[reflect(Component)]
 pub struct Panel {
+    own_id: Entity,
     title: String,
     pub visible: bool,
 }
@@ -14,6 +15,7 @@ pub struct Panel {
 impl Default for Panel {
     fn default() -> Self {
         Self {
+            own_id: Entity::PLACEHOLDER,
             title: "".into(),
             visible: true,
         }
@@ -21,6 +23,10 @@ impl Default for Panel {
 }
 
 impl Panel {
+    pub fn own_id(&self) -> Entity {
+        self.own_id
+    }
+
     pub fn title(&self) -> String {
         self.title.clone()
     }
@@ -52,9 +58,14 @@ impl<'w, 's> UiPanelExt<'w, 's> for UiBuilder<'w, 's, '_, Entity> {
         title: String,
         spawn_children: impl FnOnce(&mut UiBuilder<Entity>),
     ) -> UiBuilder<'w, 's, 'a, Entity> {
-        self.container(
-            (Panel::frame(), Panel { title, ..default() }),
-            spawn_children,
-        )
+        let mut container = self.container(Panel::frame(), spawn_children);
+        let own_id = container.id();
+
+        container.insert(Panel {
+            own_id,
+            title,
+            ..default()
+        });
+        container
     }
 }

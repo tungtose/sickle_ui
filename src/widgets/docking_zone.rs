@@ -15,11 +15,10 @@ use crate::{
 };
 
 use super::{
-    floating_panel::{FloatingPanel, FloatingPanelConfig, FloatingPanelTitle},
-    panel::Panel,
-    prelude::{SizedZoneConfig, UiPanelExt, UiSizedZoneExt, UiTabContainerExt},
+    floating_panel::FloatingPanelTitle,
+    prelude::{SizedZoneConfig, UiSizedZoneExt, UiTabContainerExt},
     sized_zone::{SizedZone, SizedZoneResizeHandleContainer},
-    tab_container::{Tab, TabBar, TabContainer},
+    tab_container::{Tab, TabBar, TabContainer, UiTabContainerSubExt},
 };
 
 pub struct DockingZonePlugin;
@@ -183,10 +182,9 @@ fn handle_docking_zone_drop_zone_change(
                 .unwrap();
 
             if drop_area == DropArea::Center {
-                commands.add(MoveFloatingPanelToDockingZone {
-                    floating_panel_id: droppable_title.panel(),
-                    target_container_id: docking_zone.tab_container,
-                });
+                commands
+                    .ui_builder(*tab_container)
+                    .dock_panel(droppable_title.panel());
             } else {
                 let split_direction = match drop_area {
                     DropArea::North => DockingZoneSplitDirection::VerticallyBefore,
@@ -317,7 +315,6 @@ impl Command for DockingZoneSplit {
 
         let mut queue = CommandQueue::default();
         let mut commands = Commands::new(&mut queue, world);
-        let mut new_container = Entity::PLACEHOLDER;
 
         if inject_container {
             let new_parent_id = commands
@@ -348,7 +345,9 @@ impl Command for DockingZoneSplit {
                 },
                 self.panel_to_dock.is_some(),
                 |tab_container| {
-                    new_container = tab_container.id();
+                    if let Some(floating_panel_id) = self.panel_to_dock {
+                        tab_container.dock_panel(floating_panel_id);
+                    }
                 },
             )
             .id();
@@ -373,85 +372,6 @@ impl Command for DockingZoneSplit {
             }
         }
 
-        if let Some(floating_panel_id) = self.panel_to_dock {
-            commands.add(MoveFloatingPanelToDockingZone {
-                target_container_id: new_container,
-                floating_panel_id,
-            });
-        }
-
-        queue.apply(world);
-    }
-}
-
-struct MoveFloatingPanelToDockingZone {
-    floating_panel_id: Entity,
-    target_container_id: Entity,
-}
-
-impl Command for MoveFloatingPanelToDockingZone {
-    fn apply(self, world: &mut World) {
-        let Ok((floating_panel, panel_config)) = world
-            .query::<(&FloatingPanel, &FloatingPanelConfig)>()
-            .get(world, self.floating_panel_id)
-        else {
-            warn!(
-                "Cannot dock {:?} in new DockingZone: Not a FloatingPanel!",
-                self.floating_panel_id
-            );
-            return;
-        };
-
-        let title = panel_config.title().unwrap_or("Untitled".into());
-        let content_container_id = floating_panel.content_container_id();
-
-        let Ok(mut tab_container) = world
-            .query::<&mut TabContainer>()
-            .get_mut(world, self.target_container_id)
-        else {
-            error!(
-                "Target container {:?} isn't a TabContainer!",
-                self.target_container_id
-            );
-            return;
-        };
-
-        let tab_count = tab_container.tab_count();
-        tab_container.set_active(tab_count);
-
-        let Ok(children) = world.query::<&Children>().get(world, content_container_id) else {
-            warn!(
-                "Cannot dock {:?} in new DockingZone: Nothing to dock!",
-                self.floating_panel_id
-            );
-            return;
-        };
-
-        let children_ids: Vec<Entity> = children.iter().map(|child| *child).collect();
-        let mut panel_to_move = Entity::PLACEHOLDER;
-        if let Some(panel_id) = children_ids
-            .iter()
-            .find(|child| world.query::<&Panel>().get(world, **child).is_ok())
-        {
-            panel_to_move = panel_id.to_owned();
-        }
-
-        let mut queue = CommandQueue::default();
-        let mut commands = Commands::new(&mut queue, world);
-
-        if panel_to_move == Entity::PLACEHOLDER {
-            commands
-                .ui_builder(self.target_container_id)
-                .panel(title, |_| {})
-                .entity_commands()
-                .insert_children(0, &children_ids);
-        } else {
-            commands
-                .entity(self.target_container_id)
-                .add_child(panel_to_move);
-        }
-
-        commands.entity(self.floating_panel_id).despawn_recursive();
         queue.apply(world);
     }
 }
@@ -532,7 +452,7 @@ pub trait UiDockingZoneExt<'w, 's> {
         &'a mut self,
         config: SizedZoneConfig,
         remove_empty: bool,
-        spawn_children: impl FnOnce(&mut UiBuilder<Entity>),
+        spawn_children: impl FnOnce(&mut UiBuilder<TabContainer>),
     ) -> UiBuilder<'w, 's, 'a, Entity>;
 }
 
@@ -541,7 +461,7 @@ impl<'w, 's> UiDockingZoneExt<'w, 's> for UiBuilder<'w, 's, '_, Entity> {
         &'a mut self,
         config: SizedZoneConfig,
         remove_empty: bool,
-        spawn_children: impl FnOnce(&mut UiBuilder<Entity>),
+        spawn_children: impl FnOnce(&mut UiBuilder<TabContainer>),
     ) -> UiBuilder<'w, 's, 'a, Entity> {
         let mut tab_container = Entity::PLACEHOLDER;
         let mut zone_highlight = Entity::PLACEHOLDER;
