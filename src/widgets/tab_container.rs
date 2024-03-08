@@ -18,7 +18,7 @@ use crate::{
 
 use super::{
     context_menu::ContextMenuUpdate,
-    floating_panel::{FloatingPanel, FloatingPanelUpdate},
+    floating_panel::{FloatingPanel, FloatingPanelUpdate, UiFloatingPanelSubExt},
     panel::Panel,
     prelude::{
         ContextMenuGenerator, FloatingPanelConfig, FloatingPanelLayout, GenerateContextMenu,
@@ -533,8 +533,8 @@ impl Command for PopoutPanelFromTabContainer {
 
         let mut queue = CommandQueue::default();
         let mut commands = Commands::new(&mut queue, world);
+        let mut floating_panel = FloatingPanel::default();
 
-        let mut container_id = Entity::PLACEHOLDER;
         let floating_panel_id = commands
             .ui_builder(root_node)
             .floating_panel(
@@ -549,13 +549,17 @@ impl Command for PopoutPanelFromTabContainer {
                     ..default()
                 },
                 |container| {
-                    container_id = container.id();
+                    floating_panel = container.context();
+                    container.set_panel(panel_id);
                 },
             )
             .id();
-        // TODO: Manage floating panel -> replace builder, make content optional, replace panel
-        commands.entity(panel_id).set_parent(container_id);
-        commands.add(RemovePanel {
+
+        // TODO: Fix prelude exports
+        // TODO: Fix Test layout
+        // FIXME: Once `FloatingPanel::move_panel_to_floating_panel` is gone, this should be just "show"
+        commands.style(panel_id).hide();
+        commands.add(RemoveTabOfPanel {
             tab_bar: tab_bar_id,
             panel: panel_id,
         });
@@ -647,12 +651,12 @@ impl Command for IncrementTabCount {
     }
 }
 
-struct RemovePanel {
+struct RemoveTabOfPanel {
     tab_bar: Entity,
     panel: Entity,
 }
 
-impl Command for RemovePanel {
+impl Command for RemoveTabOfPanel {
     fn apply(self, world: &mut World) {
         let Ok(tab_bar_children) = world.query::<&Children>().get(world, self.tab_bar) else {
             warn!(
@@ -707,7 +711,14 @@ impl Command for DockFloatingPanel {
             return;
         };
 
-        let panel_id = floating_panel.content_panel_id();
+        let Some(panel_id) = floating_panel.content_panel_id() else {
+            warn!(
+                "Failed to dock floating panel {:?}: Missing Panel",
+                self.floating_panel
+            );
+            return;
+        };
+
         let Ok(panel) = world.query::<&Panel>().get(world, panel_id) else {
             warn!(
                 "Failed to dock floating panel {:?}: Missing Panel {:?}",

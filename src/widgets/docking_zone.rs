@@ -1,7 +1,6 @@
 use bevy::{
     ecs::system::{Command, CommandQueue},
     prelude::*,
-    ui::UiSystem,
 };
 
 use crate::{
@@ -15,7 +14,7 @@ use crate::{
 };
 
 use super::{
-    floating_panel::FloatingPanelTitle,
+    floating_panel::{FloatingPanelPreUpdate, FloatingPanelTitle},
     prelude::{SizedZoneConfig, UiSizedZoneExt, UiTabContainerExt},
     sized_zone::{SizedZone, SizedZoneResizeHandleContainer},
     tab_container::{Tab, TabBar, TabContainer, UiTabContainerSubExt},
@@ -23,9 +22,16 @@ use super::{
 
 pub struct DockingZonePlugin;
 // TODO: Un-split docking zones once there is only one child
+// TODO: Re-write docking zone ui builder
 impl Plugin for DockingZonePlugin {
     fn build(&self, app: &mut App) {
         app.configure_sets(Update, DockingZoneUpdate.after(DroppableUpdate))
+            .add_systems(
+                PreUpdate,
+                remove_empty_docking_zones
+                    .run_if(should_process_empty_docking_zones)
+                    .after(FloatingPanelPreUpdate),
+            )
             .add_systems(
                 Update,
                 (
@@ -33,12 +39,6 @@ impl Plugin for DockingZonePlugin {
                     handle_docking_zone_drop_zone_change,
                 )
                     .in_set(DockingZoneUpdate),
-            )
-            .add_systems(
-                PostUpdate,
-                remove_empty_docking_zones
-                    .run_if(should_process_empty_docking_zones)
-                    .after(UiSystem::Layout),
             );
     }
 }
@@ -50,6 +50,8 @@ fn should_process_empty_docking_zones(q_removed_tabs: RemovedComponents<Tab>) ->
     q_removed_tabs.len() > 0
 }
 
+// TODO: Use TabContainer->tab_count instead!
+// TODO: Move logic to TabContainer?, remove empty or single-docking-zone-children zones
 fn remove_empty_docking_zones(
     q_empty_tab_bars: Query<&TabBar, Without<Children>>,
     q_tab_bars: Query<(&TabBar, &Children)>,
