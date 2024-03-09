@@ -4,6 +4,7 @@ pub mod animated_interaction;
 pub mod drag_interaction;
 pub mod drop_interaction;
 pub mod flux_interaction;
+pub mod hierarchy_delay;
 pub mod input_extension;
 pub mod interactions;
 pub mod resize_interaction;
@@ -16,6 +17,7 @@ pub mod widgets;
 use drag_interaction::DragInteractionPlugin;
 use drop_interaction::DropInteractionPlugin;
 pub use flux_interaction::*;
+use hierarchy_delay::HierarchyDelayPlugin;
 use interactions::InteractionsPlugin;
 use resize_interaction::ResizeHandlePlugin;
 use scroll_interaction::ScrollInteractionPlugin;
@@ -31,6 +33,7 @@ impl Plugin for SickleUiPlugin {
             AnimatedInteractionPlugin,
             DragInteractionPlugin,
             DropInteractionPlugin,
+            HierarchyDelayPlugin,
             FluxInteractionPlugin,
             InteractionsPlugin,
             ResizeHandlePlugin,

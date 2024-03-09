@@ -6,6 +6,7 @@ use bevy::{
 use crate::{
     drag_interaction::{DragState, Draggable},
     drop_interaction::{DropPhase, DropZone, DroppableUpdate},
+    hierarchy_delay::DelayActions,
     ui_builder::{UiBuilder, UiBuilderExt},
     ui_style::{
         SetBackgroundColorExt, SetNodeHeightExt, SetNodeLeftExt, SetNodeShowHideExt, SetNodeTopExt,
@@ -14,7 +15,7 @@ use crate::{
 };
 
 use super::{
-    floating_panel::{FloatingPanelPreUpdate, FloatingPanelTitle},
+    floating_panel::FloatingPanelTitle,
     prelude::{SizedZoneConfig, UiSizedZoneExt, UiTabContainerExt},
     sized_zone::{SizedZone, SizedZoneResizeHandleContainer},
     tab_container::{Tab, TabBar, TabContainer, UiTabContainerSubExt},
@@ -27,14 +28,9 @@ impl Plugin for DockingZonePlugin {
     fn build(&self, app: &mut App) {
         app.configure_sets(Update, DockingZoneUpdate.after(DroppableUpdate))
             .add_systems(
-                PreUpdate,
-                remove_empty_docking_zones
-                    .run_if(should_process_empty_docking_zones)
-                    .after(FloatingPanelPreUpdate),
-            )
-            .add_systems(
                 Update,
                 (
+                    remove_empty_docking_zones.run_if(should_process_empty_docking_zones),
                     update_docking_zone_resize_handles.run_if(should_update_resize_handles),
                     handle_docking_zone_drop_zone_change,
                 )
@@ -76,7 +72,7 @@ fn remove_empty_docking_zones(
             continue;
         }
 
-        commands.entity(to_remove.zone).despawn_recursive();
+        commands.entity(to_remove.zone).delay_depsawn(true);
     }
 }
 

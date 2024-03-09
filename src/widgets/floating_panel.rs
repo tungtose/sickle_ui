@@ -10,6 +10,7 @@ use super::prelude::{LabelConfig, UiContainerExt, UiLabelExt, UiPanelExt};
 use super::prelude::{SetLabelTextExt, UiScrollViewExt};
 use crate::animated_interaction::{AnimatedInteraction, AnimationConfig};
 use crate::drop_interaction::{Droppable, DroppableUpdate};
+use crate::hierarchy_delay::DelayActions;
 use crate::interactions::InteractiveBackground;
 use crate::resize_interaction::ResizeHandle;
 use crate::ui_builder::UiBuilderExt;
@@ -38,10 +39,6 @@ impl Plugin for FloatingPanelPlugin {
     fn build(&self, app: &mut App) {
         app.configure_sets(Update, FloatingPanelUpdate.after(DroppableUpdate))
             .add_systems(
-                PreUpdate,
-                move_panel_to_floating_panel.in_set(FloatingPanelPreUpdate),
-            )
-            .add_systems(
                 Update,
                 (
                     index_floating_panel.run_if(panel_added),
@@ -59,35 +56,7 @@ impl Plugin for FloatingPanelPlugin {
 }
 
 #[derive(SystemSet, Clone, Eq, Debug, Hash, PartialEq)]
-pub struct FloatingPanelPreUpdate;
-
-#[derive(SystemSet, Clone, Eq, Debug, Hash, PartialEq)]
 pub struct FloatingPanelUpdate;
-
-/// Workaround for a bug with the taffy integration:
-///
-/// If the panel is re-parented during the creation of the floating panel
-/// (see PopoutPanelFromTabContainer), closing the floating panel causes
-/// a panic in taffy as the parent/children map is not in sync with Bevy
-/// TODO: Report bug
-fn move_panel_to_floating_panel(
-    mut q_panels: Query<
-        (Entity, &mut FloatingPanel, &MovePanelToFloatingPanel),
-        Added<MovePanelToFloatingPanel>,
-    >,
-    mut commands: Commands,
-) {
-    for (entity, mut panel, panel_to_move) in &mut q_panels {
-        let panel_id = panel_to_move.panel;
-        commands
-            .entity(panel_id)
-            .set_parent(panel.content_panel_container);
-        commands.style(panel_id).show();
-        commands.entity(entity).remove::<MovePanelToFloatingPanel>();
-
-        panel.content_panel = panel_id.into();
-    }
-}
 
 // TODO: Disable resizing when a panel is dragged or resized
 // TODO: Fix dropzone bug
@@ -715,12 +684,6 @@ impl Command for UpdateFloatingPanelPanelId {
     }
 }
 
-#[derive(Component)]
-#[component(storage = "SparseSet")]
-struct MovePanelToFloatingPanel {
-    panel: Entity,
-}
-
 pub trait UiFloatingPanelSubExt<'w, 's> {
     fn id(&self) -> Entity;
 
@@ -776,8 +739,13 @@ impl<'w, 's> UiFloatingPanelSubExt<'w, 's> for UiBuilder<'w, 's, '_, FloatingPan
         }
 
         self.commands()
-            .entity(context.own_id)
-            .insert(MovePanelToFloatingPanel { panel: new_panel });
+            .entity(new_panel)
+            .delay_reparenting(context.content_panel_container);
+
+        self.commands().add(UpdateFloatingPanelPanelId {
+            floating_panel: context.own_id,
+            panel_id: new_panel.into(),
+        });
 
         // FIXME: Once taffy / Bevy are better friends. See `move_panel_to_floating_panel`
         // self.commands()
