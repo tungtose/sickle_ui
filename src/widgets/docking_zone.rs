@@ -9,6 +9,7 @@ use crate::{
     drop_interaction::{DropPhase, DropZone, DroppableUpdate},
     hierarchy_delay::DelayActions,
     ui_builder::{UiBuilder, UiBuilderExt},
+    ui_commands::ResetChildrenInUiSurface,
     ui_style::{
         SetBackgroundColorExt, SetNodeHeightExt, SetNodeLeftExt, SetNodeShowHideExt, SetNodeTopExt,
         SetNodeWidthExt, UiStyleExt,
@@ -45,13 +46,13 @@ impl Plugin for DockingZonePlugin {
 #[derive(SystemSet, Clone, Eq, Debug, Hash, PartialEq)]
 pub struct DockingZoneUpdate;
 
+// TODO: Fix lingering DockingZoneSplitContainer after their sole docking zone child's content is removed
 fn cleanup_empty_docking_zones(
     q_tab_containers: Query<(&TabContainer, &RemoveEmptyDockingZone), Changed<TabContainer>>,
     q_parent: Query<&Parent>,
     q_children: Query<&Children>,
     q_sized_zone: Query<(Entity, &SizedZone)>,
     q_split_zones: Query<&DockingZoneSplitContainer>,
-    q_resize_handle: Query<Entity, With<SizedZoneResizeHandleContainer>>,
     mut commands: Commands,
 ) {
     for (tab_container, zone_ref) in &q_tab_containers {
@@ -71,9 +72,10 @@ fn cleanup_empty_docking_zones(
         let parent_id = parent.get();
         if let Ok(_) = q_split_zones.get(parent_id) {
             let children = q_children.get(parent_id).unwrap();
+
             let mut remaining_zones = 0;
             for child in children {
-                if *child == zone_ref.zone || q_resize_handle.get(*child).is_ok() {
+                if *child == zone_ref.zone {
                     continue;
                 }
 
@@ -82,8 +84,27 @@ fn cleanup_empty_docking_zones(
                 }
             }
 
-            if remaining_zones < 2 {
-                if let Ok(split_parent) = q_parent.get(parent_id) {
+            if remaining_zones == 1 {
+                let remaining = children
+                    .iter()
+                    .find(|child| **child != zone_ref.zone && q_sized_zone.get(**child).is_ok())
+                    .unwrap();
+
+                let mut need_to_keep_container = false;
+                if let Ok(children_of_remaining_zone) = q_children.get(*remaining) {
+                    if children_of_remaining_zone
+                        .iter()
+                        .filter(|child| q_sized_zone.get(**child).is_ok())
+                        .count()
+                        > 0
+                    {
+                        need_to_keep_container = true;
+                    }
+                }
+
+                if need_to_keep_container {
+                    commands.entity(zone_ref.zone).despawn_recursive();
+                } else if let Ok(split_parent) = q_parent.get(parent_id) {
                     let split_parent_id = split_parent.get();
                     let index = q_children
                         .get(split_parent_id)
@@ -93,7 +114,7 @@ fn cleanup_empty_docking_zones(
                         .unwrap();
 
                     for child in children {
-                        if *child == zone_ref.zone || q_resize_handle.get(*child).is_ok() {
+                        if *child == zone_ref.zone {
                             continue;
                         }
 
@@ -104,10 +125,13 @@ fn cleanup_empty_docking_zones(
                         }
                     }
 
-                    commands.entity(parent_id).despawn_recursive();
+                    // Safe to do immediately, all children still extist
                     commands
                         .entity(split_parent_id)
-                        .reset_children_in_ui_surface();
+                        .add(ResetChildrenInUiSurface);
+                    commands.entity(parent_id).despawn_recursive();
+                } else {
+                    commands.entity(zone_ref.zone).despawn_recursive();
                 }
             } else {
                 commands.entity(zone_ref.zone).despawn_recursive();
