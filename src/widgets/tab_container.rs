@@ -555,8 +555,7 @@ impl Command for PopoutPanelFromTabContainer {
 
         // TODO: Fix prelude exports
         // TODO: Fix Test layout
-        // FIXME: Once `FloatingPanel::move_panel_to_floating_panel` is gone, this should be just "show"
-        commands.style(panel_id).hide();
+        commands.style(panel_id).show();
         commands.add(RemoveTabOfPanel {
             tab_bar: tab_bar_id,
             panel: panel_id,

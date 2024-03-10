@@ -24,7 +24,6 @@ use super::{
 
 pub struct DockingZonePlugin;
 // TODO: Un-split docking zones once there is only one child
-// TODO: Re-write docking zone ui builder
 impl Plugin for DockingZonePlugin {
     fn build(&self, app: &mut App) {
         app.configure_sets(Update, DockingZoneUpdate.after(DroppableUpdate))
@@ -47,18 +46,75 @@ impl Plugin for DockingZonePlugin {
 pub struct DockingZoneUpdate;
 
 fn cleanup_empty_docking_zones(
-    q_tab_containers: Query<
-        (Entity, &TabContainer, &RemoveEmptyDockingZone),
-        Changed<TabContainer>,
-    >,
+    q_tab_containers: Query<(&TabContainer, &RemoveEmptyDockingZone), Changed<TabContainer>>,
+    q_parent: Query<&Parent>,
+    q_children: Query<&Children>,
+    q_sized_zone: Query<(Entity, &SizedZone)>,
+    q_split_zones: Query<&DockingZoneSplitContainer>,
+    q_resize_handle: Query<Entity, With<SizedZoneResizeHandleContainer>>,
     mut commands: Commands,
 ) {
-    for (_, tab_container, zone_ref) in &q_tab_containers {
+    for (tab_container, zone_ref) in &q_tab_containers {
         if tab_container.tab_count() > 0 {
             continue;
         }
 
-        commands.entity(zone_ref.zone).despawn_recursive();
+        let Ok(parent) = q_parent.get(zone_ref.zone) else {
+            warn!(
+                "Invalid docking zone detected: Zone {:?} doesn't have a Parent!",
+                zone_ref.zone
+            );
+            commands.entity(zone_ref.zone).despawn_recursive();
+            continue;
+        };
+
+        let parent_id = parent.get();
+        if let Ok(_) = q_split_zones.get(parent_id) {
+            let children = q_children.get(parent_id).unwrap();
+            let mut remaining_zones = 0;
+            for child in children {
+                if *child == zone_ref.zone || q_resize_handle.get(*child).is_ok() {
+                    continue;
+                }
+
+                if q_sized_zone.get(*child).is_ok() {
+                    remaining_zones += 1;
+                }
+            }
+
+            if remaining_zones < 2 {
+                if let Ok(split_parent) = q_parent.get(parent_id) {
+                    let split_parent_id = split_parent.get();
+                    let index = q_children
+                        .get(split_parent_id)
+                        .unwrap()
+                        .iter()
+                        .position(|child| *child == parent_id)
+                        .unwrap();
+
+                    for child in children {
+                        if *child == zone_ref.zone || q_resize_handle.get(*child).is_ok() {
+                            continue;
+                        }
+
+                        if q_sized_zone.get(*child).is_ok() {
+                            commands
+                                .entity(split_parent_id)
+                                .insert_children(index, &[*child]);
+                        }
+                    }
+
+                    commands.entity(parent_id).despawn_recursive();
+                    commands
+                        .entity(split_parent_id)
+                        .reset_children_in_ui_surface();
+                }
+            } else {
+                commands.entity(zone_ref.zone).despawn_recursive();
+            }
+        } else {
+            commands.entity(zone_ref.zone).despawn_recursive();
+        }
     }
 }
 
@@ -315,6 +371,7 @@ impl Command for DockingZoneSplit {
                     },
                     |_| {},
                 )
+                .insert(DockingZoneSplitContainer)
                 .id();
 
             commands
@@ -384,6 +441,10 @@ enum DropArea {
     South,
     West,
 }
+
+#[derive(Component, Debug, Reflect)]
+#[reflect(Component)]
+pub struct DockingZoneSplitContainer;
 
 #[derive(Component, Debug, Reflect)]
 #[reflect(Component)]
