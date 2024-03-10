@@ -24,7 +24,7 @@ use super::{
 };
 
 pub struct DockingZonePlugin;
-// TODO: Un-split docking zones once there is only one child
+
 impl Plugin for DockingZonePlugin {
     fn build(&self, app: &mut App) {
         app.configure_sets(Update, DockingZoneUpdate.after(DroppableUpdate))
@@ -69,6 +69,7 @@ fn cleanup_empty_docking_zones(
             continue;
         };
 
+        let mut despawn_zone = true;
         let parent_id = parent.get();
         if let Ok(_) = q_split_zones.get(parent_id) {
             let children = q_children.get(parent_id).unwrap();
@@ -102,42 +103,38 @@ fn cleanup_empty_docking_zones(
                     }
                 }
 
-                if need_to_keep_container {
-                    commands.entity(zone_ref.zone).despawn_recursive();
-                } else if let Ok(split_parent) = q_parent.get(parent_id) {
-                    let split_parent_id = split_parent.get();
-                    let index = q_children
-                        .get(split_parent_id)
-                        .unwrap()
-                        .iter()
-                        .position(|child| *child == parent_id)
-                        .unwrap();
+                if !need_to_keep_container {
+                    if let Ok(split_parent) = q_parent.get(parent_id) {
+                        let split_parent_id = split_parent.get();
+                        let index = q_children
+                            .get(split_parent_id)
+                            .unwrap()
+                            .iter()
+                            .position(|child| *child == parent_id)
+                            .unwrap();
 
-                    for child in children {
-                        if *child == zone_ref.zone {
-                            continue;
+                        for child in children {
+                            if *child == zone_ref.zone {
+                                continue;
+                            }
+
+                            if q_sized_zone.get(*child).is_ok() {
+                                commands
+                                    .entity(split_parent_id)
+                                    .insert_children(index, &[*child]);
+                            }
                         }
 
-                        if q_sized_zone.get(*child).is_ok() {
-                            commands
-                                .entity(split_parent_id)
-                                .insert_children(index, &[*child]);
-                        }
+                        commands.entity(parent_id).despawn_recursive();
                     }
-
-                    // Safe to do immediately, all children still extist
-                    commands
-                        .entity(split_parent_id)
-                        .add(ResetChildrenInUiSurface);
-                    commands.entity(parent_id).despawn_recursive();
-                } else {
-                    commands.entity(zone_ref.zone).despawn_recursive();
+                    despawn_zone = false;
                 }
-            } else {
-                commands.entity(zone_ref.zone).despawn_recursive();
             }
-        } else {
+        }
+
+        if despawn_zone {
             commands.entity(zone_ref.zone).despawn_recursive();
+            commands.entity(parent_id).add(ResetChildrenInUiSurface);
         }
     }
 }
@@ -378,9 +375,6 @@ impl Command for DockingZoneSplit {
         };
         sized_zone.set_size(new_container_size);
 
-        let mut tab_container_id = Entity::PLACEHOLDER;
-        let mut tab_container = TabContainer::default();
-
         let mut queue = CommandQueue::default();
         let mut commands = Commands::new(&mut queue, world);
 
@@ -415,8 +409,9 @@ impl Command for DockingZoneSplit {
                 },
                 self.panel_to_dock.is_some(),
                 |container| {
-                    tab_container_id = container.id();
-                    tab_container = container.context().clone();
+                    if let Some(floating_panel_id) = self.panel_to_dock {
+                        container.dock_panel(floating_panel_id);
+                    }
                 },
             )
             .id();
@@ -443,15 +438,6 @@ impl Command for DockingZoneSplit {
 
         commands.entity(parent_id).reset_children_in_ui_surface();
         queue.apply(world);
-
-        if let Some(floating_panel_id) = self.panel_to_dock {
-            let mut queue = CommandQueue::default();
-            let mut commands = Commands::new(&mut queue, world);
-            commands
-                .ui_builder(tab_container)
-                .dock_panel(floating_panel_id);
-            queue.apply(world);
-        }
     }
 }
 

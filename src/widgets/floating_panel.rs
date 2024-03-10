@@ -1,11 +1,9 @@
-use bevy::ecs::system::Command;
 use bevy::ui::FocusPolicy;
 use bevy::window::PrimaryWindow;
 use bevy::{prelude::*, window::WindowResized};
 use sickle_math::ease::Ease;
 
 use super::icon::UiIconExt;
-use super::panel::Panel;
 use super::prelude::{LabelConfig, UiContainerExt, UiLabelExt, UiPanelExt};
 use super::prelude::{SetLabelTextExt, UiScrollViewExt};
 use crate::animated_interaction::{AnimatedInteraction, AnimationConfig};
@@ -37,6 +35,7 @@ pub struct FloatingPanelPlugin;
 impl Plugin for FloatingPanelPlugin {
     fn build(&self, app: &mut App) {
         app.configure_sets(Update, FloatingPanelUpdate.after(DroppableUpdate))
+            .add_systems(PreUpdate, update_floating_panel_panel_id)
             .add_systems(
                 Update,
                 (
@@ -58,7 +57,36 @@ impl Plugin for FloatingPanelPlugin {
 pub struct FloatingPanelUpdate;
 
 // TODO: Disable resizing when a panel is dragged or resized
-// TODO: Fix dropzone bug
+fn update_floating_panel_panel_id(
+    mut q_floating_panels: Query<
+        (Entity, &mut FloatingPanel, &UpdateFloatingPanelPanelId),
+        Added<UpdateFloatingPanelPanelId>,
+    >,
+    mut commands: Commands,
+) {
+    for (entity, mut floating_panel, update_ref) in &mut q_floating_panels {
+        commands
+            .entity(entity)
+            .remove::<UpdateFloatingPanelPanelId>();
+
+        if update_ref.panel_id == floating_panel.content_panel {
+            warn!("Tried setting floating panel id to its current panel!");
+            continue;
+        }
+
+        commands
+            .entity(floating_panel.content_panel)
+            .despawn_recursive();
+
+        commands
+            .entity(update_ref.panel_id)
+            .set_parent(floating_panel.content_panel_container);
+
+        commands.style(update_ref.panel_id).show();
+
+        floating_panel.content_panel = update_ref.panel_id;
+    }
+}
 
 fn panel_added(q_panels: Query<Entity, Added<FloatingPanel>>) -> bool {
     q_panels.iter().count() > 0
@@ -307,7 +335,6 @@ fn update_panel_layout(
         (Entity, &FloatingPanel, Ref<FloatingPanelConfig>),
         Or<(Changed<FloatingPanel>, Changed<FloatingPanelConfig>)>,
     >,
-    mut q_panel: Query<&mut Panel>,
     mut commands: Commands,
 ) {
     for (entity, panel, config) in &q_panels {
@@ -338,14 +365,6 @@ fn update_panel_layout(
                     true => "sickle://icons/chevron_right.png",
                     false => "sickle://icons/chevron_down.png",
                 });
-
-            if let Some(panel_id) = panel.content_panel {
-                if let Ok(mut panel) = q_panel.get_mut(panel_id) {
-                    if panel.visible == config.folded {
-                        panel.visible = !config.folded;
-                    }
-                }
-            }
         }
 
         let render_resize_handles = !config.folded && config.resizable && !panel.moving;
@@ -522,7 +541,7 @@ pub struct FloatingPanel {
     close_button: Entity,
     content_view: Entity,
     content_panel_container: Entity,
-    content_panel: Option<Entity>,
+    content_panel: Entity,
     resize_handles: (Entity, Entity),
     resizing: bool,
     moving: bool,
@@ -543,7 +562,7 @@ impl Default for FloatingPanel {
             close_button: Entity::PLACEHOLDER,
             content_view: Entity::PLACEHOLDER,
             content_panel_container: Entity::PLACEHOLDER,
-            content_panel: Default::default(),
+            content_panel: Entity::PLACEHOLDER,
             resize_handles: (Entity::PLACEHOLDER, Entity::PLACEHOLDER),
             resizing: Default::default(),
             moving: Default::default(),
@@ -553,7 +572,11 @@ impl Default for FloatingPanel {
 }
 
 impl FloatingPanel {
-    pub fn content_panel_id(&self) -> Option<Entity> {
+    pub fn content_panel_container(&self) -> Entity {
+        self.content_panel_container
+    }
+
+    pub fn content_panel_id(&self) -> Entity {
         self.content_panel
     }
 
@@ -661,114 +684,19 @@ impl FloatingPanelLayout {
     }
 }
 
-struct UpdateFloatingPanelPanelId {
-    floating_panel: Entity,
-    panel_id: Option<Entity>,
-    update_panel_title: bool,
-}
-
-impl Command for UpdateFloatingPanelPanelId {
-    fn apply(self, world: &mut World) {
-        let Ok((mut floating_panel, config)) = world
-            .query::<(&mut FloatingPanel, &FloatingPanelConfig)>()
-            .get_mut(world, self.floating_panel)
-        else {
-            warn!(
-                "Cannot update floating panel's panel ID: {:?} not a FloatingPanel",
-                self.floating_panel
-            );
-            return;
-        };
-
-        floating_panel.content_panel = self.panel_id;
-
-        if !self.update_panel_title {
-            return;
-        }
-
-        let Some(panel_id) = self.panel_id else {
-            return;
-        };
-
-        if let Some(title) = config.title.clone() {
-            let Ok(mut panel) = world.query::<&mut Panel>().get_mut(world, panel_id) else {
-                warn!("Cannot update panel title: {:?} not a Panel", panel_id);
-                return;
-            };
-
-            panel.title = title;
-        }
-    }
+#[derive(Component)]
+#[component(storage = "SparseSet")]
+pub struct UpdateFloatingPanelPanelId {
+    pub panel_id: Entity,
 }
 
 pub trait UiFloatingPanelSubExt<'w, 's> {
     fn id(&self) -> Entity;
-
-    fn content<'a>(
-        &'a mut self,
-        spawn_children: impl FnOnce(&mut UiBuilder<Entity>),
-    ) -> UiBuilder<'w, 's, 'a, FloatingPanel>;
-
-    fn set_panel<'a>(&'a mut self, new_panel: Entity) -> UiBuilder<'w, 's, 'a, FloatingPanel>;
 }
 
 impl<'w, 's> UiFloatingPanelSubExt<'w, 's> for UiBuilder<'w, 's, '_, FloatingPanel> {
     fn id(&self) -> Entity {
         self.context().own_id
-    }
-
-    fn content<'a>(
-        &'a mut self,
-        spawn_children: impl FnOnce(&mut UiBuilder<Entity>),
-    ) -> UiBuilder<'w, 's, 'a, FloatingPanel> {
-        let mut context = self.context();
-        // FIXME: Title needs to come from Floating panel
-        if let Some(panel_id) = context.content_panel {
-            let mut builder = self.commands().ui_builder(panel_id);
-            spawn_children(&mut builder);
-        } else {
-            let panel_id = self
-                .commands()
-                .ui_builder(context.content_panel_container)
-                .panel("FIXME".into(), spawn_children)
-                .id();
-
-            self.commands().add(UpdateFloatingPanelPanelId {
-                floating_panel: context.own_id,
-                panel_id: panel_id.into(),
-                update_panel_title: true,
-            });
-
-            context.content_panel = panel_id.into();
-        }
-
-        self.commands().ui_builder(context)
-    }
-
-    fn set_panel<'a>(&'a mut self, new_panel: Entity) -> UiBuilder<'w, 's, 'a, FloatingPanel> {
-        let mut context = self.context();
-
-        if let Some(panel_id) = context.content_panel {
-            warn!(
-                "Floating panel {:?} already has a Panel, despawning {:?}",
-                context.own_id, panel_id
-            );
-            self.commands().entity(panel_id).despawn_recursive();
-        }
-
-        self.commands()
-            .entity(new_panel)
-            .set_parent(context.content_panel_container);
-        self.commands().style(new_panel).show();
-
-        self.commands().add(UpdateFloatingPanelPanelId {
-            floating_panel: context.own_id,
-            panel_id: new_panel.into(),
-            update_panel_title: false,
-        });
-
-        context.content_panel = new_panel.into();
-        self.commands().ui_builder(context)
     }
 }
 
@@ -777,7 +705,7 @@ pub trait UiFloatingPanelExt<'w, 's> {
         &'a mut self,
         config: FloatingPanelConfig,
         layout: FloatingPanelLayout,
-        spawn_children: impl FnOnce(&mut UiBuilder<FloatingPanel>),
+        spawn_children: impl FnOnce(&mut UiBuilder<Entity>),
     ) -> UiBuilder<'w, 's, 'a, Entity>;
 }
 
@@ -786,7 +714,7 @@ impl<'w, 's> UiFloatingPanelExt<'w, 's> for UiBuilder<'w, 's, '_, Entity> {
         &'a mut self,
         config: FloatingPanelConfig,
         layout: FloatingPanelLayout,
-        spawn_children: impl FnOnce(&mut UiBuilder<FloatingPanel>),
+        spawn_children: impl FnOnce(&mut UiBuilder<Entity>),
     ) -> UiBuilder<'w, 's, 'a, Entity> {
         let restrict_to = config.restrict_scroll;
 
@@ -799,6 +727,7 @@ impl<'w, 's> UiFloatingPanelExt<'w, 's> for UiBuilder<'w, 's, '_, Entity> {
         let mut drag_handle = Entity::PLACEHOLDER;
         let mut content_view = Entity::PLACEHOLDER;
         let mut content_panel_container = Entity::PLACEHOLDER;
+        let mut content_panel = Entity::PLACEHOLDER;
         let mut frame = self.container(FloatingPanel::frame(), |container| {
             let panel = container.id();
 
@@ -972,6 +901,12 @@ impl<'w, 's> UiFloatingPanelExt<'w, 's> for UiBuilder<'w, 's, '_, Entity> {
             content_view = container
                 .scroll_view(restrict_to, |scroll_view| {
                     content_panel_container = scroll_view.id();
+                    content_panel = scroll_view
+                        .panel(
+                            config.title.clone().unwrap_or("Untitled".into()),
+                            spawn_children,
+                        )
+                        .id();
                 })
                 .id();
         });
@@ -993,16 +928,13 @@ impl<'w, 's> UiFloatingPanelExt<'w, 's> for UiBuilder<'w, 's, '_, Entity> {
             close_button,
             content_view,
             content_panel_container,
-            content_panel: None,
+            content_panel,
             resize_handles: (horizontal_resize_handles, vertical_resize_handles),
             priority: false,
             ..default()
         };
 
         frame.insert((config, floating_panel));
-
-        let mut builder = self.commands().ui_builder(floating_panel);
-        spawn_children(&mut builder);
 
         self.commands().ui_builder(own_id)
     }

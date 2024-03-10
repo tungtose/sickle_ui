@@ -9,7 +9,6 @@ use super::prelude::UiContainerExt;
 pub struct Panel {
     own_id: Entity,
     pub title: String,
-    pub visible: bool,
 }
 
 impl Default for Panel {
@@ -17,7 +16,6 @@ impl Default for Panel {
         Self {
             own_id: Entity::PLACEHOLDER,
             title: "".into(),
-            visible: true,
         }
     }
 }

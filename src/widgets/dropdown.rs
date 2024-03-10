@@ -12,7 +12,7 @@ use crate::{
 };
 
 use super::{
-    floating_panel::{FloatingPanel, UiFloatingPanelSubExt},
+    floating_panel::FloatingPanel,
     prelude::{
         FloatingPanelConfig, FloatingPanelLayout, LabelConfig, UiContainerExt, UiFloatingPanelExt,
         UiLabelExt,
@@ -300,19 +300,17 @@ impl<'w, 's> UiDropdownExt<'w, 's> for UiBuilder<'w, 's, '_, Entity> {
                         },
                         |container| {
                             for (index, label) in string_options.iter().enumerate() {
-                                container.content(|content_container| {
-                                    content_container.container(
-                                        Dropdown::option_bundle(index, dropdown_id),
-                                        |option| {
-                                            option.label(LabelConfig {
-                                                label: label.clone(),
-                                                margin: UiRect::horizontal(Val::Px(10.)),
-                                                color: Color::WHITE,
-                                                ..default()
-                                            });
-                                        },
-                                    );
-                                });
+                                container.container(
+                                    Dropdown::option_bundle(index, dropdown_id),
+                                    |option| {
+                                        option.label(LabelConfig {
+                                            label: label.clone(),
+                                            margin: UiRect::horizontal(Val::Px(10.)),
+                                            color: Color::WHITE,
+                                            ..default()
+                                        });
+                                    },
+                                );
                             }
                         },
                     )
