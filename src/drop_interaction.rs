@@ -1,4 +1,4 @@
-use bevy::prelude::*;
+use bevy::{prelude::*, ui::RelativeCursorPosition};
 
 use crate::drag_interaction::{DragState, Draggable, DraggableUpdate};
 
@@ -7,107 +7,120 @@ pub struct DropInteractionPlugin;
 impl Plugin for DropInteractionPlugin {
     fn build(&self, app: &mut App) {
         app.configure_sets(Update, DroppableUpdate.after(DraggableUpdate))
-            .add_systems(Update, update_drop_zones.chain().in_set(DroppableUpdate));
+            .add_systems(
+                Update,
+                (
+                    update_drop_zone_single_frame_state,
+                    update_drop_zones.run_if(should_update_drop_zones),
+                )
+                    .chain()
+                    .in_set(DroppableUpdate),
+            );
     }
 }
 
 #[derive(SystemSet, Clone, Eq, Debug, Hash, PartialEq)]
 pub struct DroppableUpdate;
 
-// TODO: Use node stack index to only interact with the topmost zone
-fn update_drop_zones(
-    q_droppables: Query<(Entity, &Draggable), (With<Droppable>, Changed<Draggable>)>,
-    mut q_drop_zones: Query<(Entity, Ref<Interaction>, &mut DropZone, &Node)>,
-) {
-    if !q_droppables
-        .iter()
-        .any(|(_, Draggable { state, .. })| *state != DragState::MaybeDragged)
-    {
-        return;
-    }
-
-    let mut hovered_to_stack_index: Vec<(Entity, u32)> = q_drop_zones
-        .iter()
-        .filter(|(_, interaction, _, _)| **interaction == Interaction::Hovered)
-        .map(|(entity, _, _, node)| (entity, node.stack_index()))
-        .collect();
-
-    hovered_to_stack_index.sort_by_key(|(_, i)| *i);
-    let top_hovered = hovered_to_stack_index
-        .last()
-        .unwrap_or(&(Entity::PLACEHOLDER, 0u32))
-        .0;
-
-    for (_, interaction, mut drop_zone, _) in &mut q_drop_zones {
-        if drop_zone.drop_phase == DropPhase::Dropped
+fn update_drop_zone_single_frame_state(mut q_drop_zones: Query<&mut DropZone, Changed<DropZone>>) {
+    for mut drop_zone in &mut q_drop_zones {
+        if drop_zone.drop_phase == DropPhase::DroppableLeft
             || drop_zone.drop_phase == DropPhase::DropCanceled
+            || drop_zone.drop_phase == DropPhase::Dropped
         {
             drop_zone.drop_phase = DropPhase::Inactive;
             drop_zone.incoming_droppable = None;
             drop_zone.position = None;
-        } else if *interaction == Interaction::None {
-            if drop_zone.drop_phase == DropPhase::DroppableHover {
+        } else if drop_zone.drop_phase == DropPhase::DroppableEntered {
+            drop_zone.drop_phase = DropPhase::DroppableHover
+        }
+    }
+}
+
+fn should_update_drop_zones(
+    q_droppables: Query<&Draggable, (With<Droppable>, Changed<Draggable>)>,
+) -> bool {
+    q_droppables.iter().any(|Draggable { state, .. }| {
+        *state != DragState::Inactive && *state != DragState::MaybeDragged
+    })
+}
+
+fn update_drop_zones(
+    q_droppables: Query<(Entity, &Draggable), (With<Droppable>, Changed<Draggable>)>,
+    q_drop_zone_data: Query<(Entity, &Interaction, &Node, &RelativeCursorPosition), With<DropZone>>,
+    mut q_drop_zones: Query<(Entity, &mut DropZone)>,
+) {
+    // Run condition makes sure we are dragging a droppable.
+    // We have no information if the interaction is from the same source,
+    // check if cursor is over any.
+    //
+    // Technically, a pointer / finger could be currently hovering the zone
+    // while another pointer / finger drags the droppable, but the ui_focus, flux and
+    // drag interactions only track main pointers.
+    let mut hovered_to_stack_index: Vec<(Entity, u32)> = q_drop_zone_data
+        .iter()
+        .filter(|(_, interaction, _, rel_pos)| {
+            **interaction == Interaction::Hovered && rel_pos.mouse_over()
+        })
+        .map(|(entity, _, node, _)| (entity, node.stack_index()))
+        .collect();
+
+    hovered_to_stack_index.sort_by_key(|(_, i)| *i);
+    if let Some((top_hovered, _)) = hovered_to_stack_index.last() {
+        // Safe unwrap: ID comes from a broader query of DropZones.
+        let (_, mut drop_zone) = q_drop_zones.get_mut(*top_hovered).unwrap();
+
+        // Take the first droppable that is moving
+        // ui_focus, flux and drag interactions only track the main pointer interaction
+        let (droppable_entity, draggable) = q_droppables
+            .iter()
+            .find(|(_, draggable)| {
+                draggable.state != DragState::Inactive && draggable.state != DragState::MaybeDragged
+            })
+            .unwrap();
+
+        // See update_drop_zone_single_frame_state which executes just before this system
+        if drop_zone.drop_phase == DropPhase::Inactive {
+            drop_zone.drop_phase = DropPhase::DroppableEntered
+        } else if draggable.state == DragState::DragEnd {
+            drop_zone.drop_phase = DropPhase::Dropped;
+        } else if draggable.state == DragState::DragCanceled {
+            drop_zone.drop_phase = DropPhase::DropCanceled;
+        }
+
+        if draggable.state == DragState::DragStart
+            || draggable.state == DragState::Dragging
+            || draggable.state == DragState::DragEnd
+        {
+            drop_zone.incoming_droppable = droppable_entity.into();
+            drop_zone.position = draggable.position;
+        } else {
+            drop_zone.incoming_droppable = None;
+            drop_zone.position = None;
+        }
+
+        // Update all the other zones
+        for (dropzone_id, mut drop_zone) in &mut q_drop_zones {
+            if dropzone_id == *top_hovered {
+                continue;
+            }
+
+            if drop_zone.drop_phase == DropPhase::DroppableEntered
+                || drop_zone.drop_phase == DropPhase::DroppableHover
+            {
                 drop_zone.drop_phase = DropPhase::DroppableLeft;
-            } else if drop_zone.drop_phase == DropPhase::DroppableLeft {
-                drop_zone.drop_phase = DropPhase::Inactive;
                 drop_zone.incoming_droppable = None;
                 drop_zone.position = None;
             }
-        } else if *interaction == Interaction::Hovered {
-            if drop_zone.drop_phase == DropPhase::Inactive {
-                drop_zone.drop_phase = DropPhase::DroppableEntered;
-            } else if drop_zone.drop_phase == DropPhase::DroppableEntered {
-                drop_zone.drop_phase = DropPhase::DroppableHover;
-            }
         }
-    }
-
-    for (droppable_entity, draggable) in &q_droppables {
-        if draggable.state == DragState::Inactive || draggable.state == DragState::MaybeDragged {
-            continue;
-        }
-
-        if draggable.state == DragState::DragStart || draggable.state == DragState::Dragging {
-            for (_, interaction, mut drop_zone, _) in &mut q_drop_zones {
-                if interaction.is_changed() {
-                    if *interaction == Interaction::Hovered {
-                        drop_zone.drop_phase = DropPhase::DroppableEntered;
-                        drop_zone.incoming_droppable = droppable_entity.into();
-                        drop_zone.position = draggable.position;
-                    } else if *interaction == Interaction::None {
-                        drop_zone.drop_phase = DropPhase::DroppableLeft;
-                        drop_zone.incoming_droppable = None;
-                        drop_zone.position = None;
-                    }
-                } else if *interaction == Interaction::Hovered {
-                    if drop_zone.drop_phase == DropPhase::Inactive {
-                        drop_zone.drop_phase = DropPhase::DroppableEntered;
-                        drop_zone.incoming_droppable = droppable_entity.into();
-                    }
-                    drop_zone.position = draggable.position;
-                }
-            }
-        } else if draggable.state == DragState::DragEnd {
-            for (entity, interaction, mut drop_zone, _) in &mut q_drop_zones {
-                if *interaction == Interaction::Hovered {
-                    if entity == top_hovered {
-                        drop_zone.drop_phase = DropPhase::Dropped;
-                        drop_zone.incoming_droppable = droppable_entity.into();
-                        drop_zone.position = draggable.position;
-                    } else {
-                        drop_zone.drop_phase = DropPhase::DroppableLeft;
-                        drop_zone.incoming_droppable = None;
-                        drop_zone.position = None;
-                    }
-                }
-            }
-        } else {
-            for (_, interaction, mut drop_zone, _) in &mut q_drop_zones {
-                if *interaction == Interaction::Hovered {
-                    drop_zone.drop_phase = DropPhase::DropCanceled;
-                    drop_zone.incoming_droppable = None;
-                    drop_zone.position = None;
-                }
+    } else {
+        for (_, mut drop_zone) in &mut q_drop_zones {
+            if drop_zone.drop_phase == DropPhase::DroppableEntered
+                || drop_zone.drop_phase == DropPhase::DroppableHover
+            {
+                drop_zone.drop_phase = DropPhase::DroppableLeft;
+                drop_zone.incoming_droppable = None;
+                drop_zone.position = None;
             }
         }
     }

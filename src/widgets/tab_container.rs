@@ -533,7 +533,6 @@ impl Command for PopoutPanelFromTabContainer {
 
         let mut queue = CommandQueue::default();
         let mut commands = Commands::new(&mut queue, world);
-        let mut floating_panel = FloatingPanel::default();
 
         let floating_panel_id = commands
             .ui_builder(root_node)
@@ -549,7 +548,6 @@ impl Command for PopoutPanelFromTabContainer {
                     ..default()
                 },
                 |container| {
-                    floating_panel = container.context();
                     container.set_panel(panel_id);
                 },
             )
@@ -739,8 +737,12 @@ impl Command for DockFloatingPanel {
         let mut queue = CommandQueue::default();
         let mut commands = Commands::new(&mut queue, world);
 
+        // commands.style(panel_id).hide();
         commands.ui_builder(*container).add_panel(panel);
-        commands.entity(self.floating_panel).despawn_recursive();
+        queue.apply(world);
+        let mut queue = CommandQueue::default();
+        let mut commands = Commands::new(&mut queue, world);
+        commands.entity(self.floating_panel).despawn_recursive(); //.delay_depsawn(true);
         queue.apply(world);
     }
 }
@@ -1038,10 +1040,12 @@ impl<'w, 's> UiTabContainerSubExt<'w, 's> for UiBuilder<'w, 's, '_, TabContainer
             },
         );
 
-        self.commands().entity(viewport_id).add_child(panel_id);
+        self.commands().entity(panel_id).set_parent(viewport_id);
+
         self.commands().add(IncrementTabCount {
             container: container_id,
         });
+
         self.commands().ui_builder(context)
     }
 

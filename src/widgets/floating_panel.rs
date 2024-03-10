@@ -10,7 +10,6 @@ use super::prelude::{LabelConfig, UiContainerExt, UiLabelExt, UiPanelExt};
 use super::prelude::{SetLabelTextExt, UiScrollViewExt};
 use crate::animated_interaction::{AnimatedInteraction, AnimationConfig};
 use crate::drop_interaction::{Droppable, DroppableUpdate};
-use crate::hierarchy_delay::DelayActions;
 use crate::interactions::InteractiveBackground;
 use crate::resize_interaction::ResizeHandle;
 use crate::ui_builder::UiBuilderExt;
@@ -665,12 +664,13 @@ impl FloatingPanelLayout {
 struct UpdateFloatingPanelPanelId {
     floating_panel: Entity,
     panel_id: Option<Entity>,
+    update_panel_title: bool,
 }
 
 impl Command for UpdateFloatingPanelPanelId {
     fn apply(self, world: &mut World) {
-        let Ok(mut floating_panel) = world
-            .query::<&mut FloatingPanel>()
+        let Ok((mut floating_panel, config)) = world
+            .query::<(&mut FloatingPanel, &FloatingPanelConfig)>()
             .get_mut(world, self.floating_panel)
         else {
             warn!(
@@ -681,6 +681,23 @@ impl Command for UpdateFloatingPanelPanelId {
         };
 
         floating_panel.content_panel = self.panel_id;
+
+        if !self.update_panel_title {
+            return;
+        }
+
+        let Some(panel_id) = self.panel_id else {
+            return;
+        };
+
+        if let Some(title) = config.title.clone() {
+            let Ok(mut panel) = world.query::<&mut Panel>().get_mut(world, panel_id) else {
+                warn!("Cannot update panel title: {:?} not a Panel", panel_id);
+                return;
+            };
+
+            panel.title = title;
+        }
     }
 }
 
@@ -719,6 +736,7 @@ impl<'w, 's> UiFloatingPanelSubExt<'w, 's> for UiBuilder<'w, 's, '_, FloatingPan
             self.commands().add(UpdateFloatingPanelPanelId {
                 floating_panel: context.own_id,
                 panel_id: panel_id.into(),
+                update_panel_title: true,
             });
 
             context.content_panel = panel_id.into();
@@ -740,22 +758,14 @@ impl<'w, 's> UiFloatingPanelSubExt<'w, 's> for UiBuilder<'w, 's, '_, FloatingPan
 
         self.commands()
             .entity(new_panel)
-            .delay_reparenting(context.content_panel_container);
+            .set_parent(context.content_panel_container);
+        self.commands().style(new_panel).show();
 
         self.commands().add(UpdateFloatingPanelPanelId {
             floating_panel: context.own_id,
             panel_id: new_panel.into(),
+            update_panel_title: false,
         });
-
-        // FIXME: Once taffy / Bevy are better friends. See `move_panel_to_floating_panel`
-        // self.commands()
-        //     .entity(new_panel)
-        //     .set_parent(context.content_panel_container);
-
-        // self.commands().add(UpdateFloatingPanelPanelId {
-        //     floating_panel: context.own_id,
-        //     panel_id: new_panel.into(),
-        // });
 
         context.content_panel = new_panel.into();
         self.commands().ui_builder(context)

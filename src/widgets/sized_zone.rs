@@ -4,6 +4,7 @@ use crate::{
     drag_interaction::{DragState, Draggable},
     resize_interaction::{ResizeDirection, ResizeHandle},
     ui_builder::*,
+    ui_commands::LogHierarchyExt,
     ui_style::{SetEntityVisiblityExt, SetNodeLeftExt, SetNodeTopExt, UiStyleExt},
 };
 
@@ -194,6 +195,7 @@ fn preset_sized_zone_resize_handles(
                         "Missing Style detected on Node {:?} during sized zone handle update.",
                         children[i]
                     );
+                    commands.entity(children[i]).log_hierarchy(None);
                     continue;
                 };
 

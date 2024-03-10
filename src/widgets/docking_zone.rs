@@ -1,6 +1,7 @@
 use bevy::{
     ecs::system::{Command, CommandQueue},
     prelude::*,
+    ui::RelativeCursorPosition,
 };
 
 use crate::{
@@ -17,8 +18,8 @@ use crate::{
 use super::{
     floating_panel::FloatingPanelTitle,
     prelude::{SizedZoneConfig, UiSizedZoneExt, UiTabContainerExt},
-    sized_zone::{SizedZone, SizedZoneResizeHandleContainer},
-    tab_container::{Tab, TabBar, TabContainer, UiTabContainerSubExt},
+    sized_zone::{SizedZone, SizedZonePreUpdate, SizedZoneResizeHandleContainer},
+    tab_container::{TabBar, TabContainer, UiTabContainerSubExt},
 };
 
 pub struct DockingZonePlugin;
@@ -28,9 +29,12 @@ impl Plugin for DockingZonePlugin {
     fn build(&self, app: &mut App) {
         app.configure_sets(Update, DockingZoneUpdate.after(DroppableUpdate))
             .add_systems(
+                PreUpdate,
+                cleanup_empty_docking_zones.after(SizedZonePreUpdate),
+            )
+            .add_systems(
                 Update,
                 (
-                    remove_empty_docking_zones.run_if(should_process_empty_docking_zones),
                     update_docking_zone_resize_handles.run_if(should_update_resize_handles),
                     handle_docking_zone_drop_zone_change,
                 )
@@ -42,37 +46,19 @@ impl Plugin for DockingZonePlugin {
 #[derive(SystemSet, Clone, Eq, Debug, Hash, PartialEq)]
 pub struct DockingZoneUpdate;
 
-fn should_process_empty_docking_zones(q_removed_tabs: RemovedComponents<Tab>) -> bool {
-    q_removed_tabs.len() > 0
-}
-
-// TODO: Use TabContainer->tab_count instead!
-// TODO: Move logic to TabContainer?, remove empty or single-docking-zone-children zones
-fn remove_empty_docking_zones(
-    q_empty_tab_bars: Query<&TabBar, Without<Children>>,
-    q_tab_bars: Query<(&TabBar, &Children)>,
-    q_tab: Query<&Tab>,
-    q_tab_container_to_remove: Query<&RemoveEmptyDockingZone>,
+fn cleanup_empty_docking_zones(
+    q_tab_containers: Query<
+        (Entity, &TabContainer, &RemoveEmptyDockingZone),
+        Changed<TabContainer>,
+    >,
     mut commands: Commands,
 ) {
-    for tab_bar in &q_empty_tab_bars {
-        let Ok(to_remove) = q_tab_container_to_remove.get(tab_bar.container_id()) else {
-            continue;
-        };
-
-        commands.entity(to_remove.zone).despawn_recursive();
-    }
-
-    for (tab_bar, children) in &q_tab_bars {
-        let Ok(to_remove) = q_tab_container_to_remove.get(tab_bar.container_id()) else {
-            continue;
-        };
-
-        if children.iter().any(|child| q_tab.get(*child).is_ok()) {
+    for (_, tab_container, zone_ref) in &q_tab_containers {
+        if tab_container.tab_count() > 0 {
             continue;
         }
 
-        commands.entity(to_remove.zone).delay_depsawn(true);
+        commands.entity(zone_ref.zone).despawn_recursive();
     }
 }
 
@@ -255,6 +241,7 @@ impl Command for DockingZoneSplit {
         let current_direction = sized_zone.direction();
         let current_size = sized_zone.size();
         let current_min_size = sized_zone.min_size();
+
         let Ok(_) = world.query::<&TabContainer>().get(world, tab_container_id) else {
             error!(
                 "Tab container {:?} missing from docking zone {:?}",
@@ -311,6 +298,9 @@ impl Command for DockingZoneSplit {
         };
         sized_zone.set_size(new_container_size);
 
+        let mut tab_container_id = Entity::PLACEHOLDER;
+        let mut tab_container = TabContainer::default();
+
         let mut queue = CommandQueue::default();
         let mut commands = Commands::new(&mut queue, world);
 
@@ -326,6 +316,7 @@ impl Command for DockingZoneSplit {
                     |_| {},
                 )
                 .id();
+
             commands
                 .entity(parent_id)
                 .insert_children(current_index, &[new_parent_id]);
@@ -342,10 +333,9 @@ impl Command for DockingZoneSplit {
                     ..default()
                 },
                 self.panel_to_dock.is_some(),
-                |tab_container| {
-                    if let Some(floating_panel_id) = self.panel_to_dock {
-                        tab_container.dock_panel(floating_panel_id);
-                    }
+                |container| {
+                    tab_container_id = container.id();
+                    tab_container = container.context().clone();
                 },
             )
             .id();
@@ -370,7 +360,17 @@ impl Command for DockingZoneSplit {
             }
         }
 
+        commands.entity(parent_id).reset_children_in_ui_surface();
         queue.apply(world);
+
+        if let Some(floating_panel_id) = self.panel_to_dock {
+            let mut queue = CommandQueue::default();
+            let mut commands = Commands::new(&mut queue, world);
+            commands
+                .ui_builder(tab_container)
+                .dock_panel(floating_panel_id);
+            queue.apply(world);
+        }
     }
 }
 
@@ -488,6 +488,7 @@ impl<'w, 's> UiDockingZoneExt<'w, 's> for UiBuilder<'w, 's, '_, Entity> {
             },
             Interaction::default(),
             DropZone::default(),
+            RelativeCursorPosition::default(),
         ));
 
         docking_zone

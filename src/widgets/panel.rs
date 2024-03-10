@@ -8,7 +8,7 @@ use super::prelude::UiContainerExt;
 #[reflect(Component)]
 pub struct Panel {
     own_id: Entity,
-    title: String,
+    pub title: String,
     pub visible: bool,
 }
 
