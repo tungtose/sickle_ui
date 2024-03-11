@@ -194,6 +194,7 @@ impl RadioButton {
                 ..default()
             },
             border_color: Color::DARK_GRAY.into(),
+            background_color: Color::ANTIQUE_WHITE.into(),
             focus_policy: FocusPolicy::Pass,
             ..default()
         }

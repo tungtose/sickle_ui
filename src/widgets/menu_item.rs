@@ -277,6 +277,7 @@ impl<'w, 's> UiMenuItemExt<'w, 's> for UiBuilder<'w, 's, '_, Entity> {
                 .label(LabelConfig {
                     label: "".into(),
                     margin: UiRect::horizontal(Val::Px(5.)),
+                    color: Color::ANTIQUE_WHITE,
                     ..default()
                 })
                 .id();
@@ -285,6 +286,7 @@ impl<'w, 's> UiMenuItemExt<'w, 's> for UiBuilder<'w, 's, '_, Entity> {
                     .label(LabelConfig {
                         label: "".into(),
                         margin: UiRect::horizontal(Val::Px(5.)),
+                        color: Color::ANTIQUE_WHITE,
                         ..default()
                     })
                     .id();

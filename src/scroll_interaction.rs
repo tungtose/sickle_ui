@@ -55,8 +55,6 @@ fn update_scrollables(
         scrollable.axis = axis.into();
         scrollable.diff = offset.into();
         scrollable.unit = unit;
-
-        break;
     }
 }
 

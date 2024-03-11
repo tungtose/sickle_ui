@@ -20,7 +20,7 @@ impl Default for LabelConfig {
     fn default() -> Self {
         Self {
             label: "Label".into(),
-            color: Color::BLACK,
+            color: Color::ANTIQUE_WHITE,
             margin: Default::default(),
             wrap: FlexWrap::NoWrap,
             flex_grow: 0.,
@@ -39,7 +39,7 @@ impl LabelConfig {
     fn text_style(&self) -> TextStyle {
         TextStyle {
             color: self.color,
-            font_size: 16.,
+            font_size: 14.,
             ..default()
         }
     }

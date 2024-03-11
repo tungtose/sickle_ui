@@ -68,6 +68,11 @@ struct SetNodeLeft {
 }
 
 #[derive(StyleCommand)]
+struct SetNodeOverflow {
+    overflow: Overflow,
+}
+
+#[derive(StyleCommand)]
 struct SetNodePadding {
     padding: UiRect,
 }
@@ -141,6 +146,36 @@ pub trait SetImageExt<'a> {
 impl<'a> SetImageExt<'a> for UiStyle<'a> {
     fn image(&'a mut self, path: impl Into<String>) -> &mut UiStyle<'a> {
         self.commands.add(SetImage { path: path.into() });
+        self
+    }
+}
+
+struct SetImageScaleMode {
+    scale_mode: ImageScaleMode,
+}
+
+impl EntityCommand for SetImageScaleMode {
+    fn apply(self, entity: Entity, world: &mut World) {
+        let mut q_scale_mode = world.query::<&mut ImageScaleMode>();
+        let Ok(mut scale_mode) = q_scale_mode.get_mut(world, entity) else {
+            warn!(
+                "Failed to set image scale mode on entity {:?}: No ImageScaleMode component found!",
+                entity
+            );
+            return;
+        };
+
+        *scale_mode = self.scale_mode;
+    }
+}
+
+pub trait SetImageScaleModeExt<'a> {
+    fn image_scale_mode(&'a mut self, scale_mode: ImageScaleMode) -> &mut UiStyle<'a>;
+}
+
+impl<'a> SetImageScaleModeExt<'a> for UiStyle<'a> {
+    fn image_scale_mode(&'a mut self, scale_mode: ImageScaleMode) -> &mut UiStyle<'a> {
+        self.commands.add(SetImageScaleMode { scale_mode });
         self
     }
 }

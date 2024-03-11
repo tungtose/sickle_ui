@@ -1,7 +1,7 @@
 use bevy::{ecs::system::CommandQueue, prelude::*, window::PrimaryWindow};
 
 use crate::{
-    ui_builder::{UiBuilder, UiBuilderExt, UiRoot},
+    ui_builder::{UiBuilder, UiBuilderExt},
     FluxInteractionUpdate,
 };
 
@@ -121,6 +121,11 @@ fn generate_context_menu(world: &mut World) {
         return;
     };
 
+    let mut root_node = entity;
+    while let Ok(parent) = world.query::<&Parent>().get(world, root_node) {
+        root_node = parent.get();
+    }
+
     let entity_ref = world.entity(entity);
     let type_registry = world.resource::<AppTypeRegistry>().read();
     let mut generators: Vec<&dyn ContextMenuGenerator> = world
@@ -188,7 +193,7 @@ fn generate_context_menu(world: &mut World) {
     let mut commands = Commands::new(&mut queue, world);
 
     let container_id = commands
-        .ui_builder(UiRoot)
+        .ui_builder(root_node)
         .spawn((ContextMenu::frame(), ContextMenu { context: entity }))
         .id();
 

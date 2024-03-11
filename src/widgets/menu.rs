@@ -201,7 +201,7 @@ impl Menu {
             },
             TrackedInteraction::default(),
             InteractiveBackground {
-                highlight: Color::rgba(0.9, 0.8, 0.7, 0.5).into(),
+                highlight: Color::DARK_GRAY.into(),
                 ..default()
             },
             AnimatedInteraction::<InteractiveBackground> {
@@ -226,8 +226,8 @@ impl Menu {
                     ..default()
                 },
                 z_index: ZIndex::Global(MENU_CONTAINER_Z_INDEX),
-                background_color: Color::rgb(0.7, 0.6, 0.5).into(),
-                border_color: Color::WHITE.into(),
+                background_color: Color::rgb(0.1, 0.1, 0.1).into(),
+                border_color: Color::ANTIQUE_WHITE.into(),
                 focus_policy: bevy::ui::FocusPolicy::Block,
                 visibility: Visibility::Hidden,
                 ..default()
@@ -256,6 +256,7 @@ impl<'w, 's> UiMenuExt<'w, 's> for UiBuilder<'w, 's, '_, Entity> {
             container = menu_button.container(Menu::container(), spawn_items).id();
             menu_button.label(LabelConfig {
                 label: config.name.clone(),
+                color: Color::ANTIQUE_WHITE,
                 ..default()
             });
         });

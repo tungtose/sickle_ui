@@ -523,6 +523,12 @@ pub trait UiDockingZoneExt<'w, 's> {
         remove_empty: bool,
         spawn_children: impl FnOnce(&mut UiBuilder<TabContainer>),
     ) -> UiBuilder<'w, 's, 'a, Entity>;
+
+    fn docking_zone_split<'a>(
+        &'a mut self,
+        config: SizedZoneConfig,
+        spawn_children: impl FnOnce(&mut UiBuilder<Entity>),
+    ) -> UiBuilder<'w, 's, 'a, Entity>;
 }
 
 impl<'w, 's> UiDockingZoneExt<'w, 's> for UiBuilder<'w, 's, '_, Entity> {
@@ -563,5 +569,18 @@ impl<'w, 's> UiDockingZoneExt<'w, 's> for UiBuilder<'w, 's, '_, Entity> {
         ));
 
         docking_zone
+    }
+
+    fn docking_zone_split<'a>(
+        &'a mut self,
+        config: SizedZoneConfig,
+        spawn_children: impl FnOnce(&mut UiBuilder<Entity>),
+    ) -> UiBuilder<'w, 's, 'a, Entity> {
+        let new_id = self
+            .sized_zone(config, spawn_children)
+            .insert(DockingZoneSplitContainer)
+            .id();
+
+        self.commands().ui_builder(new_id)
     }
 }

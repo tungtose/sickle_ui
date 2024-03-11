@@ -573,7 +573,7 @@ impl SizedZone {
                 height: Val::Percent(100.),
                 ..default()
             },
-            border_color: Color::BLACK.into(),
+            border_color: Color::rgb(0.1, 0.1, 0.1).into(),
             ..default()
         }
     }

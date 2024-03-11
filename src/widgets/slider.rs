@@ -181,7 +181,7 @@ fn update_slider_readout(
             let section = TextSection {
                 value: content,
                 style: TextStyle {
-                    color: Color::BLACK,
+                    color: Color::ANTIQUE_WHITE,
                     font_size: 14.,
                     ..default()
                 },
@@ -359,6 +359,15 @@ impl Default for SliderBar {
 impl Slider {
     pub fn value(&self) -> f32 {
         self.config.min.lerp(self.config.max, self.ratio)
+    }
+
+    pub fn set_value(&mut self, value: f32) {
+        if value > self.config.max || value < self.config.min {
+            warn!("Tried to set slider value outside of range");
+            return;
+        }
+
+        self.ratio = (value - self.config.min) / (self.config.max + (0. - self.config.min))
     }
 
     fn base_tween() -> AnimationConfig {
@@ -540,6 +549,7 @@ impl<'w, 's> UiSliderExt<'w, 's> for UiBuilder<'w, 's, '_, Entity> {
                         },
                     )
                     .id();
+                info!("Slider: {:?}", slider_bar);
 
                 if config.show_current {
                     slider.container(
@@ -596,7 +606,7 @@ impl<'w, 's> UiSliderExt<'w, 's> for UiBuilder<'w, 's, '_, Entity> {
         };
 
         input.insert(Slider {
-            ratio: config.initial_value / (config.max - config.min),
+            ratio: (config.initial_value - config.min) / (config.max + (0. - config.min)),
             config,
             slider_bar,
             drag_handle,

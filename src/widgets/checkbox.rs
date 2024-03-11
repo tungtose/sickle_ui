@@ -105,6 +105,7 @@ impl Checkbox {
                 ..default()
             },
             border_color: Color::DARK_GRAY.into(),
+            background_color: Color::ANTIQUE_WHITE.into(),
             focus_policy: FocusPolicy::Pass,
             ..default()
         }
@@ -125,11 +126,17 @@ impl Checkbox {
 }
 
 pub trait UiCheckboxExt<'w, 's> {
-    fn checkbox<'a>(&'a mut self, label: Option<impl Into<String>>) -> UiBuilder<'w, 's, 'a, Entity>;
+    fn checkbox<'a>(
+        &'a mut self,
+        label: Option<impl Into<String>>,
+    ) -> UiBuilder<'w, 's, 'a, Entity>;
 }
 
 impl<'w, 's> UiCheckboxExt<'w, 's> for UiBuilder<'w, 's, '_, Entity> {
-    fn checkbox<'a>(&'a mut self, label: Option<impl Into<String>>) -> UiBuilder<'w, 's, 'a, Entity> {
+    fn checkbox<'a>(
+        &'a mut self,
+        label: Option<impl Into<String>>,
+    ) -> UiBuilder<'w, 's, 'a, Entity> {
         let mut check_node: Entity = Entity::PLACEHOLDER;
 
         let mut input = self.container(Checkbox::checkbox_container(), |container| {

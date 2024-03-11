@@ -7,8 +7,8 @@ use crate::{
     interactions::InteractiveBackground,
     ui_builder::{UiBuilder, UiBuilderExt},
     ui_style::{
-        SetBackgroundColorExt, SetFluxInteractionExt, SetNodeLeftExt, SetNodePositionTypeExt,
-        SetNodeShowHideExt, SetZIndexExt, UiStyleExt,
+        SetBackgroundColorExt, SetFluxInteractionExt, SetNodeLeftExt, SetNodeOverflowExt,
+        SetNodePositionTypeExt, SetNodeShowHideExt, SetZIndexExt, UiStyleExt,
     },
     TrackedInteraction,
 };
@@ -56,7 +56,7 @@ impl Plugin for TabContainerPlugin {
         .add_systems(
             Update,
             (
-                update_tab_container_on_press,
+                update_tab_container_on_tab_press,
                 update_tab_container_on_change,
                 handle_tab_dragging,
             )
@@ -271,7 +271,7 @@ fn popout_tab_on_context_menu_press(
     }
 }
 
-fn update_tab_container_on_press(
+fn update_tab_container_on_tab_press(
     q_tabs: Query<(Entity, &Tab, &Interaction), Changed<Interaction>>,
     q_tab: Query<Entity, With<Tab>>,
     q_children: Query<&Children>,
@@ -331,7 +331,7 @@ fn update_tab_container_on_change(
 fn handle_tab_dragging(
     q_tabs: Query<(Entity, &Draggable, &Node, &Transform), (With<Tab>, Changed<Draggable>)>,
     q_tab_container: Query<&TabContainer>,
-    q_tab_bar: Query<(&Interaction, &Node), With<TabBar>>,
+    q_tab_bar: Query<&Node, With<TabBar>>,
     q_children: Query<&Children>,
     q_transform: Query<(&GlobalTransform, &Interaction)>,
     mut q_tab: Query<&mut Tab>,
@@ -345,7 +345,7 @@ fn handle_tab_dragging(
             continue;
         };
 
-        let Ok((_bar_interaction, bar_node)) = q_tab_bar.get(container.bar) else {
+        let Ok(bar_node) = q_tab_bar.get(container.bar) else {
             error!("Tab container {:?} doesn't have a tab bar", tab.container);
             continue;
         };
@@ -367,6 +367,8 @@ fn handle_tab_dragging(
         let bar_half_width = bar_node.size().x / 2.;
         match draggable.state {
             DragState::DragStart => {
+                commands.style(container.bar).overflow(Overflow::visible());
+
                 children.iter().for_each(|child| {
                     if *child != entity && q_tab.get(*child).is_ok() {
                         commands.style(*child).disable_flux_interaction();
@@ -474,6 +476,8 @@ fn handle_tab_dragging(
                 commands.ui_builder(entity).style().left(Val::Px(left));
             }
             DragState::DragEnd => {
+                commands.style(container.bar).overflow(Overflow::clip());
+
                 children.iter().for_each(|child| {
                     if *child != entity && q_tab.get(*child).is_ok() {
                         commands.style(*child).enable_flux_interaction();
@@ -512,6 +516,8 @@ fn handle_tab_dragging(
                 tab.original_index = None;
             }
             DragState::DragCanceled => {
+                commands.style(container.bar).overflow(Overflow::clip());
+
                 children.iter().for_each(|child| {
                     if *child != entity && q_tab.get(*child).is_ok() {
                         commands.style(*child).enable_flux_interaction();
@@ -752,6 +758,7 @@ impl TabContainer {
                     width: Val::Percent(100.),
                     height: Val::Px(30.),
                     border: UiRect::bottom(Val::Px(1.)),
+                    overflow: Overflow::clip(),
                     ..default()
                 },
                 border_color: Color::DARK_GRAY.into(),

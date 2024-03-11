@@ -1,4 +1,4 @@
-use bevy::{input::mouse::MouseScrollUnit, prelude::*};
+use bevy::{input::mouse::MouseScrollUnit, prelude::*, ui::FocusPolicy};
 use sickle_math::ease::Ease;
 
 use crate::{
@@ -7,6 +7,7 @@ use crate::{
     interactions::InteractiveBackground,
     scroll_interaction::{ScrollAxis, Scrollable, ScrollableUpdate},
     ui_builder::UiBuilder,
+    ui_style::{SetNodePaddingExt, UiStyleExt},
     TrackedInteraction,
 };
 
@@ -201,6 +202,7 @@ fn update_scroll_view_layout(
     mut q_node: Query<&Node>,
     mut q_style: Query<&mut Style>,
     mut q_visibility: Query<&mut Visibility>,
+    mut commands: Commands,
 ) {
     for (entity, scroll_view) in &q_scroll_view {
         let Ok(container_node) = q_node.get(entity) else {
@@ -240,6 +242,7 @@ fn update_scroll_view_layout(
             content_style.left = Val::Px(0.);
         }
 
+        let mut padding = (true, true);
         // Update vertical scroll bar
         if let (Some(vertical_scroll_bar), Some(vertical_scroll_bar_handle)) = (
             scroll_view.vertical_scroll_bar,
@@ -248,6 +251,7 @@ fn update_scroll_view_layout(
             if let Ok(mut vertical_bar_visibility) = q_visibility.get_mut(vertical_scroll_bar) {
                 if container_height >= content_height || container_height <= 5. {
                     *vertical_bar_visibility = Visibility::Hidden;
+                    padding.0 = false;
                 } else {
                     *vertical_bar_visibility = Visibility::Inherited;
 
@@ -274,6 +278,7 @@ fn update_scroll_view_layout(
             if let Ok(mut horizontal_bar_visibility) = q_visibility.get_mut(horizontal_scroll_bar) {
                 if container_width >= content_width || container_width <= 5. {
                     *horizontal_bar_visibility = Visibility::Hidden;
+                    padding.1 = false;
                 } else {
                     *horizontal_bar_visibility = Visibility::Inherited;
 
@@ -291,6 +296,21 @@ fn update_scroll_view_layout(
                 }
             };
         }
+
+        commands
+            .style(scroll_view.content_container)
+            .padding(UiRect::px(
+                0.,
+                match padding.0 {
+                    true => 12.,
+                    false => 0.,
+                },
+                0.,
+                match padding.1 {
+                    true => 12.,
+                    false => 0.,
+                },
+            ));
     }
 }
 
@@ -416,7 +436,7 @@ impl ScrollView {
                     overflow: Overflow::clip(),
                     ..default()
                 },
-                background_color: Color::DARK_GRAY.into(),
+                focus_policy: FocusPolicy::Pass,
                 ..default()
             },
             Interaction::default(),
@@ -445,8 +465,8 @@ impl ScrollView {
 
         let padding = if let Some(axis) = restrict_to {
             match axis {
-                ScrollAxis::Horizontal => UiRect::px(0., 0., 0., 12.),
-                ScrollAxis::Vertical => UiRect::px(0., 12., 0., 0.),
+                ScrollAxis::Horizontal => UiRect::px(0., 12., 0., 0.),
+                ScrollAxis::Vertical => UiRect::px(0., 0., 0., 12.),
             }
         } else {
             UiRect::px(0., 12., 0., 12.)
