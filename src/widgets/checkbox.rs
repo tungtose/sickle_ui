@@ -129,6 +129,7 @@ pub trait UiCheckboxExt<'w, 's> {
     fn checkbox<'a>(
         &'a mut self,
         label: Option<impl Into<String>>,
+        value: bool,
     ) -> UiBuilder<'w, 's, 'a, Entity>;
 }
 
@@ -136,6 +137,7 @@ impl<'w, 's> UiCheckboxExt<'w, 's> for UiBuilder<'w, 's, '_, Entity> {
     fn checkbox<'a>(
         &'a mut self,
         label: Option<impl Into<String>>,
+        value: bool,
     ) -> UiBuilder<'w, 's, 'a, Entity> {
         let mut check_node: Entity = Entity::PLACEHOLDER;
 
@@ -158,7 +160,7 @@ impl<'w, 's> UiCheckboxExt<'w, 's> for UiBuilder<'w, 's, '_, Entity> {
 
         input.insert(Checkbox {
             check_node,
-            checked: false,
+            checked: value,
         });
 
         input

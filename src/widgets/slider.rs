@@ -549,7 +549,6 @@ impl<'w, 's> UiSliderExt<'w, 's> for UiBuilder<'w, 's, '_, Entity> {
                         },
                     )
                     .id();
-                info!("Slider: {:?}", slider_bar);
 
                 if config.show_current {
                     slider.container(

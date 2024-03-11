@@ -607,12 +607,14 @@ impl ContextMenuGenerator for Tab {
         container
             .menu_item(MenuItemConfig {
                 name: "Close Tab".into(),
+                leading_icon: Some("sickle://icons/close.png".into()),
                 ..default()
             })
             .insert(CloseTabContextMenu { tab: context });
         container
             .menu_item(MenuItemConfig {
                 name: "Popout Tab".into(),
+                trailing_icon: Some("sickle://icons/popout_white.png".into()),
                 ..default()
             })
             .insert(PopoutTabContextMenu { tab: context });

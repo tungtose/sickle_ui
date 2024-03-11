@@ -340,8 +340,8 @@ impl ContextMenu {
                     ..default()
                 },
                 z_index: ZIndex::Global(MENU_CONTAINER_Z_INDEX),
-                background_color: Color::rgb(0.7, 0.6, 0.5).into(),
-                border_color: Color::WHITE.into(),
+                background_color: Color::rgb(0.1, 0.1, 0.1).into(),
+                border_color: Color::ANTIQUE_WHITE.into(),
                 focus_policy: bevy::ui::FocusPolicy::Block,
                 visibility: Visibility::Hidden,
                 ..default()

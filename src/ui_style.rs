@@ -93,6 +93,11 @@ struct SetNodeFlexDirection {
 }
 
 #[derive(StyleCommand)]
+struct SetNodeFlexWrap {
+    flex_wrap: FlexWrap,
+}
+
+#[derive(StyleCommand)]
 struct SetNodeFlexGrow {
     flex_grow: f32,
 }
@@ -108,8 +113,28 @@ struct SetNodeAlignSelf {
 }
 
 #[derive(StyleCommand)]
+struct SetNodeAlignItems {
+    align_items: AlignItems,
+}
+
+#[derive(StyleCommand)]
+struct SetNodeAlignContent {
+    align_content: AlignContent,
+}
+
+#[derive(StyleCommand)]
 struct SetNodeJustifySelf {
     justify_self: JustifySelf,
+}
+
+#[derive(StyleCommand)]
+struct SetNodeJustifyItems {
+    justify_items: JustifyItems,
+}
+
+#[derive(StyleCommand)]
+struct SetNodeJustifyContents {
+    justify_content: JustifyContent,
 }
 
 struct SetImage {
