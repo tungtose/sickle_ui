@@ -222,7 +222,7 @@ fn update_submenu_state(
 fn update_submenu_style(q_submenus: Query<(Entity, Ref<Submenu>)>, mut commands: Commands) {
     for (entity, submenu) in &q_submenus {
         if submenu.is_open {
-            commands.style(entity).background_color(Color::BISQUE);
+            commands.style(entity).background_color(Color::DARK_GRAY);
         } else if submenu.is_changed() {
             commands.style(entity).background_color(Color::NONE);
         }
@@ -274,7 +274,7 @@ impl Into<MenuItemConfig> for SubmenuConfig {
             name: self.name,
             alt_code: self.alt_code,
             leading_icon: self.leading_icon,
-            trailing_icon: "sickle://icons/submenu.png".to_string().into(),
+            trailing_icon: "sickle://icons/submenu_white.png".to_string().into(),
             ..default()
         }
     }
@@ -316,8 +316,8 @@ impl SubmenuContainer {
                     ..default()
                 },
                 z_index: ZIndex::Global(MENU_CONTAINER_Z_INDEX),
-                background_color: Color::rgb(0.7, 0.6, 0.5).into(),
-                border_color: Color::WHITE.into(),
+                background_color: Color::rgb(0.1, 0.1, 0.1).into(),
+                border_color: Color::ANTIQUE_WHITE.into(),
                 focus_policy: bevy::ui::FocusPolicy::Block,
                 ..default()
             },

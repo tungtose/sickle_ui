@@ -603,7 +603,7 @@ impl FloatingPanel {
                 ..default()
             },
             border_color: Color::BLACK.into(),
-            background_color: Color::GRAY.into(),
+            background_color: Color::rgb(0.15, 0.155, 0.16).into(),
             focus_policy: bevy::ui::FocusPolicy::Block,
             ..default()
         }
@@ -847,7 +847,7 @@ impl<'w, 's> UiFloatingPanelExt<'w, 's> for UiBuilder<'w, 's, '_, Entity> {
                         .label(LabelConfig {
                             label: title_text.clone(),
                             margin: UiRect::px(5., 29., 5., 2.),
-                            color: Color::WHITE,
+                            color: Color::ANTIQUE_WHITE,
                             ..default()
                         })
                         .style()
@@ -874,7 +874,7 @@ impl<'w, 's> UiFloatingPanelExt<'w, 's> for UiBuilder<'w, 's, '_, Entity> {
                                 ))
                                 .style()
                                 .margin(UiRect::px(3., 2., 2., 3.))
-                                .background_color(Color::DARK_GRAY)
+                                .background_color(Color::rgb(0.1, 0.1, 0.1))
                                 .render(config.closable)
                                 .id();
                         },

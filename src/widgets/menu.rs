@@ -148,7 +148,7 @@ fn update_menu_container_visibility(
             });
 
         commands.style(entity).border_color(match menu.is_open {
-            true => Color::WHITE,
+            true => Color::ANTIQUE_WHITE,
             false => Color::NONE,
         });
     }
@@ -286,7 +286,7 @@ impl MenuSeparator {
                 margin: UiRect::horizontal(Val::Px(5.)),
                 ..default()
             },
-            background_color: Color::GRAY.into(),
+            background_color: Color::ANTIQUE_WHITE.into(),
             ..default()
         }
     }
@@ -315,7 +315,7 @@ impl MenuItemSeparator {
                 margin: UiRect::px(5., 5., 5., 5.),
                 ..default()
             },
-            background_color: Color::GRAY.into(),
+            background_color: Color::ANTIQUE_WHITE.into(),
             ..default()
         }
     }
