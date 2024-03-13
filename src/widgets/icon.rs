@@ -2,12 +2,6 @@ use bevy::prelude::*;
 
 use crate::{ui_builder::*, ui_style::SetImageExt};
 
-pub struct IconPlugin;
-
-impl Plugin for IconPlugin {
-    fn build(&self, _app: &mut App) {}
-}
-
 #[derive(Component, Debug, Default, Reflect)]
 #[reflect(Component)]
 pub struct Icon;

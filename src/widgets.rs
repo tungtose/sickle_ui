@@ -5,6 +5,7 @@ pub mod context_menu;
 pub mod docking_zone;
 pub mod dropdown;
 pub mod floating_panel;
+pub mod foldable;
 pub mod icon;
 pub mod label;
 pub mod menu;
@@ -27,7 +28,7 @@ use self::{
     docking_zone::DockingZonePlugin,
     dropdown::DropdownPlugin,
     floating_panel::{FloatingPanelPlugin, FloatingPanelUpdate},
-    icon::IconPlugin,
+    foldable::FoldablePlugin,
     menu::MenuPlugin,
     menu_item::MenuItemPlugin,
     radio_group::RadioGroupPlugin,
@@ -79,7 +80,7 @@ impl Plugin for WidgetsPlugin {
                 DockingZonePlugin,
                 DropdownPlugin,
                 FloatingPanelPlugin,
-                IconPlugin,
+                FoldablePlugin,
                 MenuPlugin,
                 MenuItemPlugin,
                 RadioGroupPlugin,
