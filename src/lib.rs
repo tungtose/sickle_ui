@@ -1,6 +1,7 @@
 use bevy::prelude::*;
 
 pub mod animated_interaction;
+pub mod dev_panels;
 pub mod drag_interaction;
 pub mod drop_interaction;
 pub mod flux_interaction;

@@ -101,7 +101,7 @@ impl Foldable {
     }
 }
 
-pub trait UiIconExt<'w, 's> {
+pub trait UiFoldableExt<'w, 's> {
     fn foldable<'a>(
         &'a mut self,
         name: impl Into<String>,
@@ -110,7 +110,7 @@ pub trait UiIconExt<'w, 's> {
     ) -> UiBuilder<'w, 's, 'a, Entity>;
 }
 
-impl<'w, 's> UiIconExt<'w, 's> for UiBuilder<'w, 's, '_, Entity> {
+impl<'w, 's> UiFoldableExt<'w, 's> for UiBuilder<'w, 's, '_, Entity> {
     fn foldable<'a>(
         &'a mut self,
         name: impl Into<String>,
