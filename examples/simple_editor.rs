@@ -1,3 +1,4 @@
+//! An example using the widget library to create a simple 3D scene view with a hierarchy browser for the scene asset.
 use bevy::prelude::*;
 
 use sickle_ui::{
