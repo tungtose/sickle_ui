@@ -164,7 +164,7 @@ fn spawn_scene_view(
                     scene_view: container,
                 })
                 .style()
-                .background_color(Color::rgba(0., 0., 0., 0.2))
+                .background_color(Color::rgba(0., 0., 0., 0.8))
                 .justify_self(JustifySelf::Start)
                 .height(Val::Px(30.))
                 .position_type(PositionType::Absolute);

@@ -31,7 +31,7 @@ impl Plugin for SliderPlugin {
 
 // TODO: Remove hardcoded theme
 // TODO: Add input for value (w/ read/write flags)
-
+// TODO: Support click-on-bar value setting
 fn update_slider_on_scroll(
     q_scrollables: Query<
         (AnyOf<(&SliderBar, &SliderDragHandle)>, &Scrollable),
