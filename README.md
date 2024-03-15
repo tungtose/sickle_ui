@@ -9,6 +9,7 @@ cargo run --example simple_editor
 ```
 
 **THIS IS CURRENTLY IN HEAVY DEVELOPMENT**
+
 Do not depend on this project. It is here for reference for the moment.
 
 Main missing features:
@@ -19,31 +20,31 @@ Main missing features:
 
 What it can already do:
 - Resizable layout
- - Rows / columns
- - Scroll views
- - Docking zones
- - Tab containers
- - Floating panels
- - Sized zones
- - Foldables
+  - Rows / columns
+  - Scroll views
+  - Docking zones
+  - Tab containers
+  - Floating panels
+  - Sized zones
+  - Foldables
 - Input
- - Slider
- - Dropdown
- - Checkbox
- - Radio groups
+  - Slider
+  - Dropdown
+  - Checkbox
+  - Radio groups
 - Menu
- - Menu item (with leading/trailing icons and support for keyboard shortcuts)
- - Toggle menu item
- - Submenu
- - Context menu (component-based)
+  - Menu item (with leading/trailing icons and support for keyboard shortcuts)
+  - Toggle menu item
+  - Submenu
+  - Context menu (component-based)
 - Static
- - Icon
- - Label
+  - Icon
+  - Label
 - Utility
- - Command-based styling
- - Temporal tracking of interactions
- - Animated interactions
- - Context based extensions
- - Drag / drop interactions
- - Scroll interactions
+  - Command-based styling
+  - Temporal tracking of interactions
+  - Animated interactions
+  - Context based extensions
+  - Drag / drop interactions
+  - Scroll interactions
 
