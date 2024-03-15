@@ -1,4 +1,7 @@
-use bevy::prelude::*;
+use bevy::{
+    asset::io::{file::FileAssetReader, AssetSource},
+    prelude::*,
+};
 
 pub mod animated_interaction;
 pub mod dev_panels;
@@ -30,17 +33,32 @@ pub struct SickleUiPlugin;
 
 impl Plugin for SickleUiPlugin {
     fn build(&self, app: &mut App) {
-        app.add_plugins((
-            AnimatedInteractionPlugin,
-            DragInteractionPlugin,
-            DropInteractionPlugin,
-            HierarchyDelayPlugin,
-            FluxInteractionPlugin,
-            InteractionsPlugin,
-            ResizeHandlePlugin,
-            ScrollInteractionPlugin,
-            WidgetsPlugin,
-        ));
+        app // reads assets from the "other" folder, rather than the default "assets" folder
+            .register_asset_source(
+                // This is the "name" of the new source, used in asset paths.
+                // Ex: "custom://path/to/sprite.png"
+                "sickle_ui",
+                // This is a repeatable source builder. You can configure readers, writers,
+                // processed readers, processed writers, asset watchers, etc.
+                AssetSource::build()
+                    .with_reader(move || {
+                        Box::new(FileAssetReader::new(String::from("../sickle_ui/assets")))
+                    })
+                    .with_processed_reader(move || {
+                        Box::new(FileAssetReader::new(String::from("../sickle_ui/assets")))
+                    }),
+            )
+            .add_plugins((
+                AnimatedInteractionPlugin,
+                DragInteractionPlugin,
+                DropInteractionPlugin,
+                HierarchyDelayPlugin,
+                FluxInteractionPlugin,
+                InteractionsPlugin,
+                ResizeHandlePlugin,
+                ScrollInteractionPlugin,
+                WidgetsPlugin,
+            ));
     }
 }
 

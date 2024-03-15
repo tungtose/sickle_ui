@@ -11,3 +11,6 @@ sickle_macros = { path = "crates/sickle_macros" }
 
 bevy = { version = "0.13", features = ["dynamic_linking"] }
 bevy_reflect = { version = "0.13" }
+
+[dev-dependencies]
+bevy_ecs = { version = "0.13" }

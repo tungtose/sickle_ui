@@ -55,10 +55,10 @@ fn update_foldable_container(
 ) {
     for (mut config, foldable) in &mut q_menu_items {
         if foldable.open {
-            config.leading_icon = Some("sickle://icons/chevron_down.png".into());
+            config.leading_icon = Some("sickle_ui://icons/chevron_down.png".into());
             commands.style(foldable.container).show();
         } else {
-            config.leading_icon = Some("sickle://icons/chevron_right.png".into());
+            config.leading_icon = Some("sickle_ui://icons/chevron_right.png".into());
             commands.style(foldable.container).hide();
         }
     }
@@ -123,7 +123,7 @@ impl<'w, 's> UiFoldableExt<'w, 's> for UiBuilder<'w, 's, '_, Entity> {
             button = row
                 .menu_item(MenuItemConfig {
                     name: name.into(),
-                    leading_icon: Some("sickle://icons/chevron_right.png".into()),
+                    leading_icon: Some("sickle_ui://icons/chevron_right.png".into()),
                     ..default()
                 })
                 .style()

@@ -362,8 +362,8 @@ fn update_panel_layout(
             commands
                 .style(panel.fold_button)
                 .image(match config.folded {
-                    true => "sickle://icons/chevron_right.png",
-                    false => "sickle://icons/chevron_down.png",
+                    true => "sickle_ui://icons/chevron_right.png",
+                    false => "sickle_ui://icons/chevron_down.png",
                 });
         }
 
@@ -821,8 +821,8 @@ impl<'w, 's> UiFloatingPanelExt<'w, 's> for UiBuilder<'w, 's, '_, Entity> {
                 |container| {
                     fold_button = container
                         .icon(match config.folded {
-                            true => "sickle://icons/chevron_right.png",
-                            false => "sickle://icons/chevron_down.png",
+                            true => "sickle_ui://icons/chevron_right.png",
+                            false => "sickle_ui://icons/chevron_down.png",
                         })
                         .insert((
                             Interaction::default(),
@@ -858,7 +858,7 @@ impl<'w, 's> UiFloatingPanelExt<'w, 's> for UiBuilder<'w, 's, '_, Entity> {
                         FloatingPanel::close_button_container(),
                         |close_button_container| {
                             close_button = close_button_container
-                                .icon("sickle://icons/close.png")
+                                .icon("sickle_ui://icons/close.png")
                                 .insert((
                                     Interaction::default(),
                                     TrackedInteraction::default(),
