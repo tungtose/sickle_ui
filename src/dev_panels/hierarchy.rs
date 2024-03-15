@@ -225,7 +225,7 @@ struct HierarchyNode {
 
 #[derive(Component, Debug, Reflect)]
 #[reflect(Component)]
-struct HierarchyContainer {
+pub struct HierarchyContainer {
     root: Entity,
     selected: Option<Entity>,
     component_list: Entity,

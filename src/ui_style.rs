@@ -48,6 +48,16 @@ struct SetNodeHeight {
 }
 
 #[derive(StyleCommand)]
+struct SetNodeMinWidth {
+    min_width: Val,
+}
+
+#[derive(StyleCommand)]
+struct SetNodeMinHeight {
+    min_height: Val,
+}
+
+#[derive(StyleCommand)]
 struct SetNodeTop {
     top: Val,
 }
