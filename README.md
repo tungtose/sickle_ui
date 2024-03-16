@@ -10,7 +10,9 @@ cargo run --example simple_editor
 
 **THIS IS CURRENTLY IN HEAVY DEVELOPMENT**
 
-Do not depend on this project. It is here for reference for the moment.
+Do not depend on this project. It is here for reference for the moment. If you 
+still want to try it locally from within your project, clone the repository 
+next to yours. This is needed for the asset source to find the local assets.
 
 Main missing features:
 - Centralized focus management
