@@ -153,7 +153,7 @@ pub(crate) fn impl_simple_interaction_plugin_macro(attr: TokenStream, name: Iden
                 app.add_systems(
                     PreUpdate,
                     (
-                        add_animated_interaction_state::< #name>,
+                        add_animated_interaction_state::<#name>,
                         add_interactive_state::<
                             #name,
                             #state_ident,
@@ -163,7 +163,7 @@ pub(crate) fn impl_simple_interaction_plugin_macro(attr: TokenStream, name: Iden
                 )
                 .add_systems(
                     Update,
-                    update_animated_interaction_state::< #name>
+                    update_animated_interaction_state::<#name>
                         .in_set(AnimatedInteractionUpdate),
                 )
                 .add_systems(

@@ -1,3 +1,5 @@
+use std::marker::PhantomData;
+
 use bevy::prelude::*;
 use sickle_math::ease::{Ease, ValueEasing};
 
@@ -43,7 +45,7 @@ pub struct AnimatedInteractionState<T: Component + Default + Reflect> {
 #[derive(Component, Clone, Copy, Debug, Reflect)]
 #[reflect(Component)]
 pub struct AnimatedInteraction<T: Component> {
-    pub context: Option<T>,
+    pub context: PhantomData<T>,
     pub tween: AnimationConfig,
     pub hover: Option<AnimationConfig>,
     pub press: Option<AnimationConfig>,
@@ -54,7 +56,7 @@ pub struct AnimatedInteraction<T: Component> {
 impl<T: Component> Default for AnimatedInteraction<T> {
     fn default() -> Self {
         Self {
-            context: None,
+            context: Default::default(),
             tween: AnimationConfig {
                 duration: 0.1,
                 ..default()
