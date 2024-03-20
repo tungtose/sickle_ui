@@ -105,7 +105,7 @@ pub fn simple_interaction_for(attr: TokenStream, item: TokenStream) -> TokenStre
     simple_interaction_plugin::impl_simple_interaction_plugin_macro(attr, ast.ident)
 }
 
-#[proc_macro_derive(StyleCommand)]
+#[proc_macro_derive(StyleCommand, attributes(lock_attr, target_enum, target_tupl))]
 pub fn style_command_macro_derive(input: TokenStream) -> TokenStream {
     let ast: DeriveInput = syn::parse(input.clone()).unwrap();
     style_command::derive_style_command_macro(&ast)

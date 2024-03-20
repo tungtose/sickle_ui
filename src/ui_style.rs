@@ -7,6 +7,7 @@ use sickle_macros::StyleCommand;
 
 use crate::{
     interactions::{InteractionState, InteractiveBackgroundState},
+    theme::{LockedStyleAttributes, StylableAttribute},
     FluxInteraction,
 };
 
@@ -32,7 +33,30 @@ impl<'a> UiStyleExt<'a> for Commands<'_, '_> {
     }
 }
 
+pub struct UiStyleUnchecked<'a> {
+    commands: EntityCommands<'a>,
+}
+
+impl<'a> UiStyleUnchecked<'a> {
+    pub fn id(&self) -> Entity {
+        self.commands.id()
+    }
+}
+
+pub trait UiStyleUncheckedExt<'a> {
+    fn style(&'a mut self, entity: Entity) -> UiStyleUnchecked<'a>;
+}
+
+impl<'a> UiStyleUncheckedExt<'a> for Commands<'_, '_> {
+    fn style(&'a mut self, entity: Entity) -> UiStyleUnchecked<'a> {
+        UiStyleUnchecked {
+            commands: self.entity(entity),
+        }
+    }
+}
+
 #[derive(StyleCommand)]
+#[lock_attr(StylableAttribute::Left)]
 struct SetNodePositionType {
     position_type: PositionType,
 }
@@ -138,6 +162,7 @@ struct SetNodeJustifySelf {
 }
 
 #[derive(StyleCommand)]
+#[lock_attr(StylableAttribute::Left)]
 struct SetNodeJustifyItems {
     justify_items: JustifyItems,
 }
@@ -215,36 +240,11 @@ impl<'a> SetImageScaleModeExt<'a> for UiStyle<'a> {
     }
 }
 
+#[derive(StyleCommand)]
+#[lock_attr(StylableAttribute::Visibility)]
+#[target_enum]
 struct SetEntityVisiblity {
     visibility: Visibility,
-}
-
-impl EntityCommand for SetEntityVisiblity {
-    fn apply(self, entity: Entity, world: &mut World) {
-        let mut q_visibility = world.query::<&mut Visibility>();
-        let Ok(mut visiblity) = q_visibility.get_mut(world, entity) else {
-            warn!(
-                "Failed to set visiblity on entity {:?}: No Visibility component found!",
-                entity
-            );
-            return;
-        };
-
-        if *visiblity != self.visibility {
-            *visiblity = self.visibility;
-        }
-    }
-}
-
-pub trait SetEntityVisiblityExt<'a> {
-    fn visibility(&'a mut self, visibility: Visibility) -> &mut UiStyle<'a>;
-}
-
-impl<'a> SetEntityVisiblityExt<'a> for UiStyle<'a> {
-    fn visibility(&'a mut self, visibility: Visibility) -> &mut UiStyle<'a> {
-        self.commands.add(SetEntityVisiblity { visibility });
-        self
-    }
 }
 
 pub trait SetNodeShowHideExt<'a> {
@@ -299,36 +299,11 @@ impl<'a> SetNodeShowHideExt<'a> for UiStyle<'a> {
     }
 }
 
+#[derive(StyleCommand)]
+#[lock_attr(StylableAttribute::BorderColor)]
+#[target_tupl(BorderColor)]
 struct SetBorderColor {
-    color: Color,
-}
-
-impl EntityCommand for SetBorderColor {
-    fn apply(self, entity: Entity, world: &mut World) {
-        let mut q_border_color = world.query::<&mut BorderColor>();
-        let Ok(mut border_color) = q_border_color.get_mut(world, entity) else {
-            warn!(
-                "Failed to set border color on entity {:?}: No BorderColor component found!",
-                entity
-            );
-            return;
-        };
-
-        if border_color.0 != self.color.into() {
-            border_color.0 = self.color.into();
-        }
-    }
-}
-
-pub trait SetBorderColorExt<'a> {
-    fn border_color(&'a mut self, color: Color) -> &mut UiStyle<'a>;
-}
-
-impl<'a> SetBorderColorExt<'a> for UiStyle<'a> {
-    fn border_color(&'a mut self, color: Color) -> &mut UiStyle<'a> {
-        self.commands.add(SetBorderColor { color });
-        self
-    }
+    border_color: Color,
 }
 
 struct SetBackgroundColor {

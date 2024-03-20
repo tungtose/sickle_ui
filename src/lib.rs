@@ -16,6 +16,7 @@ pub mod input_extension;
 pub mod interactions;
 pub mod resize_interaction;
 pub mod scroll_interaction;
+pub mod theme;
 pub mod ui_builder;
 pub mod ui_commands;
 pub mod ui_style;
@@ -75,12 +76,4 @@ impl Plugin for SickleUiPlugin {
             WidgetsPlugin,
         ));
     }
-}
-
-#[derive(Component)]
-pub struct PointerTracker {
-    pub pointer_over: bool,
-    pub enter_timer: Timer,
-    pub exit_timer: Timer,
-    pub pointer_delta: Vec2,
 }

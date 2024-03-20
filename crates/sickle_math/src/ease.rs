@@ -19,7 +19,7 @@ const D1_F32: f32 = 2.75;
 // const N1_F64: f64 = 7.5625;
 // const D1_F64: f64 = 2.75;
 
-#[derive(Default, Copy, Clone, Debug, Reflect)]
+#[derive(Default, Copy, Clone, Debug, Hash, PartialEq, Eq, Reflect)]
 pub enum Ease {
     #[default]
     Linear,
