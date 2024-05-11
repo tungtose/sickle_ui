@@ -49,6 +49,7 @@ pub mod prelude {
         docking_zone::UiDockingZoneExt,
         dropdown::UiDropdownExt,
         floating_panel::{FloatingPanelConfig, FloatingPanelLayout, UiFloatingPanelExt},
+        foldable::UiFoldableExt,
         icon::UiIconExt,
         label::{LabelConfig, SetLabelTextExt, UiLabelExt},
         menu::{
