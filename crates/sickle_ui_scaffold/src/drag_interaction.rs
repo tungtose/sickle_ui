@@ -3,7 +3,7 @@ use bevy::window::{CursorGrabMode, PrimaryWindow};
 use bevy::ui::RelativeCursorPosition;
 use bevy_reflect::Reflect;
 
-use crate::{FluxInteraction, FluxInteractionUpdate};
+use crate::flux_interaction::{FluxInteraction, FluxInteractionUpdate};
 
 pub struct DragInteractionPlugin;
 
