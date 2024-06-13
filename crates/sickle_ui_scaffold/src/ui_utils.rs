@@ -65,24 +65,32 @@ impl UiUtils {
         (container_size, offset)
     }
 
+    /// Returns the calculated padding based on viewport (either based on TargetCamera or the Primary Window).
+    /// Vec4 contains sizes in the order: Top, Right, Bottom, Left
     pub fn padding_as_px(entity: Entity, world: &mut World) -> Vec4 {
         // Unsafe unwrap: If a UI element doesn't have a Style, we should panic!
         let style = world.get::<Style>(entity).unwrap();
         UiUtils::ui_rect_to_px(style.padding, entity, world)
     }
 
+    /// Returns the calculated border based on viewport (either based on TargetCamera or the Primary Window).
+    /// Vec4 contains sizes in the order: Top, Right, Bottom, Left
     pub fn border_as_px(entity: Entity, world: &mut World) -> Vec4 {
         // Unsafe unwrap: If a UI element doesn't have a Style, we should panic!
         let style = world.get::<Style>(entity).unwrap();
         UiUtils::ui_rect_to_px(style.border, entity, world)
     }
 
+    /// Returns the calculated margin based on viewport (either based on TargetCamera or the Primary Window).
+    /// Vec4 contains sizes in the order: Top, Right, Bottom, Left
     pub fn margin_as_px(entity: Entity, world: &mut World) -> Vec4 {
         // Unsafe unwrap: If a UI element doesn't have a Style, we should panic!
         let style = world.get::<Style>(entity).unwrap();
         UiUtils::ui_rect_to_px(style.margin, entity, world)
     }
 
+    /// Returns the calculated edge sizes based on viewport (either based on TargetCamera or the Primary Window).
+    /// Vec4 contains sizes in the order: Top, Right, Bottom, Left
     pub fn ui_rect_to_px(rect: UiRect, entity: Entity, world: &mut World) -> Vec4 {
         let viewport_size = if let Some(render_target) = UiUtils::find_render_target(entity, world)
         {
@@ -107,6 +115,11 @@ impl UiUtils {
         )
     }
 
+    /// Converts a Val to actual pixel size, based on the viewport size
+    /// NOTE: `Val::Auto` converst to 0., but this is only correct for paddings, borders, and margins.
+    /// Width and height are calculated by taffy based on flex layout.
+    /// Flex shrink may also contract final values for paddings, borders, and margins,
+    /// but we can ignore that since these are input/target values.
     pub fn val_to_px(value: Val, parent: f32, viewport_size: Vec2) -> f32 {
         match value {
             Val::Auto => 0.,

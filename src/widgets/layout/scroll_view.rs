@@ -163,24 +163,18 @@ fn update_scroll_view_on_drag(
 }
 
 fn update_scroll_view_offset(
-    mut q_scroll_view: Query<(Entity, &mut ScrollView), Changed<ScrollView>>,
+    mut q_scroll_views: Query<(&Node, &mut ScrollView), Or<(Changed<ScrollView>, Changed<Node>)>>,
     q_node: Query<&Node>,
 ) {
-    for (entity, mut scroll_view) in &mut q_scroll_view {
-        let Ok(container_node) = q_node.get(entity) else {
-            continue;
-        };
-
+    for (container_node, mut scroll_view) in &mut q_scroll_views {
         let container_width = container_node.unrounded_size().x;
         let container_height = container_node.unrounded_size().y;
         if container_width == 0. || container_height == 0. {
             continue;
         }
 
-        let Ok(content_node) = q_node.get(scroll_view.content_container) else {
-            continue;
-        };
-
+        // Unsafe unwrap: if a ScrollView's content doesn't have a Node we panic!
+        let content_node = q_node.get(scroll_view.content_container).unwrap();
         let content_width = content_node.unrounded_size().x;
         let content_height = content_node.unrounded_size().y;
 
@@ -190,6 +184,7 @@ fn update_scroll_view_offset(
         } else {
             scroll_view.scroll_offset.x
         };
+
         let overflow_y = content_height - container_height;
         let scroll_offset_y = if overflow_y > 0. {
             scroll_view.scroll_offset.y.clamp(0., overflow_y)
@@ -200,6 +195,16 @@ fn update_scroll_view_offset(
         scroll_view.scroll_offset = Vec2 {
             x: scroll_offset_x,
             y: scroll_offset_y,
+        };
+
+        scroll_view.overflow = Vec2 {
+            x: overflow_x,
+            y: overflow_y,
+        };
+
+        scroll_view.visible_ratio = Vec2 {
+            x: (container_width / content_width).clamp(0., 1.),
+            y: (container_height / content_height).clamp(0., 1.),
         };
     }
 }
@@ -213,7 +218,9 @@ fn update_scroll_view_layout(
         if scroll_view.disabled {
             commands
                 .entity(entity)
-                .add_pseudo_state(PseudoState::Disabled);
+                .add_pseudo_state(PseudoState::Disabled)
+                .remove_pseudo_state(PseudoState::OverflowX)
+                .remove_pseudo_state(PseudoState::OverflowY);
 
             continue;
         } else {
@@ -222,59 +229,15 @@ fn update_scroll_view_layout(
                 .remove_pseudo_state(PseudoState::Disabled);
         }
 
-        // Unsafe unwrap: Scroll views must have a Node
-        let container_node = q_node.get(entity).unwrap();
-        let container_width = container_node.unrounded_size().x;
-        let container_height = container_node.unrounded_size().y;
-        if container_width == 0. || container_height == 0. {
-            continue;
-        }
-
-        // Unsafe unwrap: Scroll view contents must have a Node
-        let content_node = q_node.get(scroll_view.content_container).unwrap();
-        let content_width = content_node.unrounded_size().x;
-        let content_height = content_node.unrounded_size().y;
-
-        let overflow_x = content_width - container_width;
-        let overflow_y = content_height - container_height;
-
         // Update content scroll
-        if overflow_y > 0. {
-            let scroll_offset_y = scroll_view.scroll_offset.y.clamp(0., overflow_y);
-            commands
-                .style(scroll_view.content_container)
-                .top(Val::Px(-scroll_offset_y));
-            commands
-                .entity(entity)
-                .add_pseudo_state(PseudoState::OverflowY);
-
-            // Unsafe unwrap: Scroll view scroll bars must have a Node
-            let bar_container_node = q_node.get(scroll_view.vertical_scroll_bar).unwrap();
-            let bar_container_height = bar_container_node.unrounded_size().y;
-
-            let scroll_offset_y = scroll_view.scroll_offset.y.clamp(0., overflow_y);
-            let visible_ratio = (container_height / content_height).clamp(0., 1.);
-            let bar_height =
-                (visible_ratio * bar_container_height).clamp(5., bar_container_height.max(5.));
-            let remaining_space = bar_container_height - bar_height;
-            let bar_offset = (scroll_offset_y / overflow_y) * remaining_space;
-            commands
-                .style_unchecked(scroll_view.vertical_scroll_bar_handle)
-                .height(Val::Px(bar_height))
-                .top(Val::Px(bar_offset));
-        } else {
-            commands
-                .style(scroll_view.content_container)
-                .top(Val::Px(0.));
-            commands
-                .entity(entity)
-                .remove_pseudo_state(PseudoState::OverflowY);
-        }
+        let scroll_offset_x = scroll_view.scroll_offset.x;
+        let scroll_offset_y = scroll_view.scroll_offset.y;
+        let overflow_x = scroll_view.overflow.x;
+        let overflow_y = scroll_view.overflow.y;
 
         if overflow_x > 0. {
-            let scroll_offset_x = scroll_view.scroll_offset.x.clamp(0., overflow_x);
             commands
-                .style(scroll_view.content_container)
+                .style_unchecked(scroll_view.content_container)
                 .left(Val::Px(-scroll_offset_x));
             commands
                 .entity(entity)
@@ -284,10 +247,8 @@ fn update_scroll_view_layout(
             let bar_container_node = q_node.get(scroll_view.horizontal_scroll_bar).unwrap();
             let bar_container_width = bar_container_node.unrounded_size().x;
 
-            let scroll_offset_x = scroll_view.scroll_offset.x.clamp(0., overflow_x);
-            let visible_ratio = (container_width / content_width).clamp(0., 1.);
-            let bar_width =
-                (visible_ratio * bar_container_width).clamp(5., bar_container_width.max(5.));
+            let bar_width = (scroll_view.visible_ratio.x * bar_container_width)
+                .clamp(5., bar_container_width.max(5.));
             let remaining_space = bar_container_width - bar_width;
             let bar_offset = (scroll_offset_x / overflow_x) * remaining_space;
             commands
@@ -296,8 +257,37 @@ fn update_scroll_view_layout(
                 .left(Val::Px(bar_offset));
         } else {
             commands
-                .style(scroll_view.content_container)
+                .style_unchecked(scroll_view.content_container)
                 .left(Val::Px(0.));
+            commands
+                .entity(entity)
+                .remove_pseudo_state(PseudoState::OverflowX);
+        }
+
+        if overflow_y > 0. {
+            commands
+                .style_unchecked(scroll_view.content_container)
+                .top(Val::Px(-scroll_offset_y));
+            commands
+                .entity(entity)
+                .add_pseudo_state(PseudoState::OverflowY);
+
+            // Unsafe unwrap: Scroll view scroll bars must have a Node
+            let bar_container_node = q_node.get(scroll_view.vertical_scroll_bar).unwrap();
+            let bar_container_height = bar_container_node.unrounded_size().y;
+
+            let bar_height = (scroll_view.visible_ratio.y * bar_container_height)
+                .clamp(5., bar_container_height.max(5.));
+            let remaining_space = bar_container_height - bar_height;
+            let bar_offset = (scroll_offset_y / overflow_y) * remaining_space;
+            commands
+                .style_unchecked(scroll_view.vertical_scroll_bar_handle)
+                .height(Val::Px(bar_height))
+                .top(Val::Px(bar_offset));
+        } else {
+            commands
+                .style_unchecked(scroll_view.content_container)
+                .top(Val::Px(0.));
             commands
                 .entity(entity)
                 .remove_pseudo_state(PseudoState::OverflowY);
@@ -377,6 +367,8 @@ pub struct ScrollView {
     vertical_scroll_bar: Entity,
     vertical_scroll_bar_handle: Entity,
     scroll_offset: Vec2,
+    overflow: Vec2,
+    visible_ratio: Vec2,
     restricted_to: Option<ScrollAxis>,
     pub disabled: bool,
 }
@@ -391,6 +383,8 @@ impl Default for ScrollView {
             vertical_scroll_bar: Entity::PLACEHOLDER,
             vertical_scroll_bar_handle: Entity::PLACEHOLDER,
             scroll_offset: Vec2::ZERO,
+            overflow: Vec2::ZERO,
+            visible_ratio: Vec2::ZERO,
             disabled: false,
             restricted_to: None,
         }
@@ -466,6 +460,7 @@ impl ScrollView {
         ])
     }
 
+    // TODO: bevy 0.14: Add border radius to scroll bar handles
     fn primary_style(
         style_builder: &mut StyleBuilder,
         _scroll_view: &ScrollView,
@@ -475,6 +470,10 @@ impl ScrollView {
         let colors = theme_data.colors();
 
         style_builder
+            .width(Val::Percent(100.))
+            .height(Val::Percent(100.));
+
+        style_builder
             .switch_target(ScrollView::HORIZONTAL_SCROLL_BAR)
             .bottom(Val::Px(0.))
             .left(Val::Px(0.))
@@ -482,13 +481,8 @@ impl ScrollView {
             .height(Val::Px(theme_spacing.scroll_bar_size))
             .border(UiRect::top(Val::Px(theme_spacing.borders.extra_small)))
             .border_color(colors.accent(Accent::Shadow))
-            .background_color(colors.surface(Surface::Background).with_a(0.2))
-            .display(Display::Flex)
+            .background_color(colors.container(Container::Tertiary))
             .visibility(Visibility::Hidden);
-
-        style_builder
-            .switch_target(ScrollView::HORIZONTAL_SCROLL_HANDLE)
-            .background_color(colors.container(Container::Tertiary));
 
         style_builder
             .switch_target(ScrollView::VERTICAL_SCROLL_BAR)
@@ -497,22 +491,49 @@ impl ScrollView {
             .height(Val::Percent(100.))
             .border(UiRect::left(Val::Px(theme_spacing.borders.extra_small)))
             .border_color(colors.accent(Accent::Shadow))
-            .background_color(colors.surface(Surface::Background).with_a(0.2))
-            .display(Display::Flex)
+            .background_color(colors.container(Container::Tertiary))
             .visibility(Visibility::Hidden);
 
         style_builder
-            .switch_target(ScrollView::VERTICAL_SCROLL_HANDLE)
-            .background_color(colors.container(Container::Tertiary));
+            .switch_target(ScrollView::CONTENT_CONTAINER)
+            .padding(UiRect::all(Val::Auto));
+
+        style_builder
+            .switch_context(ScrollView::HORIZONTAL_SCROLL_HANDLE.to_string(), None)
+            .border(UiRect::horizontal(Val::Px(
+                theme_spacing.borders.extra_small,
+            )))
+            .border_color(colors.accent(Accent::Shadow))
+            .animated()
+            .background_color(AnimatedVals {
+                idle: colors.accent(Accent::Tertiary).with_a(0.5),
+                hover: colors.accent(Accent::Tertiary).with_a(0.8).into(),
+                press: colors.accent(Accent::Tertiary).into(),
+                ..default()
+            })
+            .copy_from(theme_data.interaction_animation);
+
+        style_builder
+            .switch_context(ScrollView::VERTICAL_SCROLL_HANDLE.to_string(), None)
+            .border(UiRect::vertical(Val::Px(theme_spacing.borders.extra_small)))
+            .border_color(colors.accent(Accent::Shadow))
+            .animated()
+            .background_color(AnimatedVals {
+                idle: colors.accent(Accent::Tertiary).with_a(0.5),
+                hover: colors.accent(Accent::Tertiary).with_a(0.8).into(),
+                press: colors.accent(Accent::Tertiary).into(),
+                ..default()
+            })
+            .copy_from(theme_data.interaction_animation);
     }
 
     fn disabled_style(style_builder: &mut StyleBuilder, _theme_data: &ThemeData) {
         style_builder
             .switch_target(ScrollView::HORIZONTAL_SCROLL_BAR)
-            .display(Display::None);
+            .visibility(Visibility::Hidden);
         style_builder
             .switch_target(ScrollView::VERTICAL_SCROLL_BAR)
-            .display(Display::None);
+            .visibility(Visibility::Hidden);
     }
 
     fn overflow_x_style(style_builder: &mut StyleBuilder, theme_data: &ThemeData) {
@@ -524,7 +545,7 @@ impl ScrollView {
 
         style_builder
             .switch_target(ScrollView::CONTENT_CONTAINER)
-            .margin(UiRect::bottom(Val::Px(theme_spacing.scroll_bar_size)));
+            .padding(UiRect::bottom(Val::Px(theme_spacing.scroll_bar_size)));
     }
 
     fn overflow_y_style(style_builder: &mut StyleBuilder, theme_data: &ThemeData) {
@@ -536,7 +557,7 @@ impl ScrollView {
 
         style_builder
             .switch_target(ScrollView::CONTENT_CONTAINER)
-            .margin(UiRect::right(Val::Px(theme_spacing.scroll_bar_size)));
+            .padding(UiRect::right(Val::Px(theme_spacing.scroll_bar_size)));
     }
 
     fn overflow_xy_style(style_builder: &mut StyleBuilder, theme_data: &ThemeData) {
@@ -545,6 +566,15 @@ impl ScrollView {
         style_builder
             .switch_target(ScrollView::HORIZONTAL_SCROLL_BAR)
             .right(Val::Px(theme_spacing.scroll_bar_size));
+
+        style_builder
+            .switch_target(ScrollView::CONTENT_CONTAINER)
+            .padding(UiRect::px(
+                0.,
+                theme_spacing.scroll_bar_size,
+                0.,
+                theme_spacing.scroll_bar_size,
+            ));
     }
 
     fn frame() -> impl Bundle {
@@ -552,20 +582,12 @@ impl ScrollView {
             Name::new("Scroll View"),
             NodeBundle {
                 style: Style {
-                    width: Val::Percent(100.),
-                    height: Val::Percent(100.),
                     flex_direction: FlexDirection::Column,
                     ..default()
                 },
                 ..default()
             },
-            LockedStyleAttributes::from_vec(vec![
-                LockableStyleAttribute::Width,
-                LockableStyleAttribute::Height,
-                LockableStyleAttribute::Border,
-                LockableStyleAttribute::Padding,
-                LockableStyleAttribute::FlexDirection,
-            ]),
+            LockedStyleAttributes::from_vec(vec![LockableStyleAttribute::FlexDirection]),
         )
     }
 
@@ -643,6 +665,8 @@ impl ScrollView {
                 LockableStyleAttribute::AlignSelf,
                 LockableStyleAttribute::FlexDirection,
                 LockableStyleAttribute::FlexShrink,
+                LockableStyleAttribute::Top,
+                LockableStyleAttribute::Left,
             ]),
         )
     }
@@ -668,6 +692,8 @@ impl ScrollView {
                 LockableStyleAttribute::JustifyContent,
                 LockableStyleAttribute::FocusPolicy,
                 LockableStyleAttribute::ZIndex,
+                LockableStyleAttribute::Padding,
+                LockableStyleAttribute::Margin,
             ]),
         )
     }

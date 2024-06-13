@@ -280,6 +280,10 @@ impl ContextStyleAttribute {
     }
 }
 
+// TODO: Consider moving to sparse set. Static styles are removed in 
+// the same frame they are added, so only interaction animations stay long term.
+// Measure impact
+//#[component(storage = "SparseSet")]
 #[derive(Component, Clone, Debug)]
 pub struct DynamicStyle {
     attributes: Vec<ContextStyleAttribute>,

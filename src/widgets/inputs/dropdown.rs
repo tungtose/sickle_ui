@@ -305,6 +305,7 @@ impl UiContext for Dropdown {
             Dropdown::ICON => Ok(self.icon),
             Dropdown::PANEL => Ok(self.panel),
             Dropdown::SCROLL_VIEW => Ok(self.scroll_view),
+            Dropdown::SCROLL_VIEW_CONTENT => Ok(self.scroll_view_content),
             _ => Err(format!(
                 "{} doesn't exists for Dropdown. Possible contexts: {:?}",
                 target,
@@ -319,6 +320,7 @@ impl UiContext for Dropdown {
             Dropdown::ICON,
             Dropdown::PANEL,
             Dropdown::SCROLL_VIEW,
+            Dropdown::SCROLL_VIEW_CONTENT,
         ]
     }
 }
@@ -334,6 +336,7 @@ impl Dropdown {
     pub const ICON: &'static str = "Icon";
     pub const PANEL: &'static str = "Panel";
     pub const SCROLL_VIEW: &'static str = "ScrollView";
+    pub const SCROLL_VIEW_CONTENT: &'static str = "ScrollViewContent";
 
     pub fn value(&self) -> Option<usize> {
         self.value
@@ -418,6 +421,15 @@ impl Dropdown {
             .top(Val::Px(theme_spacing.areas.medium))
             .min_width(Val::Percent(100.))
             .max_height(Val::Px(theme_spacing.areas.extra_large));
+
+        style_builder
+            .switch_target(Dropdown::SCROLL_VIEW_CONTENT)
+            .margin(UiRect::px(
+                0.,
+                theme_spacing.scroll_bar_size,
+                0.,
+                theme_spacing.scroll_bar_size,
+            ));
     }
 
     fn open_style(
@@ -473,11 +485,11 @@ impl Dropdown {
         let dropdown_size = dropdown_node.unrounded_size();
         let dropdown_borders = UiUtils::border_as_px(entity, world);
         let panel_borders = UiUtils::border_as_px(dropdown_panel, world);
+        let scroll_view_margins = UiUtils::margin_as_px(scroll_view_content, world);
 
         let (container_size, dropdown_position) = UiUtils::container_size_and_offset(entity, world);
         let tl_corner = dropdown_position - dropdown_size / 2.;
-        let total_available_space = container_size - dropdown_size;
-        let halfway_point = total_available_space / 2.;
+        let halfway_point = container_size / 2.;
         let anchor = if tl_corner.x > halfway_point.x {
             if tl_corner.y > halfway_point.y {
                 DropdownPanelAnchor::TopRight
@@ -493,17 +505,15 @@ impl Dropdown {
         };
 
         let panel_size_limit = match anchor {
-            DropdownPanelAnchor::TopLeft => {
-                Vec2::new(total_available_space.x - tl_corner.x, tl_corner.y)
-            }
+            DropdownPanelAnchor::TopLeft => Vec2::new(container_size.x - tl_corner.x, tl_corner.y),
             DropdownPanelAnchor::TopRight => Vec2::new(tl_corner.x + dropdown_size.x, tl_corner.y),
             DropdownPanelAnchor::BottomLeft => Vec2::new(
-                total_available_space.x - tl_corner.x,
-                total_available_space.y - (tl_corner.y + dropdown_size.y),
+                container_size.x - tl_corner.x,
+                container_size.y - (tl_corner.y + dropdown_size.y),
             ),
             DropdownPanelAnchor::BottomRight => Vec2::new(
                 tl_corner.x + dropdown_size.x,
-                total_available_space.y - (tl_corner.y + dropdown_size.y),
+                container_size.y - (tl_corner.y + dropdown_size.y),
             ),
         }
         .max(Vec2::ZERO);
@@ -536,7 +546,9 @@ impl Dropdown {
             .unrounded_size()
             .x
             + panel_borders.y
-            + panel_borders.w)
+            + panel_borders.w
+            + scroll_view_margins.y
+            + scroll_view_margins.z)
             .clamp(0., panel_size_limit.x.max(0.));
         let idle_height = five_children_height.clamp(0., panel_size_limit.y.max(0.));
 

@@ -4,7 +4,7 @@ use bevy::{
     window::{PrimaryWindow, WindowResized},
 };
 
-use sickle_ui_scaffold::prelude::*;
+use sickle_ui_scaffold::{prelude::*, ui_commands::RefreshThemeExt};
 
 use crate::widgets::layout::{
     container::UiContainerExt,
@@ -13,6 +13,8 @@ use crate::widgets::layout::{
     resize_handles::{ResizeDirection, ResizeHandle, UiResizeHandlesExt},
     scroll_view::UiScrollViewExt,
 };
+
+use super::column::UiColumnExt;
 
 const MIN_PANEL_SIZE: Vec2 = Vec2 { x: 150., y: 100. };
 const MIN_FLOATING_PANEL_Z_INDEX: usize = 1000;
@@ -46,6 +48,9 @@ impl Plugin for FloatingPanelPlugin {
 #[derive(SystemSet, Clone, Eq, Debug, Hash, PartialEq)]
 pub struct FloatingPanelUpdate;
 
+// TODO: Extract widget interaction to separate plugins, i.e. "tab_popout"
+// TODO: Re-verify system scheduling, be extra careful of theming not being applied in cases
+// when context entity is set late, like below
 fn update_floating_panel_panel_id(
     mut q_floating_panels: Query<
         (Entity, &mut FloatingPanel, &UpdateFloatingPanelPanelId),
@@ -74,6 +79,7 @@ fn update_floating_panel_panel_id(
         commands.style(update_ref.panel_id).show();
 
         floating_panel.content_panel = update_ref.panel_id;
+        commands.entity(entity).refresh_theme::<FloatingPanel>();
     }
 }
 
@@ -684,6 +690,11 @@ impl FloatingPanel {
             .background_color(colors.container(Container::SurfaceMid));
 
         style_builder
+            .switch_target(FloatingPanel::CONTENT_VIEW)
+            .width(Val::Percent(100.))
+            .height(Val::Percent(100.));
+
+        style_builder
             .switch_context(FloatingPanel::DRAG_HANDLE.to_string(), None)
             .width(Val::Percent(100.))
             .height(Val::Px(theme_spacing.borders.small * 2.))
@@ -981,14 +992,16 @@ impl UiFloatingPanelExt for UiBuilder<'_, Entity> {
                 .id();
 
             floating_panel.content_view = container
-                .scroll_view(restrict_to, |scroll_view| {
-                    floating_panel.content_panel_container = scroll_view.id();
-                    floating_panel.content_panel = scroll_view
-                        .panel(
-                            config.title.clone().unwrap_or("Untitled".into()),
-                            spawn_children,
-                        )
-                        .id();
+                .column(|column| {
+                    column.scroll_view(restrict_to, |scroll_view| {
+                        floating_panel.content_panel_container = scroll_view.id();
+                        floating_panel.content_panel = scroll_view
+                            .panel(
+                                config.title.clone().unwrap_or("Untitled".into()),
+                                spawn_children,
+                            )
+                            .id();
+                    });
                 })
                 .style()
                 .render(config.folded)
