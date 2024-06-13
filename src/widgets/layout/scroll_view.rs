@@ -8,6 +8,7 @@ use sickle_ui_scaffold::prelude::*;
 
 use super::container::UiContainerExt;
 
+// TODO: implement click-to-scroll
 pub struct ScrollViewPlugin;
 
 impl Plugin for ScrollViewPlugin {
@@ -481,7 +482,7 @@ impl ScrollView {
             .height(Val::Px(theme_spacing.scroll_bar_size))
             .border(UiRect::top(Val::Px(theme_spacing.borders.extra_small)))
             .border_color(colors.accent(Accent::Shadow))
-            .background_color(colors.container(Container::Tertiary))
+            .background_color(colors.container(Container::SurfaceMid))
             .visibility(Visibility::Hidden);
 
         style_builder
@@ -491,7 +492,7 @@ impl ScrollView {
             .height(Val::Percent(100.))
             .border(UiRect::left(Val::Px(theme_spacing.borders.extra_small)))
             .border_color(colors.accent(Accent::Shadow))
-            .background_color(colors.container(Container::Tertiary))
+            .background_color(colors.container(Container::SurfaceMid))
             .visibility(Visibility::Hidden);
 
         style_builder

@@ -231,11 +231,15 @@ impl MenuItem {
             })
             .copy_from(theme_data.interaction_animation);
 
+        let leading_icon = match leading_icon.is_codepoint() {
+            true => leading_icon.with(colors.on(On::SurfaceVariant), theme_spacing.icons.small),
+            false => leading_icon,
+        };
         style_builder
             .switch_target(MenuItem::LEADING_ICON)
             .aspect_ratio(1.)
             .size(Val::Px(theme_spacing.icons.small))
-            .icon(leading_icon.with(colors.on(On::SurfaceVariant), theme_spacing.icons.small));
+            .icon(leading_icon);
 
         style_builder
             .switch_target(MenuItem::LABEL)
@@ -255,12 +259,16 @@ impl MenuItem {
             .sized_font(font)
             .font_color(colors.on(On::SurfaceVariant));
 
+        let trailing_icon = match trailing_icon.is_codepoint() {
+            true => trailing_icon.with(colors.on(On::SurfaceVariant), theme_spacing.icons.small),
+            false => trailing_icon,
+        };
         style_builder
             .switch_target(MenuItem::TRAILING_ICON)
             .aspect_ratio(1.)
             .margin(UiRect::left(Val::Px(theme_spacing.gaps.small)))
             .size(Val::Px(theme_spacing.icons.small))
-            .icon(trailing_icon.with(colors.on(On::SurfaceVariant), theme_spacing.icons.small));
+            .icon(trailing_icon);
     }
 
     fn button(name: String) -> impl Bundle {
