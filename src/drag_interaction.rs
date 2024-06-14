@@ -16,6 +16,7 @@ impl Plugin for DragInteractionPlugin {
                     update_drag_progress,
                     update_drag_state,
                     update_cursor_confinement_from_drag
+                        .run_if(is_windows_os())
                 )
                     .chain()
                     .in_set(DraggableUpdate),
@@ -64,16 +65,15 @@ pub enum DragSource {
     Touch(u64),
 }
 
+/// Returns `cfg!(target_os = "windows")`
+fn is_windows_os() -> impl Condition<()> {
+    IntoSystem::into_system(| mut os_check: Local<bool> | { *os_check = cfg!(target_os = "windows"); *os_check })
+}
+
 fn update_cursor_confinement_from_drag(
     q_draggable: Query<&Draggable, Changed<Draggable>>,
     mut q_window: Query<&mut Window, With<PrimaryWindow>>,
 ) {
-    // CursorGrabMode::Confined has strange behavior outside of Windows.
-    // On macOS, CursorGrabMode::Confined doesn't exist, so Bevy uses CursorGrabMode::Locked instead.
-    if !cfg!(target_os = "windows") {
-        return;
-    }
-
     let Ok(mut window) = q_window.get_single_mut() else {
         return;
     };
