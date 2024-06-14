@@ -1,4 +1,5 @@
 use bevy::prelude::*;
+use bevy::window::{CursorGrabMode, PrimaryWindow};
 use bevy::ui::RelativeCursorPosition;
 use bevy_reflect::Reflect;
 
@@ -13,7 +14,8 @@ impl Plugin for DragInteractionPlugin {
                 Update,
                 (
                     update_drag_progress,
-                    update_drag_state
+                    update_drag_state,
+                    update_cursor_confinement_from_drag
                 )
                     .chain()
                     .in_set(DraggableUpdate),
@@ -60,6 +62,32 @@ pub enum DragSource {
     #[default]
     Mouse,
     Touch(u64),
+}
+
+fn update_cursor_confinement_from_drag(
+    q_draggable: Query<&Draggable, Changed<Draggable>>,
+    mut q_window: Query<&mut Window, With<PrimaryWindow>>,
+) {
+    // CursorGrabMode::Confined has strange behavior outside of Windows.
+    // On macOS, CursorGrabMode::Confined doesn't exist, so Bevy uses CursorGrabMode::Locked instead.
+    if !cfg!(target_os = "windows") {
+        return;
+    }
+
+    let Ok(mut window) = q_window.get_single_mut() else {
+        return;
+    };
+
+    if let Some(_) = q_draggable
+        .iter()
+        .find(|&draggable| draggable.state == DragState::DragStart)
+    {
+        window.cursor.grab_mode = CursorGrabMode::Confined;
+    } else if let Some(_) = q_draggable.iter().find(|&draggable| {
+        draggable.state == DragState::DragEnd || draggable.state == DragState::DragCanceled
+    }) {
+        window.cursor.grab_mode = CursorGrabMode::None;
+    }
 }
 
 // TODO: Consider using MouseMotion and TouchInput events directly
