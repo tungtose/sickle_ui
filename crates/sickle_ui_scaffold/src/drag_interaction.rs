@@ -15,7 +15,7 @@ impl Plugin for DragInteractionPlugin {
                 (
                     update_drag_progress,
                     update_drag_state,
-                    update_cursor_confinement_from_drag.run_if(is_windows_os()),
+                    update_cursor_confinement_from_drag.run_if(is_windows_os),
                 )
                     .chain()
                     .in_set(DraggableUpdate),
@@ -65,11 +65,8 @@ pub enum DragSource {
 }
 
 /// Returns `cfg!(target_os = "windows")`
-fn is_windows_os() -> impl Condition<()> {
-    IntoSystem::into_system(|mut os_check: Local<bool>| {
-        *os_check = cfg!(target_os = "windows");
-        *os_check
-    })
+fn is_windows_os() -> bool {
+    cfg!(target_os = "windows")
 }
 
 fn update_cursor_confinement_from_drag(
