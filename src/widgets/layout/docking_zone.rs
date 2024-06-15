@@ -44,7 +44,7 @@ impl Plugin for DockingZonePlugin {
             .add_systems(
                 Update,
                 (
-                    update_docking_zone_resize_handles.run_if(should_update_resize_handles),
+                    update_docking_zone_resize_handles,
                     handle_docking_zone_drop_zone_change,
                 )
                     .in_set(DockingZoneUpdate),
@@ -380,19 +380,18 @@ fn cleanup_leftover_docking_zone_splits(
     }
 }
 
-fn should_update_resize_handles(
-    q_accepted_types: Query<&Draggable, (With<FloatingPanelTitle>, Changed<Draggable>)>,
-) -> bool {
-    q_accepted_types
-        .iter()
-        .any(|draggable| draggable.state != DragState::Inactive)
-}
-
 fn update_docking_zone_resize_handles(
     q_accepted_types: Query<&Draggable, (With<FloatingPanelTitle>, Changed<Draggable>)>,
     q_handle_containers: Query<Entity, With<SizedZoneResizeHandleContainer>>,
     mut commands: Commands,
 ) {
+    if q_accepted_types
+        .iter()
+        .all(|draggable| draggable.state == DragState::Inactive)
+    {
+        return;
+    }
+
     let dragging = q_accepted_types.iter().any(|draggable| {
         draggable.state == DragState::DragStart || draggable.state == DragState::Dragging
     });
@@ -487,7 +486,7 @@ fn handle_docking_zone_drop_zone_change(
 
             if drop_area == DropArea::Center {
                 commands
-                    .ui_builder(*tab_container)
+                    .ui_builder((docking_zone.tab_container, *tab_container))
                     .dock_panel(droppable_title.panel());
             } else {
                 let split_direction = match drop_area {
@@ -749,14 +748,7 @@ impl DockingZoneHighlight {
     }
 
     fn visible_style(style_builder: &mut StyleBuilder, theme_data: &ThemeData) {
-        style_builder
-            .animated()
-            .background_color(AnimatedVals {
-                idle: theme_data.colors().accent(Accent::Outline).with_a(0.5),
-                enter_from: Some(Color::NONE),
-                ..default()
-            })
-            .copy_from(theme_data.enter_animation);
+        style_builder.background_color(theme_data.colors().accent(Accent::Outline).with_a(0.5));
     }
 
     fn bundle(zone: Entity) -> impl Bundle {
@@ -802,7 +794,7 @@ pub trait UiDockingZoneExt {
         &mut self,
         config: SizedZoneConfig,
         remove_empty: bool,
-        spawn_children: impl FnOnce(&mut UiBuilder<TabContainer>),
+        spawn_children: impl FnOnce(&mut UiBuilder<(Entity, TabContainer)>),
     ) -> UiBuilder<Entity>;
 
     fn docking_zone_split(
@@ -817,7 +809,7 @@ impl UiDockingZoneExt for UiBuilder<'_, Entity> {
         &mut self,
         config: SizedZoneConfig,
         remove_empty: bool,
-        spawn_children: impl FnOnce(&mut UiBuilder<TabContainer>),
+        spawn_children: impl FnOnce(&mut UiBuilder<(Entity, TabContainer)>),
     ) -> UiBuilder<Entity> {
         let mut tab_container = Entity::PLACEHOLDER;
         let mut zone_highlight = Entity::PLACEHOLDER;

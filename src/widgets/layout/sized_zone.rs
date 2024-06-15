@@ -313,7 +313,6 @@ fn update_sized_zone_resize_handles(
     }
 
     for (handles, direction, visible) in handle_visibility {
-        info!("{:?}: {:?} {:?}", handles, direction, visible);
         if visible {
             commands
                 .entity(handles)

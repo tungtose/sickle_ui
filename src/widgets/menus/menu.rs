@@ -234,7 +234,8 @@ impl Menu {
                 idle: colors.container(Container::SurfaceMid),
                 hover: colors.container(Container::SurfaceHighest).into(),
                 ..default()
-            });
+            })
+            .copy_from(theme_data.interaction_animation);
 
         style_builder
             .switch_target(Menu::LABEL)
