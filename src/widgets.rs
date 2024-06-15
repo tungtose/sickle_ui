@@ -42,7 +42,7 @@ pub mod prelude {
         layout::icon::UiIconExt,
         layout::label::{LabelConfig, UiLabelExt},
         layout::panel::UiPanelExt,
-        layout::resize_handles::{ResizeHandle, UiResizeHandlesExt},
+        layout::resize_handles::{ResizeHandle, ResizeHandles, UiResizeHandlesExt},
         layout::row::UiRowExt,
         layout::scroll_view::{ScrollViewLayoutUpdate, UiScrollViewExt},
         layout::sized_zone::{SizedZoneConfig, SizedZonePreUpdate, UiSizedZoneExt},

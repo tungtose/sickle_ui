@@ -943,7 +943,7 @@ impl UiFloatingPanelExt for UiBuilder<'_, Entity> {
         let mut frame = self.container(FloatingPanel::frame(title_text.clone()), |container| {
             let panel = container.id();
             floating_panel.resize_handles = container
-                .resize_handles(FloatingPanelResizeHandle { panel })
+                .resize_handles(FloatingPanelResizeHandle { panel }, |_| {})
                 .id();
 
             let mut title_builder =

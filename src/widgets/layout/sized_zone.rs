@@ -5,7 +5,7 @@ use sickle_ui_scaffold::{prelude::*, ui_commands::LogHierarchyExt};
 use super::{
     container::UiContainerExt,
     docking_zone::DockingZoneUpdate,
-    resize_handles::{ResizeDirection, ResizeHandle},
+    resize_handles::{ResizeHandle, UiResizeHandlesExt},
 };
 
 const MIN_SIZED_ZONE_SIZE: f32 = 50.;
@@ -14,13 +14,15 @@ pub struct SizedZonePlugin;
 
 impl Plugin for SizedZonePlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(
+        app.add_plugins((
+            HierarchyToPseudoState::<SizedZone>::new(),
+            ComponentThemePlugin::<SizedZone>::default(),
+        ))
+        .add_systems(
             PreUpdate,
             (
                 preset_sized_zone_flex_layout,
                 preset_sized_zone_children_size,
-                preset_sized_zone_resize_handles,
-                preset_sized_zone_border,
             )
                 .chain()
                 .in_set(SizedZonePreUpdate)
@@ -37,6 +39,12 @@ impl Plugin for SizedZonePlugin {
             fit_sized_zones_on_window_resize
                 .run_if(should_fit_sized_zones)
                 .after(UiSystem::Layout),
+        )
+        .add_systems(
+            PostUpdate,
+            update_sized_zone_resize_handles
+                .run_if(should_update_sized_zone_layout)
+                .after(DynamicStylePostUpdate),
         );
     }
 }
@@ -137,21 +145,7 @@ fn preset_sized_zone_children_size(
     }
 }
 
-fn preset_sized_zone_border(mut q_sized_zones: Query<(&SizedZone, &mut Style)>) {
-    for (zone, mut style) in &mut q_sized_zones {
-        match zone.flex_direction {
-            FlexDirection::Row => {
-                style.border = UiRect::vertical(Val::Px(2.));
-            }
-            FlexDirection::Column => {
-                style.border = UiRect::horizontal(Val::Px(2.));
-            }
-            _ => (),
-        }
-    }
-}
-
-fn preset_sized_zone_resize_handles(
+fn update_sized_zone_resize_handles(
     q_sized_zone_parents: Query<&Parent, With<SizedZone>>,
     q_children: Query<&Children>,
     q_sized_zones: Query<&SizedZone>,
@@ -160,7 +154,8 @@ fn preset_sized_zone_resize_handles(
     mut commands: Commands,
 ) {
     let zone_count = q_sized_zone_parents.iter().count();
-    let mut handle_visibility: Vec<(Entity, bool)> = Vec::with_capacity(zone_count * 4);
+    let mut handle_visibility: Vec<(Entity, CardinalDirection, bool)> =
+        Vec::with_capacity(zone_count * 4);
     let mut handle_neighbours: Vec<(Entity, Option<Entity>)> = Vec::with_capacity(zone_count * 4);
     let parents: Vec<Entity> =
         q_sized_zone_parents
@@ -182,10 +177,10 @@ fn preset_sized_zone_resize_handles(
             let Ok(zone) = q_sized_zones.get(children[0]) else {
                 return;
             };
-            handle_visibility.push((zone.top_handle, false));
-            handle_visibility.push((zone.right_handle, false));
-            handle_visibility.push((zone.bottom_handle, false));
-            handle_visibility.push((zone.left_handle, false));
+            handle_visibility.push((zone.resize_handles, CardinalDirection::North, false));
+            handle_visibility.push((zone.resize_handles, CardinalDirection::East, false));
+            handle_visibility.push((zone.resize_handles, CardinalDirection::South, false));
+            handle_visibility.push((zone.resize_handles, CardinalDirection::West, false));
         } else {
             let mut zone_children: Vec<Entity> = Vec::with_capacity(child_count);
             let mut prev_is_zone = true;
@@ -209,16 +204,48 @@ fn preset_sized_zone_resize_handles(
 
                 match zone.flex_direction {
                     FlexDirection::Row => {
-                        handle_visibility.push((zone.top_handle, !prev_is_zone));
-                        handle_visibility.push((zone.bottom_handle, i != child_count - 1));
-                        handle_visibility.push((zone.right_handle, false));
-                        handle_visibility.push((zone.left_handle, false));
+                        handle_visibility.push((
+                            zone.resize_handles,
+                            CardinalDirection::North,
+                            !prev_is_zone,
+                        ));
+                        handle_visibility.push((
+                            zone.resize_handles,
+                            CardinalDirection::South,
+                            i != child_count - 1,
+                        ));
+                        handle_visibility.push((
+                            zone.resize_handles,
+                            CardinalDirection::East,
+                            false,
+                        ));
+                        handle_visibility.push((
+                            zone.resize_handles,
+                            CardinalDirection::West,
+                            false,
+                        ));
                     }
                     FlexDirection::Column => {
-                        handle_visibility.push((zone.left_handle, !prev_is_zone));
-                        handle_visibility.push((zone.right_handle, i != child_count - 1));
-                        handle_visibility.push((zone.top_handle, false));
-                        handle_visibility.push((zone.bottom_handle, false));
+                        handle_visibility.push((
+                            zone.resize_handles,
+                            CardinalDirection::West,
+                            !prev_is_zone,
+                        ));
+                        handle_visibility.push((
+                            zone.resize_handles,
+                            CardinalDirection::East,
+                            i != child_count - 1,
+                        ));
+                        handle_visibility.push((
+                            zone.resize_handles,
+                            CardinalDirection::North,
+                            false,
+                        ));
+                        handle_visibility.push((
+                            zone.resize_handles,
+                            CardinalDirection::South,
+                            false,
+                        ));
                     }
                     _ => warn!(
                         "Invalid flex_direction detected on sized zone {:?}",
@@ -232,11 +259,25 @@ fn preset_sized_zone_resize_handles(
 
             for i in 0..zone_children.len() {
                 let zone = q_sized_zones.get(zone_children[i]).unwrap();
-                let Some((prev_handle, next_handle)) = (match zone.flex_direction {
-                    FlexDirection::Row => (zone.top_handle, zone.bottom_handle).into(),
-                    FlexDirection::Column => (zone.left_handle, zone.right_handle).into(),
-                    _ => None,
-                }) else {
+                let Some((prev_dir, prev_handle, next_dir, next_handle)) =
+                    (match zone.flex_direction {
+                        FlexDirection::Row => (
+                            CardinalDirection::North,
+                            zone.top_handle,
+                            CardinalDirection::South,
+                            zone.bottom_handle,
+                        )
+                            .into(),
+                        FlexDirection::Column => (
+                            CardinalDirection::West,
+                            zone.left_handle,
+                            CardinalDirection::East,
+                            zone.right_handle,
+                        )
+                            .into(),
+                        _ => None,
+                    })
+                else {
                     warn!(
                         "Invalid flex_direction detected on sized zone {:?}",
                         zone_children[i]
@@ -245,11 +286,11 @@ fn preset_sized_zone_resize_handles(
                 };
 
                 if i == 0 {
-                    handle_visibility.push((prev_handle, false));
+                    handle_visibility.push((zone.resize_handles, prev_dir, false));
                 }
 
                 if i == zone_children.len() - 1 {
-                    handle_visibility.push((next_handle, false));
+                    handle_visibility.push((zone.resize_handles, next_dir, false));
                 }
 
                 handle_neighbours.push((
@@ -271,11 +312,17 @@ fn preset_sized_zone_resize_handles(
         }
     }
 
-    for (handle, visible) in handle_visibility {
-        commands.style(handle).visibility(match visible {
-            true => Visibility::Inherited,
-            false => Visibility::Hidden,
-        });
+    for (handles, direction, visible) in handle_visibility {
+        info!("{:?}: {:?} {:?}", handles, direction, visible);
+        if visible {
+            commands
+                .entity(handles)
+                .add_pseudo_state(PseudoState::Resizable(direction));
+        } else {
+            commands
+                .entity(handles)
+                .remove_pseudo_state(PseudoState::Resizable(direction));
+        }
     }
 
     for (handle, neighbour) in handle_neighbours {
@@ -516,13 +563,20 @@ impl Default for SizedZoneResizeHandle {
     }
 }
 
-#[derive(Component, Debug, Reflect)]
+#[derive(Debug, Default)]
+pub struct SizedZoneConfig {
+    pub size: f32,
+    pub min_size: f32,
+}
+
+#[derive(Component, Clone, Debug, Reflect)]
 #[reflect(Component)]
 pub struct SizedZone {
     size_percent: f32,
     min_size: f32,
     children_size: f32,
     flex_direction: FlexDirection,
+    resize_handles: Entity,
     top_handle: Entity,
     right_handle: Entity,
     bottom_handle: Entity,
@@ -536,6 +590,7 @@ impl Default for SizedZone {
             min_size: MIN_SIZED_ZONE_SIZE,
             children_size: Default::default(),
             flex_direction: Default::default(),
+            resize_handles: Entity::PLACEHOLDER,
             top_handle: Entity::PLACEHOLDER,
             right_handle: Entity::PLACEHOLDER,
             bottom_handle: Entity::PLACEHOLDER,
@@ -544,13 +599,33 @@ impl Default for SizedZone {
     }
 }
 
-#[derive(Debug, Default)]
-pub struct SizedZoneConfig {
-    pub size: f32,
-    pub min_size: f32,
+impl UiContext for SizedZone {
+    fn get(&self, target: &str) -> Result<Entity, String> {
+        match target {
+            SizedZone::RESIZE_HANDLES => Ok(self.resize_handles),
+            _ => Err(format!(
+                "{} doesn't exists for SizedZone. Possible contexts: {:?}",
+                target,
+                self.contexts()
+            )),
+        }
+    }
+
+    fn contexts(&self) -> Vec<&'static str> {
+        vec![SizedZone::RESIZE_HANDLES]
+    }
+}
+
+impl DefaultTheme for SizedZone {
+    fn default_theme() -> Option<Theme<SizedZone>> {
+        SizedZone::theme().into()
+    }
 }
 
 impl SizedZone {
+    pub const RESIZE_HANDLES: &'static str = "Label";
+    pub const RESIZE_HANDLES_Z_INDEX: i32 = 120000;
+
     pub fn direction(&self) -> FlexDirection {
         self.flex_direction
     }
@@ -567,33 +642,119 @@ impl SizedZone {
         self.min_size
     }
 
+    pub fn theme() -> Theme<SizedZone> {
+        let base_theme = PseudoTheme::deferred(None, SizedZone::primary_style);
+
+        let theme_row = PseudoTheme::deferred(vec![PseudoState::LayoutRow], SizedZone::style_row);
+        let theme_row_first = PseudoTheme::deferred(
+            vec![PseudoState::LayoutRow, PseudoState::FirstChild],
+            SizedZone::style_row_first,
+        );
+        let theme_row_last = PseudoTheme::deferred(
+            vec![PseudoState::LayoutRow, PseudoState::LastChild],
+            SizedZone::style_row_last,
+        );
+        let theme_row_single = PseudoTheme::deferred(
+            vec![
+                PseudoState::LayoutRow,
+                PseudoState::FirstChild,
+                PseudoState::LastChild,
+                PseudoState::SingleChild,
+            ],
+            SizedZone::style_row_single,
+        );
+
+        let theme_column =
+            PseudoTheme::deferred(vec![PseudoState::LayoutColumn], SizedZone::style_column);
+        let theme_column_first = PseudoTheme::deferred(
+            vec![PseudoState::LayoutColumn, PseudoState::FirstChild],
+            SizedZone::style_column_first,
+        );
+        let theme_column_last = PseudoTheme::deferred(
+            vec![PseudoState::LayoutColumn, PseudoState::LastChild],
+            SizedZone::style_column_last,
+        );
+        let theme_column_single = PseudoTheme::deferred(
+            vec![
+                PseudoState::LayoutColumn,
+                PseudoState::FirstChild,
+                PseudoState::LastChild,
+                PseudoState::SingleChild,
+            ],
+            SizedZone::style_column_single,
+        );
+
+        Theme::new(vec![
+            base_theme,
+            theme_row,
+            theme_row_first,
+            theme_row_last,
+            theme_row_single,
+            theme_column,
+            theme_column_first,
+            theme_column_last,
+            theme_column_single,
+        ])
+    }
+
+    fn primary_style(style_builder: &mut StyleBuilder, theme_data: &ThemeData) {
+        let colors = theme_data.colors();
+
+        style_builder
+            .border_color(colors.accent(Accent::OutlineVariant))
+            .background_color(colors.surface(Surface::Surface));
+
+        style_builder
+            .switch_target(SizedZone::RESIZE_HANDLES)
+            .z_index(ZIndex::Global(SizedZone::RESIZE_HANDLES_Z_INDEX));
+    }
+
+    fn style_row(style_builder: &mut StyleBuilder, theme_data: &ThemeData) {
+        style_builder.border(UiRect::vertical(Val::Px(
+            theme_data.spacing.borders.extra_small,
+        )));
+    }
+    fn style_row_first(style_builder: &mut StyleBuilder, theme_data: &ThemeData) {
+        style_builder.border(UiRect::bottom(Val::Px(
+            theme_data.spacing.borders.extra_small,
+        )));
+    }
+    fn style_row_last(style_builder: &mut StyleBuilder, theme_data: &ThemeData) {
+        style_builder.border(UiRect::top(Val::Px(theme_data.spacing.borders.extra_small)));
+    }
+    fn style_row_single(style_builder: &mut StyleBuilder, _: &ThemeData) {
+        style_builder.border(UiRect::all(Val::Auto));
+    }
+
+    fn style_column(style_builder: &mut StyleBuilder, theme_data: &ThemeData) {
+        style_builder.border(UiRect::horizontal(Val::Px(
+            theme_data.spacing.borders.extra_small,
+        )));
+    }
+    fn style_column_first(style_builder: &mut StyleBuilder, theme_data: &ThemeData) {
+        style_builder.border(UiRect::right(Val::Px(
+            theme_data.spacing.borders.extra_small,
+        )));
+    }
+    fn style_column_last(style_builder: &mut StyleBuilder, theme_data: &ThemeData) {
+        style_builder.border(UiRect::left(Val::Px(
+            theme_data.spacing.borders.extra_small,
+        )));
+    }
+    fn style_column_single(style_builder: &mut StyleBuilder, _: &ThemeData) {
+        style_builder.border(UiRect::all(Val::Auto));
+    }
+
     fn frame() -> impl Bundle {
         (
             Name::new("Sized Zone"),
-            NodeBundle {
-                style: Style {
-                    width: Val::Percent(100.),
-                    height: Val::Percent(100.),
-                    ..default()
-                },
-                border_color: Color::rgb(0.1, 0.1, 0.1).into(),
-                ..default()
-            },
-        )
-    }
-
-    fn vertical_handles_container() -> impl Bundle {
-        (
-            Name::new("Vertical Handles"),
-            NodeBundle {
-                style: Style {
-                    width: Val::Percent(100.),
-                    height: Val::Percent(100.),
-                    justify_content: JustifyContent::SpaceBetween,
-                    ..default()
-                },
-                ..default()
-            },
+            NodeBundle::default(),
+            PseudoStates::new(),
+            FlexDirectionToPseudoState,
+            LockedStyleAttributes::from_vec(vec![
+                LockableStyleAttribute::Width,
+                LockableStyleAttribute::Height,
+            ]),
         )
     }
 }
@@ -614,111 +775,33 @@ impl UiSizedZoneExt for UiBuilder<'_, Entity> {
     ) -> UiBuilder<Entity> {
         let size = config.size.clamp(0., 100.);
         let min_size = config.min_size.max(MIN_SIZED_ZONE_SIZE);
-        let mut left_handle = Entity::PLACEHOLDER;
-        let mut right_handle = Entity::PLACEHOLDER;
-        let mut top_handle = Entity::PLACEHOLDER;
-        let mut bottom_handle = Entity::PLACEHOLDER;
+        let mut sized_zone = SizedZone {
+            size_percent: size,
+            min_size,
+            ..Default::default()
+        };
 
-        let mut sized_zone = self.container(SizedZone::frame(), |container| {
+        let mut frame = self.container(SizedZone::frame(), |container| {
             let zone_id = container.id();
+            spawn_children(container);
+
             let handle = SizedZoneResizeHandle {
                 sized_zone: zone_id,
                 ..default()
             };
-
-            spawn_children(container);
-
-            container.container(
-                (
-                    ResizeHandle::resize_handle_container(10),
-                    SizedZoneResizeHandleContainer,
-                ),
-                |resize_container| {
-                    resize_container.container(
-                        (
-                            Name::new("Top Row"),
-                            NodeBundle {
-                                style: Style {
-                                    width: Val::Percent(100.),
-                                    height: Val::Px(ResizeHandle::resize_zone_size()),
-                                    ..default()
-                                },
-                                ..default()
-                            },
-                        ),
-                        |top_row| {
-                            top_handle = top_row
-                                .spawn((
-                                    ResizeHandle::resize_handle(ResizeDirection::North),
-                                    handle,
-                                ))
-                                .style()
-                                .left(Val::Px(0.))
-                                .id();
-                        },
-                    );
-
-                    resize_container.container(
-                        (
-                            Name::new("Bottom Row"),
-                            NodeBundle {
-                                style: Style {
-                                    width: Val::Percent(100.),
-                                    height: Val::Px(ResizeHandle::resize_zone_size()),
-                                    ..default()
-                                },
-                                ..default()
-                            },
-                        ),
-                        |bottom_row| {
-                            bottom_handle = bottom_row
-                                .spawn((
-                                    ResizeHandle::resize_handle(ResizeDirection::South),
-                                    handle,
-                                ))
-                                .style()
-                                .left(Val::Px(0.))
-                                .id();
-                        },
-                    );
-                },
-            );
-
-            container.container(
-                (
-                    ResizeHandle::resize_handle_container(11),
-                    SizedZoneResizeHandleContainer,
-                ),
-                |resize_container| {
-                    resize_container.container(
-                        SizedZone::vertical_handles_container(),
-                        |middle_row| {
-                            left_handle = middle_row
-                                .spawn((ResizeHandle::resize_handle(ResizeDirection::West), handle))
-                                .style()
-                                .top(Val::Px(0.))
-                                .id();
-                            right_handle = middle_row
-                                .spawn((ResizeHandle::resize_handle(ResizeDirection::East), handle))
-                                .style()
-                                .top(Val::Px(0.))
-                                .id();
-                        },
-                    );
-                },
-            );
+            sized_zone.resize_handles = container
+                .resize_handles(handle, |handles| {
+                    sized_zone.top_handle = handles.context().handle_north;
+                    sized_zone.right_handle = handles.context().handle_east;
+                    sized_zone.bottom_handle = handles.context().handle_south;
+                    sized_zone.left_handle = handles.context().handle_west;
+                })
+                .insert(SizedZoneResizeHandleContainer)
+                .id();
         });
 
-        sized_zone.insert(SizedZone {
-            size_percent: size,
-            min_size,
-            top_handle,
-            right_handle,
-            bottom_handle,
-            left_handle,
-            ..default()
-        });
+        frame.insert(sized_zone);
 
-        sized_zone
+        frame
     }
 }

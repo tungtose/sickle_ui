@@ -92,19 +92,15 @@ fn should_cleanup_lingering_docking_zone_splits(
     //   - it's a leaf node and should be just despawn_recursive'd:
     //   - [DockingZoneSplitContainer]
     //     - [SizedZoneResizeHandleContainer]
-    //     - [SizedZoneResizeHandleContainer]
     //     - [UnsupportedAdditionalContent]
     // - it is a child of a split and has exactly one sized zone child and no sized zone siblings
     //   - update the child's size to the parent's
     //   - replace parent with the single zone child, depsawn parent and self (refresh new parent's children):
     //   - [DockingZoneSplitContainer:Column]            ->   [SizedZone:Column]
     //       - [DockingZoneSplitContainer:Row]                - [SizedZoneResizeHandleContainer]
-    //         - [SizedZone:Column]                           - [SizedZoneResizeHandleContainer]
-    //           - [SizedZoneResizeHandleContainer]
+    //         - [SizedZone:Column]
     //           - [SizedZoneResizeHandleContainer]
     //         - [SizedZoneResizeHandleContainer]
-    //         - [SizedZoneResizeHandleContainer]
-    //     - [SizedZoneResizeHandleContainer]
     //     - [SizedZoneResizeHandleContainer]
     //   - if it has multiple sized zone childs, move them to the parent, but spread the size amongst them
     // - any chain of empty splits should be removed
@@ -125,7 +121,6 @@ fn cleanup_empty_docking_zone_splits(
     //   - spread size equally among sized zone siblings
     //   - it's a leaf node and should be just despawn_recursive'd:
     //   - [DockingZoneSplitContainer]
-    //     - [SizedZoneResizeHandleContainer]
     //     - [SizedZoneResizeHandleContainer]
     //     - [UnsupportedAdditionalContent]
     // - any chain of empty splits should be removed
@@ -220,12 +215,9 @@ fn cleanup_shell_docking_zone_splits(
     //   - replace parent with the single zone child, depsawn parent and self (refresh new parent's children):
     //   - [DockingZoneSplitContainer:Column]            ->   [SizedZone:Column]
     //       - [DockingZoneSplitContainer:Row]                - [SizedZoneResizeHandleContainer]
-    //         - [SizedZone:Column]                           - [SizedZoneResizeHandleContainer]
-    //           - [SizedZoneResizeHandleContainer]
+    //         - [SizedZone:Column]
     //           - [SizedZoneResizeHandleContainer]
     //         - [SizedZoneResizeHandleContainer]
-    //         - [SizedZoneResizeHandleContainer]
-    //     - [SizedZoneResizeHandleContainer]
     //     - [SizedZoneResizeHandleContainer]
     //   - if it has multiple sized zone childs, move them to the parent, but spread the size amongst them
 
@@ -336,9 +328,7 @@ fn cleanup_leftover_docking_zone_splits(
     //   - [DockingZoneSplitContainer:Column]            ->   [DockingZone:Column]
     //     - [DockingZone:Row]                                  - [TabContainer]
     //       - [TabContainer]                                   - [SizedZoneResizeHandleContainer]
-    //       - [SizedZoneResizeHandleContainer]                 - [SizedZoneResizeHandleContainer]
     //       - [SizedZoneResizeHandleContainer]
-    //     - [SizedZoneResizeHandleContainer]
     //     - [SizedZoneResizeHandleContainer]
     // - Make sure to check if there are no other sized zones in the split before moving docking zone up
     for (zone_split_id, zone_split_children, zone_split_parent) in &q_zone_splits {
@@ -751,27 +741,6 @@ impl DockingZoneHighlight {
         Theme::new(vec![base_theme, visible_theme])
     }
 
-    fn bundle() -> impl Bundle {
-        (
-            Name::new("Zone Highlight"),
-            NodeBundle {
-                style: Style {
-                    position_type: PositionType::Absolute,
-                    ..default()
-                },
-                focus_policy: FocusPolicy::Pass,
-                visibility: Visibility::Hidden,
-                ..default()
-            },
-            LockedStyleAttributes::from_vec(vec![
-                LockableStyleAttribute::FocusPolicy,
-                LockableStyleAttribute::PositionType,
-                LockableStyleAttribute::Visibility,
-            ]),
-            PseudoStates::new(),
-        )
-    }
-
     fn primary_style(style_builder: &mut StyleBuilder, theme_data: &ThemeData) {
         style_builder
             .width(Val::Percent(100.))
@@ -797,6 +766,29 @@ impl DockingZoneHighlight {
                 ..default()
             })
             .copy_from(theme_data.enter_animation);
+    }
+
+    fn bundle(zone: Entity) -> impl Bundle {
+        (
+            Name::new("Zone Highlight"),
+            NodeBundle {
+                style: Style {
+                    position_type: PositionType::Absolute,
+                    ..default()
+                },
+                focus_policy: FocusPolicy::Pass,
+                visibility: Visibility::Hidden,
+                ..default()
+            },
+            LockedStyleAttributes::from_vec(vec![
+                LockableStyleAttribute::FocusPolicy,
+                LockableStyleAttribute::PositionType,
+                LockableStyleAttribute::Visibility,
+            ]),
+            PseudoStates::new(),
+            VisibilityToPseudoState,
+            DockingZoneHighlight { zone },
+        )
     }
 }
 
@@ -848,12 +840,7 @@ impl UiDockingZoneExt for UiBuilder<'_, Entity> {
             }
             tab_container = new_tab_container.id();
 
-            zone_highlight = zone
-                .spawn((
-                    DockingZoneHighlight::bundle(),
-                    DockingZoneHighlight { zone: zone_id },
-                ))
-                .id();
+            zone_highlight = zone.spawn((DockingZoneHighlight::bundle(zone_id),)).id();
         });
 
         docking_zone.insert((

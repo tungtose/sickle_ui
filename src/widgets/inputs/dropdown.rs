@@ -353,7 +353,7 @@ impl Dropdown {
         let base_theme = PseudoTheme::deferred(None, Dropdown::primary_style);
         let open_theme = PseudoTheme::deferred_world(vec![PseudoState::Open], Dropdown::open_style);
 
-        Theme::<Dropdown>::new(vec![base_theme, open_theme])
+        Theme::new(vec![base_theme, open_theme])
     }
 
     fn primary_style(style_builder: &mut StyleBuilder, theme_data: &ThemeData) {
@@ -699,6 +699,7 @@ impl UiDropdownExt for UiBuilder<'_, Entity> {
                         LockableStyleAttribute::FocusPolicy,
                     ]),
                     PseudoStates::default(),
+                    VisibilityToPseudoState,
                 ))
                 .style_unchecked()
                 .focus_policy(bevy::ui::FocusPolicy::Block)

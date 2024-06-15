@@ -13,7 +13,7 @@ impl Plugin for DynamicStylePlugin {
     fn build(&self, app: &mut App) {
         app.configure_sets(
             PostUpdate,
-            DynamicStyleUpdate
+            DynamicStylePostUpdate
                 .after(CustomThemeUpdate)
                 .before(UiSystem::Layout),
         )
@@ -26,13 +26,13 @@ impl Plugin for DynamicStylePlugin {
                 update_dynamic_style_on_stopwatch_change,
             )
                 .chain()
-                .in_set(DynamicStyleUpdate),
+                .in_set(DynamicStylePostUpdate),
         );
     }
 }
 
 #[derive(SystemSet, Clone, Eq, Debug, Hash, PartialEq)]
-pub struct DynamicStyleUpdate;
+pub struct DynamicStylePostUpdate;
 
 fn tick_dynamic_style_stopwatch(
     time: Res<Time<Real>>,

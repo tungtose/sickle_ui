@@ -318,7 +318,6 @@ fn setup(
                     },
                 )
                 .style()
-                .width(Val::Px(400.))
                 .border(UiRect::right(Val::Px(4.)))
                 .background_color(Color::rgb(0.15, 0.155, 0.16));
 
@@ -328,11 +327,7 @@ fn setup(
                     ..default()
                 },
                 |main_content| {
-                    root_entity = main_content
-                        .insert(UiContextRoot)
-                        .style()
-                        .width(Val::Percent(100.))
-                        .id();
+                    root_entity = main_content.insert(UiContextRoot).style().id();
 
                     spawn_test_content(main_content);
                 },

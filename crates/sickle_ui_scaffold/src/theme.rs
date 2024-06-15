@@ -21,11 +21,14 @@ use crate::{ui_commands::RefreshThemeExt, ui_style::builder::StyleBuilder};
 pub mod prelude {
     pub use super::{
         dynamic_style::{
-            ContextStyleAttribute, DynamicStyle, DynamicStyleEnterState, DynamicStyleUpdate,
+            ContextStyleAttribute, DynamicStyle, DynamicStyleEnterState, DynamicStylePostUpdate,
         },
         dynamic_style_attribute::{DynamicStyleAttribute, DynamicStyleController},
         icons::IconData,
-        pseudo_state::{PseudoState, PseudoStates},
+        pseudo_state::{
+            FlexDirectionToPseudoState, HierarchyToPseudoState, PseudoState, PseudoStates,
+            VisibilityToPseudoState,
+        },
         style_animation::{
             AnimationLoop, AnimationSettings, AnimationState, InteractionStyle,
             LoopedAnimationConfig,

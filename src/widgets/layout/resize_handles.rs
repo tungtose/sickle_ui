@@ -2,25 +2,11 @@ use bevy::prelude::*;
 use bevy::ui::RelativeCursorPosition;
 use bevy_reflect::Reflect;
 
-use sickle_math::ease::Ease;
-use sickle_ui_scaffold::{
-    animated_interaction::{AnimatedInteraction, AnimationConfig},
-    interactions::InteractiveBackground,
-    prelude::*,
-    ui_commands::SetCursorExt,
-};
+use sickle_ui_scaffold::{prelude::*, ui_commands::SetCursorExt};
 
 use super::container::UiContainerExt;
 
 const RESIZE_HANDLES_LOCAL_Z_INDEX: i32 = 100;
-const HANDLE_NORTH: &'static str = "HandleNorth";
-const HANDLE_NORTH_EAST: &'static str = "HandleNorthEast";
-const HANDLE_EAST: &'static str = "HandleEast";
-const HANDLE_SOUTH_EAST: &'static str = "HandleSouthEast";
-const HANDLE_SOUTH: &'static str = "HandleSouth";
-const HANDLE_SOUTH_WEST: &'static str = "HandleSouthWest";
-const HANDLE_WEST: &'static str = "HandleWest";
-const HANDLE_NORTH_WEST: &'static str = "HandleNorthWest";
 
 pub struct ResizeHandlePlugin;
 
@@ -175,108 +161,19 @@ impl ResizeHandle {
     pub fn direction(&self) -> ResizeDirection {
         self.direction
     }
-
-    fn base_tween() -> AnimationConfig {
-        AnimationConfig {
-            duration: 0.1,
-            easing: Ease::OutExpo,
-            ..default()
-        }
-    }
-
-    pub fn resize_zone_size() -> f32 {
-        4.
-    }
-
-    pub fn resize_zone_pullback() -> f32 {
-        2.
-    }
-
-    pub fn resize_handle_container(elevation: i32) -> impl Bundle {
-        (
-            Name::new("Resize Handle Container"),
-            NodeBundle {
-                style: Style {
-                    position_type: PositionType::Absolute,
-                    width: Val::Percent(100.),
-                    height: Val::Percent(100.),
-                    justify_content: JustifyContent::SpaceBetween,
-                    align_self: AlignSelf::Stretch,
-                    flex_direction: FlexDirection::Column,
-                    ..default()
-                },
-                z_index: ZIndex::Local(elevation),
-                ..default()
-            },
-        )
-    }
-
-    pub fn resize_handle(direction: ResizeDirection) -> impl Bundle {
-        let zone_size = ResizeHandle::resize_zone_size();
-
-        let (width, height) = match direction {
-            ResizeDirection::North => (Val::Percent(100.), Val::Px(zone_size)),
-            ResizeDirection::NorthEast => (Val::Px(zone_size), Val::Px(zone_size)),
-            ResizeDirection::East => (Val::Px(zone_size), Val::Percent(100.)),
-            ResizeDirection::SouthEast => (Val::Px(zone_size), Val::Px(zone_size)),
-            ResizeDirection::South => (Val::Percent(100.), Val::Px(zone_size)),
-            ResizeDirection::SouthWest => (Val::Px(zone_size), Val::Px(zone_size)),
-            ResizeDirection::West => (Val::Px(zone_size), Val::Percent(100.)),
-            ResizeDirection::NorthWest => (Val::Px(zone_size), Val::Px(zone_size)),
-        };
-        let name = match direction {
-            ResizeDirection::North => "North",
-            ResizeDirection::NorthEast => "NorthEast",
-            ResizeDirection::East => "East",
-            ResizeDirection::SouthEast => "SouthEast",
-            ResizeDirection::South => "South",
-            ResizeDirection::SouthWest => "SouthWest",
-            ResizeDirection::West => "West",
-            ResizeDirection::NorthWest => "NorthWest",
-        };
-
-        let pullback = Val::Px(-ResizeHandle::resize_zone_pullback());
-        (
-            Name::new(format!("Resize Handle: [{}]", name)),
-            NodeBundle {
-                style: Style {
-                    top: pullback,
-                    left: pullback,
-                    width,
-                    height,
-                    ..default()
-                },
-                focus_policy: bevy::ui::FocusPolicy::Pass,
-                ..default()
-            },
-            Interaction::default(),
-            TrackedInteraction::default(),
-            InteractiveBackground {
-                highlight: Color::rgb(0., 0.5, 1.).into(),
-                ..default()
-            },
-            AnimatedInteraction::<InteractiveBackground> {
-                tween: ResizeHandle::base_tween(),
-                ..default()
-            },
-            Draggable::default(),
-            RelativeCursorPosition::default(),
-            ResizeHandle { direction },
-        )
-    }
 }
 
 #[derive(Component, Clone, Debug, Reflect)]
 #[reflect(Component)]
 pub struct ResizeHandles {
     pub handle_north: Entity,
-    handle_north_east: Entity,
-    handle_east: Entity,
-    handle_south_east: Entity,
-    handle_south: Entity,
-    handle_south_west: Entity,
-    handle_west: Entity,
-    handle_north_west: Entity,
+    pub handle_north_east: Entity,
+    pub handle_east: Entity,
+    pub handle_south_east: Entity,
+    pub handle_south: Entity,
+    pub handle_south_west: Entity,
+    pub handle_west: Entity,
+    pub handle_north_west: Entity,
 }
 
 impl Default for ResizeHandles {
@@ -297,14 +194,14 @@ impl Default for ResizeHandles {
 impl UiContext for ResizeHandles {
     fn get(&self, target: &str) -> Result<Entity, String> {
         match target {
-            HANDLE_NORTH => Ok(self.handle_north),
-            HANDLE_NORTH_EAST => Ok(self.handle_north_east),
-            HANDLE_EAST => Ok(self.handle_east),
-            HANDLE_SOUTH_EAST => Ok(self.handle_south_east),
-            HANDLE_SOUTH => Ok(self.handle_south),
-            HANDLE_SOUTH_WEST => Ok(self.handle_south_west),
-            HANDLE_WEST => Ok(self.handle_west),
-            HANDLE_NORTH_WEST => Ok(self.handle_north_west),
+            ResizeHandles::HANDLE_NORTH => Ok(self.handle_north),
+            ResizeHandles::HANDLE_NORTH_EAST => Ok(self.handle_north_east),
+            ResizeHandles::HANDLE_EAST => Ok(self.handle_east),
+            ResizeHandles::HANDLE_SOUTH_EAST => Ok(self.handle_south_east),
+            ResizeHandles::HANDLE_SOUTH => Ok(self.handle_south),
+            ResizeHandles::HANDLE_SOUTH_WEST => Ok(self.handle_south_west),
+            ResizeHandles::HANDLE_WEST => Ok(self.handle_west),
+            ResizeHandles::HANDLE_NORTH_WEST => Ok(self.handle_north_west),
             _ => Err(format!(
                 "{} doesn't exists for ResizeHandles. Possible contexts: {:?}",
                 target,
@@ -315,14 +212,14 @@ impl UiContext for ResizeHandles {
 
     fn contexts(&self) -> Vec<&'static str> {
         vec![
-            HANDLE_NORTH,
-            HANDLE_NORTH_EAST,
-            HANDLE_EAST,
-            HANDLE_SOUTH_EAST,
-            HANDLE_SOUTH,
-            HANDLE_SOUTH_WEST,
-            HANDLE_WEST,
-            HANDLE_NORTH_WEST,
+            ResizeHandles::HANDLE_NORTH,
+            ResizeHandles::HANDLE_NORTH_EAST,
+            ResizeHandles::HANDLE_EAST,
+            ResizeHandles::HANDLE_SOUTH_EAST,
+            ResizeHandles::HANDLE_SOUTH,
+            ResizeHandles::HANDLE_SOUTH_WEST,
+            ResizeHandles::HANDLE_WEST,
+            ResizeHandles::HANDLE_NORTH_WEST,
         ]
     }
 }
@@ -334,6 +231,15 @@ impl DefaultTheme for ResizeHandles {
 }
 
 impl ResizeHandles {
+    pub const HANDLE_NORTH: &'static str = "HandleNorth";
+    pub const HANDLE_NORTH_EAST: &'static str = "HandleNorthEast";
+    pub const HANDLE_EAST: &'static str = "HandleEast";
+    pub const HANDLE_SOUTH_EAST: &'static str = "HandleSouthEast";
+    pub const HANDLE_SOUTH: &'static str = "HandleSouth";
+    pub const HANDLE_SOUTH_WEST: &'static str = "HandleSouthWest";
+    pub const HANDLE_WEST: &'static str = "HandleWest";
+    pub const HANDLE_NORTH_WEST: &'static str = "HandleNorthWest";
+
     pub fn theme() -> Theme<ResizeHandles> {
         let base_theme = PseudoTheme::deferred_world(None, ResizeHandles::primary_style);
         let theme_north = PseudoTheme::deferred(
@@ -502,7 +408,6 @@ impl ResizeHandles {
         };
 
         style_builder
-            .position_type(PositionType::Absolute)
             .flex_shrink(0.)
             .top(Val::Px(-parent_border_px.x - pullback.y))
             .right(Val::Px(parent_border_px.w - pullback.x))
@@ -510,7 +415,7 @@ impl ResizeHandles {
             .left(Val::Px(-parent_border_px.w - pullback.x));
 
         style_builder
-            .switch_placement(HANDLE_NORTH)
+            .switch_placement(ResizeHandles::HANDLE_NORTH)
             .height(Val::Px(resize_spacing.width))
             .visibility(Visibility::Hidden)
             .animated()
@@ -518,7 +423,7 @@ impl ResizeHandles {
             .copy_from(interaction_animation);
 
         style_builder
-            .switch_placement(HANDLE_NORTH_EAST)
+            .switch_placement(ResizeHandles::HANDLE_NORTH_EAST)
             .height(Val::Px(resize_spacing.width))
             .width(Val::Px(resize_spacing.width))
             .top(Val::Px(0.))
@@ -529,7 +434,7 @@ impl ResizeHandles {
             .copy_from(interaction_animation);
 
         style_builder
-            .switch_placement(HANDLE_EAST)
+            .switch_placement(ResizeHandles::HANDLE_EAST)
             .width(Val::Px(resize_spacing.width))
             .right(Val::Px(0.))
             .visibility(Visibility::Hidden)
@@ -538,7 +443,7 @@ impl ResizeHandles {
             .copy_from(interaction_animation);
 
         style_builder
-            .switch_placement(HANDLE_SOUTH_EAST)
+            .switch_placement(ResizeHandles::HANDLE_SOUTH_EAST)
             .width(Val::Px(resize_spacing.width))
             .height(Val::Px(resize_spacing.width))
             .right(Val::Px(0.))
@@ -549,7 +454,7 @@ impl ResizeHandles {
             .copy_from(interaction_animation);
 
         style_builder
-            .switch_placement(HANDLE_SOUTH)
+            .switch_placement(ResizeHandles::HANDLE_SOUTH)
             .height(Val::Px(resize_spacing.width))
             .bottom(Val::Px(0.))
             .visibility(Visibility::Hidden)
@@ -558,7 +463,7 @@ impl ResizeHandles {
             .copy_from(interaction_animation);
 
         style_builder
-            .switch_placement(HANDLE_SOUTH_WEST)
+            .switch_placement(ResizeHandles::HANDLE_SOUTH_WEST)
             .width(Val::Px(resize_spacing.width))
             .height(Val::Px(resize_spacing.width))
             .bottom(Val::Px(0.))
@@ -569,7 +474,7 @@ impl ResizeHandles {
             .copy_from(interaction_animation);
 
         style_builder
-            .switch_placement(HANDLE_WEST)
+            .switch_placement(ResizeHandles::HANDLE_WEST)
             .width(Val::Px(resize_spacing.width))
             .left(Val::Px(0.))
             .visibility(Visibility::Hidden)
@@ -578,7 +483,7 @@ impl ResizeHandles {
             .copy_from(interaction_animation);
 
         style_builder
-            .switch_placement(HANDLE_NORTH_WEST)
+            .switch_placement(ResizeHandles::HANDLE_NORTH_WEST)
             .width(Val::Px(resize_spacing.width))
             .height(Val::Px(resize_spacing.width))
             .top(Val::Px(0.))
@@ -592,7 +497,7 @@ impl ResizeHandles {
     // North handle
     fn resizable_north(style_builder: &mut StyleBuilder, _theme_data: &ThemeData) {
         style_builder
-            .switch_target(HANDLE_NORTH)
+            .switch_target(ResizeHandles::HANDLE_NORTH)
             .right(Val::Px(0.))
             .left(Val::Px(0.))
             .visibility(Visibility::Inherited);
@@ -601,28 +506,28 @@ impl ResizeHandles {
         let resize_spacing = theme_data.spacing.resize_zone;
 
         style_builder
-            .switch_target(HANDLE_NORTH)
+            .switch_target(ResizeHandles::HANDLE_NORTH)
             .left(Val::Px(resize_spacing.width + resize_spacing.handle_gap));
     }
     fn resizable_north_north_east(style_builder: &mut StyleBuilder, theme_data: &ThemeData) {
         let resize_spacing = theme_data.spacing.resize_zone;
 
         style_builder
-            .switch_target(HANDLE_NORTH)
+            .switch_target(ResizeHandles::HANDLE_NORTH)
             .right(Val::Px(resize_spacing.width + resize_spacing.handle_gap));
     }
 
     // North-east corner
     fn resizable_north_east(style_builder: &mut StyleBuilder, _theme_data: &ThemeData) {
         style_builder
-            .switch_target(HANDLE_NORTH_EAST)
+            .switch_target(ResizeHandles::HANDLE_NORTH_EAST)
             .visibility(Visibility::Inherited);
     }
 
     // East handle
     fn resizable_east(style_builder: &mut StyleBuilder, _theme_data: &ThemeData) {
         style_builder
-            .switch_target(HANDLE_EAST)
+            .switch_target(ResizeHandles::HANDLE_EAST)
             .top(Val::Px(0.))
             .bottom(Val::Px(0.))
             .visibility(Visibility::Inherited);
@@ -631,28 +536,28 @@ impl ResizeHandles {
         let resize_spacing = theme_data.spacing.resize_zone;
 
         style_builder
-            .switch_target(HANDLE_EAST)
+            .switch_target(ResizeHandles::HANDLE_EAST)
             .top(Val::Px(resize_spacing.width + resize_spacing.handle_gap));
     }
     fn resizable_east_south_east(style_builder: &mut StyleBuilder, theme_data: &ThemeData) {
         let resize_spacing = theme_data.spacing.resize_zone;
 
         style_builder
-            .switch_target(HANDLE_EAST)
+            .switch_target(ResizeHandles::HANDLE_EAST)
             .bottom(Val::Px(resize_spacing.width + resize_spacing.handle_gap));
     }
 
     // South-east corner
     fn resizable_south_east(style_builder: &mut StyleBuilder, _theme_data: &ThemeData) {
         style_builder
-            .switch_target(HANDLE_SOUTH_EAST)
+            .switch_target(ResizeHandles::HANDLE_SOUTH_EAST)
             .visibility(Visibility::Inherited);
     }
 
     // South handle
     fn resizable_south(style_builder: &mut StyleBuilder, _theme_data: &ThemeData) {
         style_builder
-            .switch_target(HANDLE_SOUTH)
+            .switch_target(ResizeHandles::HANDLE_SOUTH)
             .right(Val::Px(0.))
             .left(Val::Px(0.))
             .visibility(Visibility::Inherited);
@@ -661,28 +566,28 @@ impl ResizeHandles {
         let resize_spacing = theme_data.spacing.resize_zone;
 
         style_builder
-            .switch_target(HANDLE_SOUTH)
+            .switch_target(ResizeHandles::HANDLE_SOUTH)
             .right(Val::Px(resize_spacing.width + resize_spacing.handle_gap));
     }
     fn resizable_south_south_west(style_builder: &mut StyleBuilder, theme_data: &ThemeData) {
         let resize_spacing = theme_data.spacing.resize_zone;
 
         style_builder
-            .switch_target(HANDLE_SOUTH)
+            .switch_target(ResizeHandles::HANDLE_SOUTH)
             .left(Val::Px(resize_spacing.width + resize_spacing.handle_gap));
     }
 
     // South-west corner
     fn resizable_south_west(style_builder: &mut StyleBuilder, _theme_data: &ThemeData) {
         style_builder
-            .switch_target(HANDLE_SOUTH_WEST)
+            .switch_target(ResizeHandles::HANDLE_SOUTH_WEST)
             .visibility(Visibility::Inherited);
     }
 
     // West handle
     fn resizable_west(style_builder: &mut StyleBuilder, _theme_data: &ThemeData) {
         style_builder
-            .switch_target(HANDLE_WEST)
+            .switch_target(ResizeHandles::HANDLE_WEST)
             .top(Val::Px(0.))
             .bottom(Val::Px(0.))
             .visibility(Visibility::Inherited);
@@ -691,21 +596,21 @@ impl ResizeHandles {
         let resize_spacing = theme_data.spacing.resize_zone;
 
         style_builder
-            .switch_target(HANDLE_WEST)
+            .switch_target(ResizeHandles::HANDLE_WEST)
             .bottom(Val::Px(resize_spacing.width + resize_spacing.handle_gap));
     }
     fn resizable_west_north_west(style_builder: &mut StyleBuilder, theme_data: &ThemeData) {
         let resize_spacing = theme_data.spacing.resize_zone;
 
         style_builder
-            .switch_target(HANDLE_WEST)
+            .switch_target(ResizeHandles::HANDLE_WEST)
             .top(Val::Px(resize_spacing.width + resize_spacing.handle_gap));
     }
 
     // North-west corner
     fn resizable_north_west(style_builder: &mut StyleBuilder, _theme_data: &ThemeData) {
         style_builder
-            .switch_target(HANDLE_NORTH_WEST)
+            .switch_target(ResizeHandles::HANDLE_NORTH_WEST)
             .visibility(Visibility::Inherited);
     }
 
@@ -714,6 +619,7 @@ impl ResizeHandles {
             Name::new("Resize Handles"),
             NodeBundle {
                 style: Style {
+                    position_type: PositionType::Absolute,
                     overflow: Overflow::visible(),
                     ..default()
                 },
@@ -722,6 +628,7 @@ impl ResizeHandles {
                 ..default()
             },
             LockedStyleAttributes::from_vec(vec![
+                LockableStyleAttribute::PositionType,
                 LockableStyleAttribute::FocusPolicy,
                 LockableStyleAttribute::Overflow,
             ]),
@@ -776,11 +683,19 @@ impl ResizeHandles {
 }
 
 pub trait UiResizeHandlesExt {
-    fn resize_handles(&mut self, marker: impl Bundle + Clone) -> UiBuilder<Entity>;
+    fn resize_handles(
+        &mut self,
+        marker: impl Bundle + Clone,
+        capture_handles: impl FnOnce(&mut UiBuilder<ResizeHandles>),
+    ) -> UiBuilder<Entity>;
 }
 
 impl UiResizeHandlesExt for UiBuilder<'_, Entity> {
-    fn resize_handles(&mut self, marker: impl Bundle + Clone) -> UiBuilder<Entity> {
+    fn resize_handles(
+        &mut self,
+        marker: impl Bundle + Clone,
+        capture_handles: impl FnOnce(&mut UiBuilder<ResizeHandles>),
+    ) -> UiBuilder<Entity> {
         let mut resize_handles = ResizeHandles::default();
         let container = self
             .container(ResizeHandles::container(), |resize_container| {
@@ -835,6 +750,9 @@ impl UiResizeHandlesExt for UiBuilder<'_, Entity> {
             })
             .insert(resize_handles.clone())
             .id();
+
+        let mut builder = self.commands().ui_builder(resize_handles);
+        capture_handles(&mut builder);
 
         self.commands().ui_builder(container)
     }
