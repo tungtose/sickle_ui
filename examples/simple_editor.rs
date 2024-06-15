@@ -6,11 +6,8 @@ use sickle_ui::{
         hierarchy::{HierarchyTreeViewPlugin, UiHierarchyExt},
         scene_view::{SceneView, SceneViewPlugin, SpawnSceneViewPreUpdate, UiSceneViewExt},
     },
-    theme::prelude::*,
-    ui_builder::{UiBuilderExt, UiContextRoot, UiRoot},
+    prelude::*,
     ui_commands::SetCursorExt,
-    ui_style::prelude::*,
-    widgets::{inputs::slider::SliderConfig, prelude::*},
     SickleUiPlugin,
 };
 

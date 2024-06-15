@@ -21,6 +21,13 @@ pub use sickle_macros::*;
 pub use sickle_math::*;
 pub use sickle_ui_scaffold::*;
 
+pub mod prelude {
+    pub use super::widgets::prelude::*;
+    pub use sickle_macros::*;
+    pub use sickle_math::*;
+    pub use sickle_ui_scaffold::prelude::*;
+}
+
 /// Core plugin.
 ///
 /// Must be added after [`DefaultPlugins`].

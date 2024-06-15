@@ -31,7 +31,7 @@ pub mod prelude {
         inputs::checkbox::{Checkbox, UiCheckboxExt},
         inputs::dropdown::{Dropdown, UiDropdownExt},
         inputs::radio_group::{RadioGroup, UiRadioGroupExt},
-        inputs::slider::{Slider, UiSliderExt},
+        inputs::slider::{Slider, SliderConfig, UiSliderExt},
         layout::column::UiColumnExt,
         layout::container::UiContainerExt,
         layout::docking_zone::UiDockingZoneExt,
