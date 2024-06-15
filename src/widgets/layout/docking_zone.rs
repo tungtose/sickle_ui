@@ -741,16 +741,10 @@ impl DockingZoneHighlight {
         Theme::new(vec![base_theme, visible_theme])
     }
 
-    fn primary_style(style_builder: &mut StyleBuilder, theme_data: &ThemeData) {
+    fn primary_style(style_builder: &mut StyleBuilder, _: &ThemeData) {
         style_builder
             .width(Val::Percent(100.))
             .height(Val::Percent(100.))
-            .background_color(
-                theme_data
-                    .colors()
-                    .accent(Accent::InversePrimary)
-                    .with_a(0.2),
-            )
             .z_index(ZIndex::Local(100));
     }
 
@@ -758,10 +752,7 @@ impl DockingZoneHighlight {
         style_builder
             .animated()
             .background_color(AnimatedVals {
-                idle: theme_data
-                    .colors()
-                    .accent(Accent::InversePrimary)
-                    .with_a(0.2),
+                idle: theme_data.colors().accent(Accent::Outline).with_a(0.5),
                 enter_from: Some(Color::NONE),
                 ..default()
             })
