@@ -1,4 +1,5 @@
 use bevy::{
+    ecs::component::ComponentInfo,
     prelude::*,
     render::camera::{ManualTextureViews, RenderTarget},
     window::{PrimaryWindow, WindowRef, WindowResolution},
@@ -7,6 +8,26 @@ use bevy::{
 pub struct UiUtils;
 
 impl UiUtils {
+    pub fn simplify_component_name(component_info: &ComponentInfo) -> String {
+        let name = component_info.name();
+        let mut simple_name = String::from(name.split("::").last().unwrap());
+
+        if name.split("<").count() > 1 {
+            let left = name.split("<").next().unwrap().split("::").last().unwrap();
+            let generic = name
+                .split("<")
+                .skip(1)
+                .next()
+                .unwrap()
+                .split("::")
+                .last()
+                .unwrap();
+            simple_name = String::new() + left + "<" + generic;
+        }
+
+        simple_name
+    }
+
     /// Gets the nearest clipped container, useful for absolutely positioned elements to find a maximum size
     pub fn container_size_and_offset(entity: Entity, world: &World) -> (Vec2, Vec2) {
         let mut container_size = Vec2::ZERO;

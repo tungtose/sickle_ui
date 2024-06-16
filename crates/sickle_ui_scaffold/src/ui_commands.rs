@@ -20,6 +20,7 @@ use crate::{
     flux_interaction::{
         FluxInteraction, FluxInteractionStopwatchLock, StopwatchLock, TrackedInteraction,
     },
+    prelude::UiUtils,
     theme::prelude::*,
     ui_style::builder::StyleBuilder,
 };
@@ -175,25 +176,7 @@ impl EntityCommand for LogHierarchy {
                     true
                 }
             })
-            .map(|component_info| {
-                let name = component_info.name();
-                let mut simple_name = String::from(name.split("::").last().unwrap());
-
-                if name.split("<").count() > 1 {
-                    let left = name.split("<").next().unwrap().split("::").last().unwrap();
-                    let generic = name
-                        .split("<")
-                        .skip(1)
-                        .next()
-                        .unwrap()
-                        .split("::")
-                        .last()
-                        .unwrap();
-                    simple_name = String::new() + left + "<" + generic;
-                }
-
-                simple_name
-            })
+            .map(UiUtils::simplify_component_name)
             .collect();
 
         let prefix = if self.is_last { "╚" } else { "╠" };
