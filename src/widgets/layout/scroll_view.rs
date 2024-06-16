@@ -99,6 +99,8 @@ fn update_scroll_view_on_scroll(
     }
 }
 
+// TODO: replace dragging logic to make scroll bar to treat the drag start as a threshold
+// TODO: add drag bar container click-to-scroll and click-to-drag
 fn update_scroll_view_on_drag(
     q_draggable: Query<(Entity, &Draggable, &ScrollBarHandle), Changed<Draggable>>,
     q_node: Query<&Node>,

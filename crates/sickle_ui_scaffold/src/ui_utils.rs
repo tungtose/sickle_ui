@@ -9,7 +9,10 @@ pub struct UiUtils;
 
 impl UiUtils {
     pub fn simplify_component_name(component_info: &ComponentInfo) -> String {
-        let name = component_info.name();
+        UiUtils::simplify_type_name(component_info.name())
+    }
+
+    pub fn simplify_type_name(name: &str) -> String {
         let mut simple_name = String::from(name.split("::").last().unwrap());
 
         if name.split("<").count() > 1 {

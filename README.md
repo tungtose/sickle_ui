@@ -2,21 +2,22 @@
 
 A widget library built on top of `bevy_ui`.
 
+![Screenshot of the simple_editor example](/assets/images/Screenshot_Simple_Editor.png)
+
 ## Example
 
 ```
+cargo build
 cargo run --example simple_editor
 ```
 
 **THIS IS CURRENTLY IN HEAVY DEVELOPMENT**
 
-Do not depend on this project. It is here for reference for the moment. If you 
-still want to try it locally from within your project, clone the repository 
-next to yours. This is needed for the asset source to find the local assets.
+The project has no crate release yet. If you still want to try it locally from 
+within your project, add a dependency on the repository directly.
 
 Main missing features:
 - Centralized focus management
-- Centralized theming support
 - Text / Text area input widgets
 - Documentation
 
@@ -49,4 +50,4 @@ What it can already do:
   - Context based extensions
   - Drag / drop interactions
   - Scroll interactions
-
+- Theming
