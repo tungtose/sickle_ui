@@ -380,6 +380,7 @@ fn cleanup_leftover_docking_zone_splits(
     }
 }
 
+// TODO: Replace this when focus management is implemented
 fn update_docking_zone_resize_handles(
     q_accepted_types: Query<&Draggable, (With<FloatingPanelTitle>, Changed<Draggable>)>,
     q_handle_containers: Query<Entity, With<SizedZoneResizeHandleContainer>>,
@@ -470,13 +471,11 @@ fn handle_docking_zone_drop_zone_change(
             };
 
             commands
-                .style(docking_zone.zone_highlight)
+                .style_unchecked(docking_zone.zone_highlight)
                 .width(width)
                 .height(height)
                 .left(left)
-                .top(top);
-            commands
-                .style_unchecked(docking_zone.zone_highlight)
+                .top(top)
                 .visibility(Visibility::Inherited);
         } else if drop_zone.drop_phase() == DropPhase::Dropped {
             // Validated above
@@ -741,14 +740,11 @@ impl DockingZoneHighlight {
     }
 
     fn primary_style(style_builder: &mut StyleBuilder, _: &ThemeData) {
-        style_builder
-            .width(Val::Percent(100.))
-            .height(Val::Percent(100.))
-            .z_index(ZIndex::Local(100));
+        style_builder.z_index(ZIndex::Local(100));
     }
 
     fn visible_style(style_builder: &mut StyleBuilder, theme_data: &ThemeData) {
-        style_builder.background_color(theme_data.colors().accent(Accent::Outline).with_a(0.5));
+        style_builder.background_color(theme_data.colors().accent(Accent::Outline).with_a(0.2));
     }
 
     fn bundle(zone: Entity) -> impl Bundle {
@@ -764,6 +760,12 @@ impl DockingZoneHighlight {
                 ..default()
             },
             LockedStyleAttributes::from_vec(vec![
+                LockableStyleAttribute::Width,
+                LockableStyleAttribute::Height,
+                LockableStyleAttribute::Top,
+                LockableStyleAttribute::Right,
+                LockableStyleAttribute::Bottom,
+                LockableStyleAttribute::Left,
                 LockableStyleAttribute::FocusPolicy,
                 LockableStyleAttribute::PositionType,
                 LockableStyleAttribute::Visibility,

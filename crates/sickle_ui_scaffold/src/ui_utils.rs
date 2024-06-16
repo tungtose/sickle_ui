@@ -187,8 +187,9 @@ impl UiUtils {
 
     pub fn get_primary_window(world: &World) -> &Window {
         // Unsafe single: don't ask for a primary window if it doesn't exists pls.
-        //todo: use resource to store primary window entity
+        // TODO: use resource to store primary window entity
         let primary_window = world.component_id::<PrimaryWindow>().unwrap();
+        // TODO: This could cause a panic during shutdown if theming is in progress
         let window_arch = world
             .archetypes()
             .iter()

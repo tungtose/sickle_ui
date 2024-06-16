@@ -130,7 +130,6 @@ fn dock_panel_in_tab_container(
 
         commands.entity(viewport_id).add_child(panel_id);
         commands.entity(dock_ref.floating_panel).despawn_recursive();
-        // commands.style(panel_id).hide();
 
         tab_container.tab_count += 1;
         tab_container.active = tab_container.tab_count - 1;
@@ -335,6 +334,7 @@ fn update_tab_container_on_change(
     }
 }
 
+// TODO: Replace this when focus management is implemented
 fn update_sized_zone_resize_handles_on_tab_drag(
     q_accepted_types: Query<&Draggable, (With<Tab>, Changed<Draggable>)>,
     q_handle_containers: Query<Entity, With<SizedZoneResizeHandleContainer>>,

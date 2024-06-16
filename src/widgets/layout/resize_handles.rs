@@ -620,7 +620,6 @@ impl ResizeHandles {
             NodeBundle {
                 style: Style {
                     position_type: PositionType::Absolute,
-                    overflow: Overflow::visible(),
                     ..default()
                 },
                 z_index: ZIndex::Local(RESIZE_HANDLES_LOCAL_Z_INDEX),
@@ -630,7 +629,6 @@ impl ResizeHandles {
             LockedStyleAttributes::from_vec(vec![
                 LockableStyleAttribute::PositionType,
                 LockableStyleAttribute::FocusPolicy,
-                LockableStyleAttribute::Overflow,
             ]),
         )
     }

@@ -484,7 +484,7 @@ where
 
         let mut cleanup_main_style = true;
         let mut unstyled_entities: Vec<Entity> = context
-            .contexts()
+            .cleared_contexts()
             .iter()
             .map(|ctx_name| {
                 // Unsafe unwrap: ctx_name comes from the context itslef, we should panic if it doesn't resolve!

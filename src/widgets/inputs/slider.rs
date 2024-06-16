@@ -525,20 +525,11 @@ impl Slider {
             .switch_context(Slider::HANDLE, None)
             .size(Val::Px(theme_spacing.icons.small))
             .border(UiRect::all(Val::Px(theme_spacing.borders.extra_small)))
-            .animated()
-            .border_color(AnimatedVals {
-                idle: colors.accent(Accent::Shadow),
-                hover: colors.on(On::Surface).into(),
-                press: colors.on(On::PrimaryContainer).into(),
-                ..default()
-            })
-            .copy_from(theme_data.interaction_animation);
-
-        style_builder
+            .border_color(colors.accent(Accent::Shadow))
             .animated()
             .background_color(AnimatedVals {
                 idle: colors.accent(Accent::Primary),
-                press: colors.container(Container::Primary).into(),
+                hover: colors.container(Container::Primary).into(),
                 ..default()
             })
             .copy_from(theme_data.interaction_animation);

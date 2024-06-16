@@ -44,7 +44,7 @@ impl Plugin for SizedZonePlugin {
             PostUpdate,
             update_sized_zone_resize_handles
                 .run_if(should_update_sized_zone_layout)
-                .after(DynamicStylePostUpdate),
+                .after(fit_sized_zones_on_window_resize),
         );
     }
 }
@@ -54,11 +54,14 @@ pub struct SizedZonePreUpdate;
 
 fn should_update_sized_zone_layout(
     q_added_zones: Query<Entity, Added<SizedZone>>,
-    q_parent_changed_zones: Query<Entity, (With<SizedZone>, Changed<Parent>)>,
+    q_parent_children_changed_zones: Query<
+        Entity,
+        (With<SizedZone>, Or<(Changed<Parent>, Changed<Children>)>),
+    >,
     q_removed_zones: RemovedComponents<SizedZone>,
 ) -> bool {
     q_added_zones.iter().count() > 0
-        || q_parent_changed_zones.iter().count() > 0
+        || q_parent_children_changed_zones.iter().count() > 0
         || q_removed_zones.len() > 0
 }
 
@@ -610,6 +613,10 @@ impl UiContext for SizedZone {
         }
     }
 
+    fn cleared_contexts(&self) -> Vec<&'static str> {
+        vec![]
+    }
+
     fn contexts(&self) -> Vec<&'static str> {
         vec![SizedZone::RESIZE_HANDLES]
     }
@@ -623,7 +630,7 @@ impl DefaultTheme for SizedZone {
 
 impl SizedZone {
     pub const RESIZE_HANDLES: &'static str = "Label";
-    pub const RESIZE_HANDLES_Z_INDEX: i32 = 120000;
+    pub const RESIZE_HANDLES_Z_INDEX: i32 = 200;
 
     pub fn direction(&self) -> FlexDirection {
         self.flex_direction

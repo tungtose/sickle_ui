@@ -145,7 +145,7 @@ impl Checkbox {
             .switch_target(Checkbox::CHECKMARK)
             .size(Val::Px(theme_spacing.inputs.checkbox.checkmark_size))
             .icon(theme_data.icons.checkmark.with(
-                colors.on(On::Surface),
+                colors.on(On::PrimaryContainer),
                 theme_spacing.inputs.checkbox.checkmark_size,
             ));
 

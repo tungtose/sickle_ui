@@ -367,17 +367,15 @@ impl Dropdown {
             .align_self(AlignSelf::Start)
             .align_items(AlignItems::Center)
             .justify_content(JustifyContent::SpaceBetween)
-            .background_color(colors.container(Container::Primary))
-            .border(UiRect::all(Val::Px(theme_spacing.borders.extra_small)))
             .height(Val::Px(theme_spacing.areas.small))
             .padding(UiRect::axes(
                 Val::Px(theme_spacing.gaps.medium),
                 Val::Px(theme_spacing.gaps.extra_small),
             ))
             .animated()
-            .border_color(AnimatedVals {
-                idle: colors.accent(Accent::Outline),
-                hover: colors.on(On::Surface).into(),
+            .background_color(AnimatedVals {
+                idle: colors.accent(Accent::Primary),
+                hover: colors.container(Container::Primary).into(),
                 ..default()
             })
             .copy_from(theme_data.interaction_animation);
@@ -387,8 +385,8 @@ impl Dropdown {
             .sized_font(font)
             .animated()
             .font_color(AnimatedVals {
-                idle: colors.on(On::PrimaryContainer),
-                hover: colors.on(On::Surface).into(),
+                idle: colors.on(On::Primary),
+                hover: colors.on(On::PrimaryContainer).into(),
                 ..default()
             })
             .copy_from(theme_data.interaction_animation);
@@ -401,12 +399,12 @@ impl Dropdown {
                 theme_data
                     .icons
                     .expand_more
-                    .with(colors.on(On::PrimaryContainer), theme_spacing.icons.small),
+                    .with(colors.on(On::Primary), theme_spacing.icons.small),
             )
             .animated()
             .font_color(AnimatedVals {
-                idle: colors.on(On::PrimaryContainer),
-                hover: colors.on(On::Surface).into(),
+                idle: colors.on(On::Primary),
+                hover: colors.on(On::PrimaryContainer).into(),
                 ..default()
             })
             .copy_from(theme_data.interaction_animation);
@@ -441,7 +439,17 @@ impl Dropdown {
             }
         };
 
-        let enter_animation = world.resource::<ThemeData>().enter_animation.clone();
+        let theme_data = world.resource::<ThemeData>();
+        let colors = theme_data.colors();
+        let enter_animation = theme_data.enter_animation.clone();
+
+        style_builder.background_color(colors.container(Container::Primary));
+        style_builder
+            .switch_target(Dropdown::LABEL)
+            .font_color(colors.on(On::PrimaryContainer));
+        style_builder
+            .switch_target(Dropdown::ICON)
+            .font_color(colors.on(On::PrimaryContainer));
 
         style_builder
             .switch_target(Dropdown::PANEL)
@@ -480,7 +488,6 @@ impl Dropdown {
         let dropdown_size = dropdown_node.unrounded_size();
         let dropdown_borders = UiUtils::border_as_px(entity, world);
         let panel_borders = UiUtils::border_as_px(dropdown_panel, world);
-        let scroll_view_margins = UiUtils::margin_as_px(scroll_view_content, world);
 
         let (container_size, dropdown_position) = UiUtils::container_size_and_offset(entity, world);
         let tl_corner = dropdown_position - dropdown_size / 2.;
@@ -541,9 +548,7 @@ impl Dropdown {
             .unrounded_size()
             .x
             + panel_borders.y
-            + panel_borders.w
-            + scroll_view_margins.y
-            + scroll_view_margins.z)
+            + panel_borders.w)
             .clamp(0., panel_size_limit.x.max(0.));
         let idle_height = five_children_height.clamp(0., panel_size_limit.y.max(0.));
 
