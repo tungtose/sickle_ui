@@ -97,7 +97,7 @@ example (that is displayed in the screenshot above) for how different parts work
 
 > [!IMPORTANT] 
 > Sickle UI is primarily using `Commands` and `EntityCommands` to spawn, style, and configure widgets.
-> Systems use these widgets need to consider that the changes will not be reflected in the ECS `world`
+> Systems using these widgets need to consider that the changes will not be reflected in the ECS `world`
 > until the next `apply_deferred` is executed. This is mostly automatic starting from `bevy 0.13`. Internally
 > `sickle_ui` uses systems in well defined sets and order to make sure all widgets play nicely with each other.
 
@@ -111,11 +111,12 @@ create a layout by calling a chain of functions. Comparing vanilla and Sickle UI
 
 ### Vanilla `bevy`
 
-In Bevy, you can use `commands.spawn(bundle)` and `commands.entity(entity).spawn(bundle)` to spawn your entities.
-Typically, you would pass in a `NodeBundle`, `ButtonBundle`, or perhaps an `ImageBundle` just to name the
-most common ones. Then, you can use the `.with_children(builder)` extension to spawn sub-entities. This will
-quickly become verbose and convulated with Rust's borrowing rules. It will be difficult to create entities
-with two way references between parent and children, elements further down the tree, or siblings.
+In Bevy, you can use `commands.spawn(bundle)` and `commands.entity(entity).with_children(builder)` to 
+spawn your entities. Typically, you would pass in a `NodeBundle`, `ButtonBundle`, or perhaps an 
+`ImageBundle` just to name a few. Then, you can use the `.with_children(builder)` extension to spawn
+sub-entities. This will quickly become verbose and convulated with Rust's borrowing rules. It will 
+be difficult to create entities with two way references between parent and children, elements further
+down the tree, or siblings.
 
 ```rust
 fn setup(mut commands: Commands) {
@@ -197,7 +198,7 @@ The difference in the above is marely a styling choice of the developer (pun int
 > the overall display of the `Node`, such as `BackgroundColor`, `BorderColor`, etc.
 
 > [!WARNING]
-> Theming may override styles applied this way. Read further down on how theming works.
+> Theming may override styles applied this way. Read [Theming](#theming) further down on how theming works.
 
 
 ### Noteworthy contexts
@@ -247,14 +248,14 @@ fn setup(mut commands: Commands) {
 > [!TIP]
 > The same applies here as with styling. Callbacks may point to the same entity as the frame, so
 > `insert` may be called in the callback as well:
-> 
-> ```rust
-> fn setup(mut commands: Commands) {
->   commands.ui_builder(UiRoot).column(|column|{
->     column.insert(MyMarkerComponent); 
->   });
-> }
-> ```
+
+```rust
+fn setup(mut commands: Commands) {
+  commands.ui_builder(UiRoot).column(|column|{
+    column.insert(MyMarkerComponent); 
+  });
+}
+```
 
 
 ### OK, but I didn't find a widget I need
@@ -273,7 +274,7 @@ fn setup(mut commands: Commands) {
         background_color: Color::NONE.into(),
         ..default()
     }, |my_container|{
-      ... // etc. my_container is an `Entity` context UiBuilder
+      // ... etc. my_container is an `Entity` context UiBuilder
     });
   });  
 }
@@ -298,48 +299,48 @@ fn setup(mut commands: Commands) {
 ```
 
 > [!TIP]
-> Since we are using `Commands` and `EntityCommands` and just spawn regulare `bevy_ui` `Node`s
+> Since we are using `Commands` and `EntityCommands` and just spawn regular `bevy_ui` `Node`s
 > you can also mix this syntax with the vanilla Bevy spawns:
-> 
-> ```rust
-> fn setup(mut commands: Commands) {
->   let mut inner_id = Entity::PLACEHOLDER;
->   
->   commands.spawn(NodeBundle {
->       style: Style {
->           height: Val::Percent(100.),
->           flex_direction: FlexDirection::Column,
->           ..default()
->       },
->       background_color: Color::NONE.into(),
->       ..default()
->   }).with_children(|parent|{
->     inner_id = parent.spawn(NodeBundle::default()).with_children(|parent|{
->       // ...
->     }).id();
->   });
-> 
->   commands.ui_builder(inner_id).column(|column|{
->     // Add a column into the inner entity and continue.
->   });
-> }
-> ```
+
+```rust
+fn setup(mut commands: Commands) {
+  let mut inner_id = Entity::PLACEHOLDER;
+  
+  commands.spawn(NodeBundle {
+      style: Style {
+          height: Val::Percent(100.),
+          flex_direction: FlexDirection::Column,
+          ..default()
+      },
+      background_color: Color::NONE.into(),
+      ..default()
+  }).with_children(|parent|{
+    inner_id = parent.spawn(NodeBundle::default()).with_children(|parent|{
+      // ...
+    }).id();
+  });
+
+  commands.ui_builder(inner_id).column(|column|{
+    // Add a column into the inner entity and continue.
+  });
+}
+```
 
 > [!TIP]
 > And vica-versa!
-> 
-> ```rust
-> fn setup(mut commands: Commands) {
->   commands.ui_builder(UiRoot).column(|column|{
->     column.row(|row|{
->       let mut row_commands = row.entity_commands();
->       row_commands.with_children(|parent| {
->         // ... etc.
->       });
->     });
->   });
-> }
-> ```
+
+```rust
+fn setup(mut commands: Commands) {
+  commands.ui_builder(UiRoot).column(|column|{
+    column.row(|row|{
+      let mut row_commands = row.entity_commands();
+      row_commands.with_children(|parent| {
+        // ... etc.
+      });
+    });
+  });
+}
+```
 
 
 ### OK, but my widget isn't _simple_
@@ -363,12 +364,12 @@ to the widgets you create. If you don't need dynamic theming, you don't need to 
 > `sickle_ui` includes a snipped for each of the scenarios outlined above to get you started.
 > These are VSCode snippets, available in the `.vscode` folder. You can either copy the
 > `sickle_ui.code-snippets` to your workspace's `.vscode` folder, or copy the file contents to your
-> Rust snippets (File -> Preferences -> Configure User Snippets -> [select the rust language from the list])
+> Rust snippets (`File` -> `Preferences` -> `Configure User Snippets` -> `[select the rust language from the list]`)
 
 
 ### Structural extensions
 
-These are widgets that don't need systems and just create a pre-defined sub-tree that you can easily invoke
+These are widgets that don't need systems and just create a pre-defined sub-tree that you can easily inject
 in the contexts you define them in. In this case you just need to create the relevant extension and describe
 your plugin structure using the technique described under [OK, but I didn't find a widget I need](#ok-but-i-didnt-find-a-widget-i-need)
 
@@ -408,7 +409,7 @@ impl UiMyWidgetExt for UiBuilder<'_, Entity> {
 > snippet files, but it is recommended to avoid using `widget` as a trigger (it collides with often used `width`).
 
 > [!TIP]
-> The snippet support 3 tab points: The widget component name, the convenience `Name` component string, 
+> The snippets support 3 tab points: The widget component name, the convenience `Name` component string, 
 > and the actual extension function name.
 
 You can then use your widget after bringing it into scope:
@@ -432,5 +433,6 @@ available in these contexts, provided you add the `use my_widget::UiMyWidgetExt;
 
 You may have _also_ noticed that the snippet uses `self` to spawn the `container`. `self` will simply be
 a `UiBuilder` of the `Entity` context, so any _other_ extensions that you brought into scope with `use`
-will be available. This also means that `style` commands are also available, so long as you imported them.
+will be available. This also means that `style` commands are also available, so long as you have imported them.
 
+## Theming
