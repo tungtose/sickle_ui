@@ -189,7 +189,7 @@ fn setup(mut commands: Commands) {
 }
 ```
 
-The difference in the above is marely a styling choice of the developer (pun intended).
+The difference in the above is merely a styling choice of the developer (pun intended).
 
 > [!IMPORTANT] 
 > Styling is applied as a regular command in the chain, so rendering of the component
@@ -216,7 +216,7 @@ Where `entity` is an entity - ID - acquired by some other means, such as spawing
 
 > [!CAUTION]
 > `UiRoot` must not be confused with `UiContextRoot`. The former is a marker to indicate that we spawn without
-> a `Parent` while the later is a component that indicates the _logical_ root of a sub-tree of widgets.
+> a `Parent` while the latter is a component that indicates the _logical_ root of a sub-tree of widgets.
 > It is used by widgets such as `ContextMenu` and `TabContainer` to find mounting points for dynamically
 > spawned widgets. `ContextMenu` places the menu container at `UiContextRoot` and `TabContainer` creates
 > the `FloatingPanel` at this location in the tree when a tab is popped out.
@@ -361,7 +361,7 @@ These are however, NOT distinct extensions. Rather these are levels of customiza
 to the widgets you create. If you don't need dynamic theming, you don't need to implement all that.
 
 > [!TIP]
-> `sickle_ui` includes a snipped for each of the scenarios outlined above to get you started.
+> `sickle_ui` includes a snippet for each of the scenarios outlined above to get you started.
 > These are VSCode snippets, available in the `.vscode` folder. You can either copy the
 > `sickle_ui.code-snippets` to your workspace's `.vscode` folder, or copy the file contents to your
 > Rust snippets (`File` -> `Preferences` -> `Configure User Snippets` -> `[select the rust language from the list]`)
