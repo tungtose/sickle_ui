@@ -845,8 +845,9 @@ In the above code, there is a call on `style_builder` to `switch_target` to our 
 Refer to [Style builder](#style-builder) for how this works in detail.
 
 > [!CAUTION]
-> All subsequent calls to `style_builder` will be applied to the target. You can `reset_target` on the builder
-> to swap to the main widget again, but it is more readable to have each target in a single chain / group. 
+> Once a target is set all subsequent calls to `style_builder` will be applied to the target. 
+> You can `reset_target` on the builder to swap to the main widget again, but it is more readable 
+> to have each target in a single chain / group. 
 
 
 ### That's it?
