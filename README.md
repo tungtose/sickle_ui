@@ -435,4 +435,416 @@ You may have _also_ noticed that the snippet uses `self` to spawn the `container
 a `UiBuilder` of the `Entity` context, so any _other_ extensions that you brought into scope with `use`
 will be available. This also means that `style` commands are also available, so long as you have imported them.
 
+
+### Functional extension
+
+Functional extension simply means that your widget _does_ something beyond creating a pre-defined structure.
+You can use the snippet `Sickle UI plugin widget` to generate code similar to the one outlined in [Structural extensions](#structural-extensions), with the addition of a plugin:
+
+```rust
+pub struct MyWidgetPlugin;
+
+impl Plugin for MyWidgetPlugin {
+    fn build(&self, _app: &mut App) {
+        // TODO
+    }
+}
+
+#[derive(Component, Debug, Default, Reflect)]
+#[reflect(Component)]
+pub struct MyWidget;
+
+impl MyWidget {
+    fn frame() -> impl Bundle {
+        (Name::new("My Widget"), NodeBundle::default())
+    }
+}
+
+pub trait UiMyWidgetExt {
+    fn my_widget(
+        &mut self,
+        spawn_children: impl FnOnce(&mut UiBuilder<Entity>),
+    ) -> UiBuilder<Entity>;
+}
+
+impl UiMyWidgetExt for UiBuilder<'_, Entity> {
+    fn my_widget(
+        &mut self,
+        spawn_children: impl FnOnce(&mut UiBuilder<Entity>),
+    ) -> UiBuilder<Entity> {
+        self.container((MyWidget::frame(), MyWidget), spawn_children)
+    }
+}
+```
+
+> [!TIP]
+> The snippets also supports tab points, so you can quickly name the widget and plugin in a consistent manner.
+
+All that is left is for you to implement the heart of the widget and the systems that act on it. Don't
+forget to add the generated plugin to your app!
+
+
+### Themed widgets
+
+Now, this is where the fun begins.
+
+Themed widgets refer to widgets that have a style defined for them in a central place. However, themed widgets 
+also allow overrides to their style, based on their position in the widget tree or their [pseudo states](#pseudo-states).
+
+> [!IMPORTANT]
+> Themed widgets only apply style to their outermost `Node`, but not to their sub-nodes. Those are the 
+> [Contextually themed widgets](#contextually-themed-widgets).
+
+Similarly to the previous cases, there is a snippet to generate the shell of a themed widget: 
+The `Sickle UI themed plugin widget`.
+
+> [!TIP]
+> The snippets also supports tab points, so you can quickly name the widget and plugin in a consistent manner.
+
+```rust
+pub struct MyWidgetPlugin;
+
+impl Plugin for MyWidgetPlugin {
+    fn build(&self, app: &mut App) {
+        app.add_plugins(ComponentThemePlugin::<MyWidget>::default());
+    }
+}
+
+#[derive(Component, Clone, Debug, Default, Reflect, UiContext)]
+#[reflect(Component)]
+pub struct MyWidget;
+
+impl DefaultTheme for MyWidget {
+    fn default_theme() -> Option<Theme<MyWidget>> {
+        MyWidget::theme().into()
+    }
+}
+
+impl MyWidget {
+    pub fn theme() -> Theme<MyWidget> {
+        let base_theme = PseudoTheme::deferred(None, MyWidget::primary_style);
+        Theme::new(vec![base_theme])
+    }
+
+    fn primary_style(style_builder: &mut StyleBuilder, theme_data: &ThemeData) {
+        let theme_spacing = theme_data.spacing;
+        let colors = theme_data.colors();
+
+        style_builder
+            .background_color(colors.surface(Surface::Surface))
+            .padding(UiRect::all(Val::Px(theme_spacing.gaps.small)));
+    }
+
+    fn frame() -> impl Bundle {
+        (Name::new("My Widget"), NodeBundle::default())
+    }
+}
+
+pub trait UiMyWidgetExt {
+    fn my_widget(
+        &mut self,
+        spawn_children: impl FnOnce(&mut UiBuilder<Entity>),
+    ) -> UiBuilder<Entity>;
+}
+
+impl UiMyWidgetExt for UiBuilder<'_, Entity> {
+    fn my_widget(
+        &mut self,
+        spawn_children: impl FnOnce(&mut UiBuilder<Entity>),
+    ) -> UiBuilder<Entity> {
+        self.container((MyWidget::frame(), MyWidget), spawn_children)
+    }
+}
+```
+
+While we have seen most of the above from the previous snippets, there are a couple additions.
+
+First, an additional plugin has been injected to our app in the widget's plugin definition:
+
+```rust
+impl Plugin for MyWidgetPlugin {
+    fn build(&self, app: &mut App) {
+        // This here is very important!
+        app.add_plugins(ComponentThemePlugin::<MyWidget>::default());
+    }
+}
+```
+
+The `ComponentThemePlugin` handles theme calculation and reloading for the component is is added for. 
+In this case we added it for `MyWidget`, which is the example component.
+
+> [!IMPORTANT]
+> `MyWidget` now ***must*** derives `UiContext`. This derive provides default implementation for the context 
+> we will look at later in [Contextually themed widgets](#contextually-themed-widgets).
+
+Next, we have the implementation of `DefaultTheme`:
+
+```rust
+impl DefaultTheme for MyWidget {
+    fn default_theme() -> Option<Theme<MyWidget>> {
+        MyWidget::theme().into()
+    }
+}
+```
+
+This is the theme that will be applied (unless it returns `None`) to any widget in the widget tree that has no
+overrides on any of its ancestors. We will look at how this works exactly in the [Theming](#theming) section.
+
+For now, the key point is that it is generally desirable to implement the default theme of the widget as part
+of this implementation so an explicit injection is not needed or a sane fallback is provided.
+
+The last part is the actual definition of the theme as part of the widget's `impl` block:
+
+```rust
+impl MyWidget {
+    pub fn theme() -> Theme<MyWidget> {
+        let base_theme = PseudoTheme::deferred(None, MyWidget::primary_style);
+        Theme::new(vec![base_theme])
+    }
+
+    fn primary_style(style_builder: &mut StyleBuilder, theme_data: &ThemeData) {
+        let theme_spacing = theme_data.spacing;
+        let colors = theme_data.colors();
+
+        style_builder
+            .background_color(colors.surface(Surface::Surface))
+            .padding(UiRect::all(Val::Px(theme_spacing.gaps.small)));
+    }
+
+    // ...
+}
+```
+
+The two function above define the theme itself and the styling that is applied as part of the
+[PseudoTheme](#pseudo-theme) of `None`. This is simply the style that is applied when the widget has no special
+[PseudoState](#pseudo-states) attached to it. It is the base theme and the fallback style that is always applied
+to any new entities that are added to the widget tree. It is also the basis of any overrides.
+
+In the simplest use case, defining the style is just a matter of calling style function on the
+provided `style_builder`. The methods availbale here are the same as the ones provided by the `UiStyle`
+extensions outlined in [Did I mention style?](#did-i-mention-style) with a few additions.
+
+> [!TIP]
+> See [Style builder](#style-builder) further below for information on what it provides.
+
+With this, we have a convenient place to implement all our styling needs.
+
+> [!IMPORTANT]
+> Styles defined in a theme are applied in `PostUpdate` as part of the `DynamicStylePostUpdate` system set.
+> This means that any style the node was created with (as overrides in the spawn bundle) or those that were
+> applied via `.style()` commands will potentially be overwritten here.
+
+
+### Contextually themed widgets
+
+Contextually themed widgets take [Themed widgets](#themed-widgets) a step further by allowing the styling to be
+applied to sub-widgets defined as part of the main widget. The snippet `Sickle UI contexted themed plugin widget`
+generates the following shell:
+
+```rust
+pub struct MyWidgetPlugin;
+
+impl Plugin for MyWidgetPlugin {
+    fn build(&self, app: &mut App) {
+        app.add_plugins(ComponentThemePlugin::<MyWidget>::default());
+    }
+}
+
+#[derive(Component, Clone, Debug, Reflect)]
+#[reflect(Component)]
+pub struct MyWidget {
+    label: Entity,
+}
+
+impl Default for MyWidget {
+    fn default() -> Self {
+        Self {
+            label: Entity::PLACEHOLDER,
+        }
+    }
+}
+
+impl DefaultTheme for MyWidget {
+    fn default_theme() -> Option<Theme<MyWidget>> {
+        MyWidget::theme().into()
+    }
+}
+
+impl UiContext for MyWidget {
+    fn get(&self, target: &str) -> Result<Entity, String> {
+        match target {
+            MyWidget::LABEL => Ok(self.label),
+            _ => Err(format!(
+                "{} doesn't exists for MyWidget. Possible contexts: {:?}",
+                target,
+                self.contexts()
+            )),
+        }
+    }
+
+    fn contexts(&self) -> Vec<&'static str> {
+        vec![MyWidget::LABEL]
+    }
+}
+
+impl MyWidget {
+    pub const LABEL: &'static str = "Label";
+
+    pub fn theme() -> Theme<MyWidget> {
+        let base_theme = PseudoTheme::deferred(None, MyWidget::primary_style);
+        Theme::new(vec![base_theme])
+    }
+
+    fn primary_style(style_builder: &mut StyleBuilder, theme_data: &ThemeData) {
+        let theme_spacing = theme_data.spacing;
+        let colors = theme_data.colors();
+        let font = theme_data
+            .text
+            .get(FontStyle::Body, FontScale::Medium, FontType::Regular);
+
+        style_builder
+            .background_color(colors.surface(Surface::Surface))
+            .padding(UiRect::all(Val::Px(theme_spacing.gaps.small)));
+
+        style_builder
+            .switch_target(MyWidget::LABEL)
+            .sized_font(font);
+    }
+
+    fn frame() -> impl Bundle {
+        (Name::new("My Widget"), NodeBundle::default())
+    }
+}
+
+pub trait UiMyWidgetExt {
+    fn my_widget(
+        &mut self,
+        spawn_children: impl FnOnce(&mut UiBuilder<Entity>),
+    ) -> UiBuilder<Entity>;
+}
+
+impl UiMyWidgetExt for UiBuilder<'_, Entity> {
+    fn my_widget(
+        &mut self,
+        spawn_children: impl FnOnce(&mut UiBuilder<Entity>),
+    ) -> UiBuilder<Entity> {
+        let label = self
+            .label(LabelConfig {
+                label: "MyWidget".into(),
+                ..default()
+            })
+            .id();
+
+        self.container((MyWidget::frame(), MyWidget { label }), spawn_children)
+    }
+}
+```
+
+> [!TIP]
+> The snippets also supports tab points, so you can quickly name the widget and plugin in a consistent manner.
+
+Now, our widget component is no longer just a tag. It now has a reference to a label sub-widget:
+
+```rust
+#[derive(Component, Clone, Debug, Reflect)]
+#[reflect(Component)]
+pub struct MyWidget {
+    label: Entity,
+}
+
+impl Default for MyWidget {
+    fn default() -> Self {
+        Self {
+            label: Entity::PLACEHOLDER,
+        }
+    }
+}
+```
+
+We need to implement `Default` for it manually, since `Entity` has no default. Using `Entity::PLACEHOLDER` is
+alright as long as we make sure we always assign an actual entity to it (otherwise it will panic!).
+
+But this isnt't the only addition. Now our sippet defined an implementation for `UiContext` we previously
+got from a simple `derive`:
+
+```rust
+impl UiContext for MyWidget {
+    fn get(&self, target: &str) -> Result<Entity, String> {
+        match target {
+            MyWidget::LABEL => Ok(self.label),
+            _ => Err(format!(
+                "{} doesn't exists for MyWidget. Possible contexts: {:?}",
+                target,
+                self.contexts()
+            )),
+        }
+    }
+
+    fn contexts(&self) -> Vec<&'static str> {
+        vec![MyWidget::LABEL]
+    }
+}
+```
+
+This tells the theming system that `MyWidget` has a single additional context (besides the main entity).
+The additional context can be accessed by the `MyWidget::LABEL` constant, which was added to the `ìmpl` block:
+
+```rust 
+impl MyWidget {
+    pub const LABEL: &'static str = "Label";
+
+    // ...
+}
+```
+
+Further down we can also see a change: The `primary_style` now applies styling to the label!
+
+```rust
+impl MyWidget {    
+    // ...
+    
+    fn primary_style(style_builder: &mut StyleBuilder, theme_data: &ThemeData) {
+        let theme_spacing = theme_data.spacing;
+        let colors = theme_data.colors();
+        let font = theme_data
+            .text
+            .get(FontStyle::Body, FontScale::Medium, FontType::Regular);
+
+        style_builder
+            .background_color(colors.surface(Surface::Surface))
+            .padding(UiRect::all(Val::Px(theme_spacing.gaps.small)));
+
+        style_builder
+            .switch_target(MyWidget::LABEL)
+            .sized_font(font);
+    }
+
+    // ...    
+}
+```
+
+In the above code, there is a call on `style_builder` to `switch_target` to our label and set its font size.
+Refer to [Style builder](#style-builder) for how this works in detail.
+
+> [!CAUTION]
+> All subsequent calls to `style_builder` will be applied to the target. You can `reset_target` on the builder
+> to swap to the main widget again, but it is more readable to have each target in a single chain / group. 
+
+
+### That's it?
+
+In a nutshell, yes. If you use the snippets, you can quickly set up a complex widget tree and define each
+sub-widget's style by chaining the calls to the `style_builder`. Of course, there are other ways to interact
+with the theming process, such as accesing the world or the current widget component, but the heart of it is
+the same: A theme, made up of pseudo themes that build the styling of the widget and its sub-widgets.
+
+
 ## Theming
+
+### Pseudo theme
+
+### Pseudo states
+
+### Style builder
+
+### Dynamic style
