@@ -759,6 +759,24 @@ impl Default for MyWidget {
         }
     }
 }
+
+// ...
+
+impl UiMyWidgetExt for UiBuilder<'_, Entity> {
+    fn my_widget(
+        &mut self,
+        spawn_children: impl FnOnce(&mut UiBuilder<Entity>),
+    ) -> UiBuilder<Entity> {
+        let label = self
+            .label(LabelConfig {
+                label: "MyWidget".into(),
+                ..default()
+            })
+            .id();
+
+        self.container((MyWidget::frame(), MyWidget { label }), spawn_children)
+    }
+}
 ```
 
 We need to implement `Default` for it manually, since `Entity` has no default. Using `Entity::PLACEHOLDER` is
