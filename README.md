@@ -177,6 +177,9 @@ fn setup(mut commands: Commands) {
 > (outermost) entity, while the internal builder is for its content view (that will be clipped to
 > the frame!).
 
+> [!NOTE]
+> Styling interactions is not possible this way. These are only static styles.
+
 This means that in _some_ cases, this also works as expected:
 
 ```rust
@@ -560,6 +563,9 @@ impl UiMyWidgetExt for UiBuilder<'_, Entity> {
 
 While we have seen most of the above from the previous snippets, there are a couple additions.
 
+
+#### The ComponentThemePlugin
+
 First, an additional plugin has been injected to our app in the widget's plugin definition:
 
 ```rust
@@ -849,7 +855,7 @@ In the above code, there is a call on `style_builder` to `switch_target` to our 
 Refer to [Style builder](#style-builder) for how this works in detail.
 
 > [!CAUTION]
-> Once a target is set all subsequent calls to `style_builder` will be applied to the target.
+> Once a target is set, all subsequent calls to `style_builder` will be applied to the target.
 > You can `reset_target` on the builder to swap to the main widget again, but it is more readable
 > to have each target in a single chain / group.
 
@@ -912,15 +918,161 @@ they are not a complete subset of the entity's state.
 > be applied in the order they were added to the [Theme](#theme)!
 
 
+### What triggers theming?
+
+If the [ComponentThemePlugin::<C>](#the-componentthemeplugin) is in place, the following changes trigger
+themes to be processed for the managed component `C`:
+
+- Entity added with `C`: The theme for each new entity will be evaluated and applied
+- [Theme data](#theme-data) resource changed: All entities with `C` will be processed
+- Any `Theme<C>` added, changed, or removed: All entities with `C` will be processed
+- Any entity with component `C` will be re-processed if their [PseudoStates](#pseudo-states) changes
+(or if it has been removed).
+
+> [!TIP]
+> In case the `ComponentThemePlugin` was not used, theme processing can be manually triggered by calling
+> `commands.entity(entity).refresh_theme::<C>();`.
+
+
 ### Can I use CSS?
 
+No.
+
+
+#### But technically, if I write my own parser?
+
+Still no. Themes are related to components, and there is no theme merging across components. This is because
+`sickle_ui` does not support defining relation between component themes to achieve this (for multiple reasons).
+
+HOWEVER! If we are talking about the case where developers no longer use the `C` in `CSS` it is possible.
+
+Modern web development usually follows some sort of style simplification to avoid running into issues with
+ambigous specificities or the performance cost of deeply nested styles (not to mention minimization). One
+widespread method is to use the BEM (Block, Element, Modifier) notation to compose class names. Combined with
+a pre-processor like SASS and some discipline, most single page apps have a single-level nested style sheet.
+
+Parsing such a style sheet, generating a `bevy` component for each of the classes, then transforming the style
+to themes should be entirely possible. Because of how theme overrides work some nesting can also be achieved so
+long as two themes don't style the same _entity_. To make this work well, the brave developer would need to
+implement:
+
+- A setup that removes nesting from raw CSS (BEM + SASS is a good starting point)
+- Something* to parse the above mentioned "flat" CSS to generate components and themes
+- Systems that automatically inject theme overrides to achieve nesting
+- And finally some systems to automatically apply `PseudoState`s matching that of CSS. See
+[PseudoStates](#pseudo-states) for what is already implemented and how to use it.
+
+> [!NOTE]
+> To support hot-reloading the parser would need to work with a single, pre-defined component that has information
+> on what CSS `class` it corresponds to on any given entity. Themes then can use this information to recover
+> the style sheet of such an entity. The scaffolding to allow this approach already exist in `sickle_ui`.
+
+
+#### Will you..
+
+No.
+
+
 ### Theme
+
+`Theme<C + DefaultTheme>` is a standard `bevy` component used to hold [PseudoTheme](#pseudo-theme)s. Inserting
+a `Theme::<C>` component in the widget tree will override styling for `C` components below (or on) it.
 
 
 ### Pseudo theme
 
+`PseudoTheme<C>` is a carrier struct to map a list of `PseudoState`s to _builders_ for styling. While this
+struct can be created directly with a `DynamicStyleBuilder` variant, it is recommended to use one of the
+exposed function:
+
+- [PseudoTheme::build](crates/sickle_ui_scaffold/src/theme.rs#L116)
+- [PseudoTheme::deferred](crates/sickle_ui_scaffold/src/theme.rs#L129)
+- [PseudoTheme::deferred_context](crates/sickle_ui_scaffold/src/theme.rs#L139)
+- [PseudoTheme::deferred_world](crates/sickle_ui_scaffold/src/theme.rs#L149)
+- [PseudoTheme::deferred_info_world](crates/sickle_ui_scaffold/src/theme.rs#L159)
+
+#### `build`
+
+`build` requires a simple callback that accepts a `StyleBuilder` instance to setup the entity style.
+This style builder is immediatelly evaluated to generate the `DynamicStyle` that will be copied to
+entities. Switching context on the style builder emits a warning. This is because the target context
+cannot be known at compile time.
+
+
+#### `deferred` variants
+
+Deferred builders are stored as callbacks and evaluated when the theming system is applying styling.
+Depending on the variant you use, the callback will receive a different set of parameters:
+
+- `deferred` will receive the style builder and the theme data resource
+- `deferred_context` will additionally receive `&C`, which is a reference to the styled component instance.
+- `deferred_world` will receive the entity (ID), `&C`, and a readonly reference to the `World`.
+- `deferred_info_world` will additionally receive the ID of the theme that is being applied and the set of
+`PseudoState`s. These are both optional as the theming could be done from the `DefaultTheme` for the base
+pseudo theme (defined for `None`). This callback is useful if the whole context is needed to map a callback
+to an external stylesheet implementation.
+
+> [!IMPORTANT]
+> Callbacks may be evaluated even if the final style they generate will be discarded entirely. This is because
+> The overrides are calculated per-attribute and not per-pseudo theme!
+
+
 ### Pseudo states
+
+`PseudoStates` is a `bevy` component with the sole purpose of holding `PseudoState` variants. This component
+is monitored by the [ComponentThemePlugin::<C>](#the-componentthemeplugin), see 
+[What triggers theming?](#what-triggers-theming) for how it ties into it.
+
+`EntityCommands` extensions are provided with the trait 
+[ManagePseudoStateExt](crates/sickle_ui_scaffold/src/ui_commands.rs#L551) to manage the list as follows:
+
+- `add_pseudo_state`: used to add a `PseudoState`
+- `remove_pseudo_state`: used to remove a `PseudoState`
+
+There are a couple of systems that automatically apply certain `PseudoState`s to entities, but these are all
+opt-in:
+
+- Entities tagged with `FlexDirectionToPseudoState` will be processed to set either 
+`PseudoState::LayoutRow` or `PseudoState::LayoutColumn` based on their `Style`'s `flex_direction`.
+The update is done in `PostUpdate` before `ThemeUpdate`, so themes will automatically process changes in layout.
+- Entities tagged with `VisibilityToPseudoState` will be processed to set or remove `PseudoState::Visible`
+from their list of `PseudoStates`. This update considers actual visibility based on the entity's
+`Visibility` and `InheritedVisibility`, updated only on changes to either of these. The update is done in
+`PostUpdate`, after `VisibilitySystems::VisibilityPropagate`, but before `ThemeUpdate`.
+- An entity's position among its siblings with component `C` can be tracked with the
+`HierarchyToPseudoState::<C>` plugin. This plugin will set `PseudoState::FirstChild`, `PseudoState::LastChild`,
+`PseudoState::NthChild(i)`, `PseudoState::SingleChild`, `PseudoState::EvenChild`, and
+`PseudoState::OddChild` as appropriate.
+
+Most build-in widgets will also set `PseudoState`s based on user interaction, such as a `Dropdown` will set
+`PseudoState::Open` when the list of options should be visible. These are annotated on the `UiBuilder` extensions.
+
 
 ### Style builder
 
+
+
 ### Dynamic style
+
+### Theme data
+
+
+## Utilities
+
+### FluxInteraction
+
+### ScrollInteraction
+
+### DragInteraction
+
+### DropInteraction
+
+### ResizeInteraction
+
+### UiContextRoot
+
+### UiUtils
+
+### UiCommands
+
+### Context Menu

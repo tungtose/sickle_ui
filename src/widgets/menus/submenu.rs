@@ -447,6 +447,10 @@ impl UiSubmenuSubExt for UiBuilder<'_, Submenu> {
 }
 
 pub trait UiSubmenuExt {
+    /// A submenu in a menu, context menu, or submenu
+    ///
+    /// ### PseudoState usage
+    /// - `PseudoState::Open` is used when the submenu panel is visible
     fn submenu(
         &mut self,
         config: SubmenuConfig,

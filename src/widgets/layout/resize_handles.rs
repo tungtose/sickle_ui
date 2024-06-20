@@ -689,6 +689,11 @@ pub trait UiResizeHandlesExt {
 }
 
 impl UiResizeHandlesExt for UiBuilder<'_, Entity> {
+    /// A set of handles that can be dragged for resizing. Actual resize implementation is up to 
+    /// widgets that incorporate these handles. See e.g. FloatingPanel, SizedZone.
+    /// 
+    /// ### PseudoState usage
+    /// - `PseudoState::Resizable(_)` states are used to indicate which direction the container is resizable in.
     fn resize_handles(
         &mut self,
         marker: impl Bundle + Clone,

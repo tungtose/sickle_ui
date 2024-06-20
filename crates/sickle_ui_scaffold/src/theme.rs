@@ -273,7 +273,7 @@ where
         q_targets: Query<Entity, With<C>>,
         q_added_targets: Query<Entity, Added<C>>,
         q_removed_themes: RemovedComponents<Theme<C>>,
-        q_changed_themes: Query<(Entity, &Theme<C>), Changed<Theme<C>>>,
+        q_changed_themes: Query<Entity, Changed<Theme<C>>>,
         theme_data: Res<ThemeData>,
         mut commands: Commands,
     ) {

@@ -996,6 +996,7 @@ pub trait UiTabContainerExt {
 }
 
 impl UiTabContainerExt for UiBuilder<'_, Entity> {
+    /// A simple tab container.
     fn tab_container(
         &mut self,
         spawn_children: impl FnOnce(&mut UiBuilder<(Entity, TabContainer)>),
@@ -1050,6 +1051,10 @@ impl UiTabContainerSubExt for UiBuilder<'_, (Entity, TabContainer)> {
         self.context().0
     }
 
+    /// Adds a tab to the TabContainer
+    /// 
+    /// ### PseudoState usage
+    /// - `PseudoState::Selected` is added to the tab currently selected per TabContainer
     fn add_tab(
         &mut self,
         title: String,

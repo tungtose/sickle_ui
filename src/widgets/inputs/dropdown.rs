@@ -644,6 +644,10 @@ pub trait UiDropdownExt {
 }
 
 impl UiDropdownExt for UiBuilder<'_, Entity> {
+    /// A simple dropdown with options.
+    /// 
+    /// ### PseudoState usage
+    /// - `PseudoState::Open`, when the options panel should be visible
     fn dropdown(
         &mut self,
         options: Vec<impl Into<String>>,

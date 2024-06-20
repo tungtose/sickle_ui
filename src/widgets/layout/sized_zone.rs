@@ -774,6 +774,15 @@ pub trait UiSizedZoneExt {
 }
 
 impl UiSizedZoneExt for UiBuilder<'_, Entity> {
+    /// A sized zone, that can be resized by dragging its edge handle.
+    /// Nested sized zones automatically change layout direction to fit the resizing axis.
+    /// 
+    /// ### PseudoState usage
+    /// - `PseudoState::LayoutRow` and `PseudoState::LayoutColumn` are added automatically
+    /// - `PseudoState::FirstChild`, `PseudoState::LastChild`, `PseudoState::NthChild(i)`, 
+    /// `PseudoState::SingleChild`, `PseudoState::EvenChild`, and `PseudoState::OddChild`
+    /// are added automatically
+    /// - `PseudoState::Resizable(_)` is used transiently to configure the zone resize handles.
     fn sized_zone(
         &mut self,
         config: SizedZoneConfig,

@@ -920,6 +920,11 @@ pub trait UiFloatingPanelExt {
 }
 
 impl UiFloatingPanelExt for UiBuilder<'_, Entity> {
+    /// A floating panel that can be optionally dragable, foldable, and closable.
+    /// 
+    /// ### PseudoState usage
+    /// - `PseudoState::Folded` is used when the panel is folded
+    /// - `PseudoState::Resizable(_)` is transiently used by its resize handles
     fn floating_panel(
         &mut self,
         config: FloatingPanelConfig,

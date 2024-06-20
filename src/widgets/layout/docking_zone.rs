@@ -807,6 +807,10 @@ pub trait UiDockingZoneExt {
 }
 
 impl UiDockingZoneExt for UiBuilder<'_, Entity> {
+    /// A flexible docking zone, able to receive `FloatingPanels` and dock them in its `TabContainer`
+    /// 
+    /// ### PseudoState usage
+    /// - `PseudoState::Visible` is used by its `DockingZoneHighlight`
     fn docking_zone(
         &mut self,
         config: SizedZoneConfig,

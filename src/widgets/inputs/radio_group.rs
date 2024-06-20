@@ -355,6 +355,10 @@ pub trait UiRadioGroupExt {
 }
 
 impl UiRadioGroupExt for UiBuilder<'_, Entity> {
+    /// A simple radio group with options. Optionally, the radio group can be "unselected"
+    /// 
+    /// ### PseudoState usage
+    /// - `PseudoState::Checked` is added to the currently selected `RadioButton` entity
     fn radio_group(
         &mut self,
         options: Vec<impl Into<String>>,

@@ -303,6 +303,10 @@ impl Menu {
 }
 
 pub trait UiMenuExt {
+    /// A menu in a MenuBar
+    ///
+    /// ### PseudoState usage
+    /// - `PseudoState::Open` is used when the menu panel is visible
     fn menu(
         &mut self,
         config: MenuConfig,

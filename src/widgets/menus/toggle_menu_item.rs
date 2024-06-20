@@ -197,6 +197,10 @@ impl ToggleMenuItem {
 }
 
 pub trait UiToggleMenuItemExt {
+    /// A toggle menu item in a menu, context menu, or submenu
+    /// 
+    /// ### PseudoState usage
+    /// - `PseudoState::Checked` is used when the item is checked
     fn toggle_menu_item(&mut self, config: ToggleMenuItemConfig) -> UiBuilder<Entity>;
 }
 
