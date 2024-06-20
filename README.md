@@ -1056,6 +1056,9 @@ from their list of `PseudoStates`. This update considers actual visibility based
 Most build-in widgets will also set `PseudoState`s based on user interaction, such as a `Dropdown` will set
 `PseudoState::Open` when the list of options should be visible, etc.. These are documented on the `UiBuilder` extensions themselves.
 
+> [!TIP] Oh no! I don't have a pseudo state I can abuse!
+> Don't you worry, there is a `PseudoState::Custom(String)` specfifically for such use cases.
+
 
 ### Style builder
 
@@ -1154,14 +1157,18 @@ fn animated_style(style_builder: &mut StyleBuilder, theme_data: &ThemeData) {
 > variants match). They can also convert it according to their chosen implementation, we don't judge.
 
 
-#### Switching targets ![checkbox retargeting](/assets/gifs/sickle_ui_checkbox_interaction.gif)
+#### Switching targets
+
+![checkbox retargeting](/assets/gifs/sickle_ui_checkbox_interaction.gif)
 
 As described in [Contextually themed widgets](#contextually-themed-widgets), widget components can
 manually implement [The UiContext](#the-uicontext) to provide additional styling targets / placements.
 
 Switching target on the style builder configures subsequent calls to target an entity other than the main one.
 The string labels used to identify targets are mapped to entities during the theme building process. The
-targets can only be entity properties of the widget component.
+targets can only be entity properties of the widget component. To rever back to styling the main widget, call
+`reset_target` on the style builder. Internally, the target is an `Option` and `None` always means "target the
+entity the `DynamicStyle` component is on".
 
 > [!CAUTION]
 > Manually building `DynamicStyle` components allow setting target entities directly, but this is not recommended.
@@ -1178,7 +1185,36 @@ interacted.
 
 #### Switching placements
 
+Switching placement, as opposed to switching the `target` of styling, changes where the `DynamicStyle`
+component will be injected. This means that interactions will be detected on the placement and thus can
+narrow down interactive area to sub-entities. Calling `reset_placement` reverts the builder to add
+attributes to the `DynamicStyle` of the main entity. Interanlly `placement` is an `Option`, and `None`
+means that new attributes are collected for the main entity being styled.
+
+> [!CAUTION]
+> The previously set `target` remains even after the switch. It is thus recommended to use
+> [switch_context](#switching-context) on the style builder instead to explicitly set the
+> placement and target together. `None` target will continue to target the entity the `DynamicStyle`
+> is placed on, hence it is not possible to style the main entity from a sub-widget.
+
+> [!TIP]
+> As a (intended) side-effect of the above, it is possible to use interactions on one sub-widget, while
+> targeting a different sub-widgets with the feedback styling.
+
+
+#### Switching context
+
+Switching context combines setting `placement` and `target` together, and is the recommended way to interact
+with the builder to change `placement`s. This is because the `target` may remain from a previous call and
+cause unwanted styling. Call `reset_context` on the style builder to remove both `placement` and `target` setting.
+
+
 #### I am missing an attribute I want to style!
+
+Don't worry, `sickle_ui` got you covered!
+
+All attribute types support a `custom` variant, that can be provided as a callback.
+
 
 ### Dynamic style
 
