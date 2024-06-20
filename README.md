@@ -16,7 +16,7 @@ cargo run --example simple_editor
 > [!WARNING]
 > THIS IS CURRENTLY IN HEAVY DEVELOPMENT
 
-The project has no crate release yet. If you still want to try it locally from 
+The project has no crate release yet. If you still want to try it locally from
 within your project, add a dependency on the repository directly.
 
 Main missing features:
@@ -72,7 +72,7 @@ sickle_ui = { rev = "a548517", git = "https://github.com/UmbraLuminosa/sickle_ui
 > [!NOTE]
 > change `rev = "..."` to a version of your chosing. Major versions are marked with a git tag.
 
-Once you have the new dependency, `cargo build` to download it. Now you are ready to use it, 
+Once you have the new dependency, `cargo build` to download it. Now you are ready to use it,
 so add it to your app as a plugin:
 
 ```rust
@@ -89,13 +89,13 @@ fn main() {
 ```
 
 The main `SickleUiPlugin` takes care of adding all the convenient features `sickle_ui` offers, and
-the `sickle_ui::prelude::*` brings into scope all available extensions. Have a look at the `simple_editor` 
+the `sickle_ui::prelude::*` brings into scope all available extensions. Have a look at the `simple_editor`
 example (that is displayed in the screenshot above) for how different parts work together.
 
 
 ## Foreword
 
-> [!IMPORTANT] 
+> [!IMPORTANT]
 > Sickle UI is primarily using `Commands` and `EntityCommands` to spawn, style, and configure widgets.
 > Systems using these widgets need to consider that the changes will not be reflected in the ECS `world`
 > until the next `apply_deferred` is executed. This is mostly automatic starting from `bevy 0.13`. Internally
@@ -104,17 +104,17 @@ example (that is displayed in the screenshot above) for how different parts work
 
 ## Basic use case
 
-In the most simple use cases you just want to use existing widgets to build up your UI. Sickle UI adds 
+In the most simple use cases you just want to use existing widgets to build up your UI. Sickle UI adds
 extensions to both `Commands` and `EntityCommands`, so in a regular system context you can quickly
 create a layout by calling a chain of functions. Comparing vanilla and Sickle UI:
 
 
 ### Vanilla `bevy`
 
-In Bevy, you can use `commands.spawn(bundle)` and `commands.entity(entity).with_children(builder)` to 
-spawn your entities. Typically, you would pass in a `NodeBundle`, `ButtonBundle`, or perhaps an 
+In Bevy, you can use `commands.spawn(bundle)` and `commands.entity(entity).with_children(builder)` to
+spawn your entities. Typically, you would pass in a `NodeBundle`, `ButtonBundle`, or perhaps an
 `ImageBundle` just to name a few. Then, you can use the `.with_children(builder)` extension to spawn
-sub-entities. This will quickly become verbose and convulated with Rust's borrowing rules. It will 
+sub-entities. This will quickly become verbose and convulated with Rust's borrowing rules. It will
 be difficult to create entities with two way references between parent and children, elements further
 down the tree, or siblings.
 
@@ -151,7 +151,7 @@ fn setup(mut commands: Commands) {
 }
 ```
 
-While this may seem as a simple shorthand, the key difference is that `column` and `row` in the 
+While this may seem as a simple shorthand, the key difference is that `column` and `row` in the
 callbacks are contextual builders themselves and they give you access to `commands` and, where
 available, `entity_commands`. You can easily jump to another entity to insert components,
 style, or spawn new sub-entitites without tripping Rust's borrow checker.
@@ -191,7 +191,7 @@ fn setup(mut commands: Commands) {
 
 The difference in the above is merely a styling choice of the developer (pun intended).
 
-> [!IMPORTANT] 
+> [!IMPORTANT]
 > Styling is applied as a regular command in the chain, so rendering of the component
 > will change the next time UI layout is calulated by `bevy` in its `PostUpdate` systems. The `style`
 > commands are mapped to the `Style` component fields and _some other_ component fields that affect
@@ -203,7 +203,7 @@ The difference in the above is merely a styling choice of the developer (pun int
 
 ### Noteworthy contexts
 
-As mentioned, all builder function have a context. 
+As mentioned, all builder function have a context.
 - The root one is `UiRoot`. The entity spawned in the `UiRoot` context does not have a `Parent` entity,
 hence it will be a root `Node`.
 - The most common regular context is `Entity`, which can be acquired by calling `commands.ui_builder(entity)`.
@@ -211,7 +211,7 @@ Where `entity` is an entity - ID - acquired by some other means, such as spawing
 
 > [!TIP]
 > Other contexts are specific for use cases, such as the tab container's or that of the menu system. You'll
-> find these eventually as you use these widgets, but they are generally transparent. Use the editor's 
+> find these eventually as you use these widgets, but they are generally transparent. Use the editor's
 > auto-complete feature to see what extensions are available in each!
 
 > [!CAUTION]
@@ -276,7 +276,7 @@ fn setup(mut commands: Commands) {
     }, |my_container|{
       // ... etc. my_container is an `Entity` context UiBuilder
     });
-  });  
+  });
 }
 ```
 
@@ -409,7 +409,7 @@ impl UiMyWidgetExt for UiBuilder<'_, Entity> {
 > snippet files, but it is recommended to avoid using `widget` as a trigger (it collides with often used `width`).
 
 > [!TIP]
-> The snippets support 3 tab points: The widget component name, the convenience `Name` component string, 
+> The snippets support 3 tab points: The widget component name, the convenience `Name` component string,
 > and the actual extension function name.
 
 You can then use your widget after bringing it into scope:
@@ -439,7 +439,8 @@ will be available. This also means that `style` commands are also available, so 
 ### Functional extension
 
 Functional extension simply means that your widget _does_ something beyond creating a pre-defined structure.
-You can use the snippet `Sickle UI plugin widget` to generate code similar to the one outlined in [Structural extensions](#structural-extensions), with the addition of a plugin:
+You can use the snippet `Sickle UI plugin widget` to generate code similar to the one outlined in
+[Structural extensions](#structural-extensions), with the addition of a plugin:
 
 ```rust
 pub struct MyWidgetPlugin;
@@ -492,10 +493,10 @@ Themed widgets refer to widgets that have a style defined for them in a central 
 also allow overrides to their style, based on their position in the widget tree or their [pseudo states](#pseudo-states).
 
 > [!IMPORTANT]
-> Themed widgets only apply style to their outermost `Node`, but not to their sub-nodes. Those are the 
+> Themed widgets only apply style to their outermost `Node`, but not to their sub-nodes. Those are the
 > [Contextually themed widgets](#contextually-themed-widgets).
 
-Similarly to the previous cases, there is a snippet to generate the shell of a themed widget: 
+Similarly to the previous cases, there is a snippet to generate the shell of a themed widget:
 The `Sickle UI themed plugin widget`.
 
 > [!TIP]
@@ -570,14 +571,17 @@ impl Plugin for MyWidgetPlugin {
 }
 ```
 
-The `ComponentThemePlugin` handles theme calculation and reloading for the component is is added for. 
+The `ComponentThemePlugin` handles theme calculation and reloading for the component is is added for.
 In this case we added it for `MyWidget`, which is the example component.
 
 > [!IMPORTANT]
-> `MyWidget` now ***must*** derives `UiContext`. This derive provides default implementation for the context 
+> `MyWidget` now ***must*** derives `UiContext`. This derive provides default implementation for the context
 > we will look at later in [Contextually themed widgets](#contextually-themed-widgets).
 
 Next, we have the implementation of `DefaultTheme`:
+
+
+#### The `DefaultTheme`
 
 ```rust
 impl DefaultTheme for MyWidget {
@@ -807,7 +811,7 @@ impl UiContext for MyWidget {
 This tells the theming system that `MyWidget` has a single additional context (besides the main entity).
 The additional context can be accessed by the `MyWidget::LABEL` constant, which was added to the `ìmpl` block:
 
-```rust 
+```rust
 impl MyWidget {
     pub const LABEL: &'static str = "Label";
 
@@ -818,9 +822,9 @@ impl MyWidget {
 Further down we can also see a change: The `primary_style` now applies styling to the label!
 
 ```rust
-impl MyWidget {    
+impl MyWidget {
     // ...
-    
+
     fn primary_style(style_builder: &mut StyleBuilder, theme_data: &ThemeData) {
         let theme_spacing = theme_data.spacing;
         let colors = theme_data.colors();
@@ -837,7 +841,7 @@ impl MyWidget {
             .sized_font(font);
     }
 
-    // ...    
+    // ...
 }
 ```
 
@@ -845,9 +849,9 @@ In the above code, there is a call on `style_builder` to `switch_target` to our 
 Refer to [Style builder](#style-builder) for how this works in detail.
 
 > [!CAUTION]
-> Once a target is set all subsequent calls to `style_builder` will be applied to the target. 
-> You can `reset_target` on the builder to swap to the main widget again, but it is more readable 
-> to have each target in a single chain / group. 
+> Once a target is set all subsequent calls to `style_builder` will be applied to the target.
+> You can `reset_target` on the builder to swap to the main widget again, but it is more readable
+> to have each target in a single chain / group.
 
 
 ### That's it?
@@ -859,6 +863,59 @@ the same: A theme, made up of pseudo themes that build the styling of the widget
 
 
 ## Theming
+
+Theming is the process of applying styling on an entity (`Node`) based on its position in the widget tree,
+function, and current state. A [Theme](#theme) is a collection of [PseudoTheme](#pseudo-theme)s, which define
+the style for an entity when it has the relevant `PseudoState`s in its [PseudoStates](#pseudo-states)
+collection component.
+
+Styling is done per-attribute, meaning each stylable attribute has its own entry in the final
+[DynamicStyle](#dynamic-style). Each [Theme](#theme) and their [PseudoTheme](#pseudo-theme)s are evaluated in
+a strict order to calculate the final style for each attribute.
+
+### Evaluation order
+
+When a themed component is added to the hierarchy, the system will look for all [Theme](#theme) components
+in its chain of ancestors (including itself) until it reaches a root entity. [DefaultTheme](#the-defaulttheme)
+implementations are checked last. Once the list of applicable [Theme](#theme)s are found, they are evaluated
+in reverse order. This means that the [DefaultTheme](#the-defaulttheme) is the first that will be evaluated,
+then any override starting from the root entity, down to the themed entity itself.
+
+Once we have the list of [Theme](#theme)s, each theme is expanded to collect the applicable
+[PseudoTheme](#pseudo-theme)s in their order of `specificity`. A [PseudoTheme](#pseudo-theme) is considered
+if, and only if, all of the `PseudoState`s it was defined for is on the entity. However, if it only defines
+a subset of `PseudoState`s it will still be considered, but before the ones that fully cover the states.
+
+> [!NOTE]
+> `specificity` is the number of `PseudoState`s that the [PseudoTheme](#pseudo-theme) was defined for.
+> The only exception is the case when a [PseudoTheme](#pseudo-theme) was defined for `None`, which is
+> considered the base pseudo theme of the entity.
+
+
+#### Exmaple:
+
+If an entity has the `PseudoState`s `[Checked, Disabled, FirstChild]` then [PseudoTheme](#pseudo-theme)s
+defined for `None`, `[Checked]`, `[Disabled]`, `[FirstChild]`, `[Checked, Disabled]`, `[Checked, FirstChild]`,
+and `[Checked, Disabled, FirstChild]` will be considered, in this order.
+
+If the entity only has the `[Checked]` state, then [PseudoTheme](#pseudo-theme)s defined for `None`, and
+`[Checked]` will be applied, but none of the others because they are either defiend for a disjoint set or
+they are not a complete subset of the entity's state.
+
+> [!IMPORTANT]
+> The [PseudoTheme](#pseudo-theme) defined for `None` or the empty set of `[]` are considered the base
+> pseudo themes. This means that they will always be applied before any of the more specific
+> [PseudoTheme](#pseudo-theme)s.
+
+> [!CAUTION]
+> When the `specificity` of a [PseudoTheme](#pseudo-theme) is the same as an other pseudo theme, they will
+> be applied in the order they were added to the [Theme](#theme)!
+
+
+### Can I use CSS?
+
+### Theme
+
 
 ### Pseudo theme
 
