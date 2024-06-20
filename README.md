@@ -887,6 +887,10 @@ Styling is done per-attribute, meaning each stylable attribute has its own entry
 > This is useful if the developer would like to have the _power_ of the interactive / animated styling,
 > but do not wish to pay the cost of the theming lookup in general. It is also useful for one-off widgets.
 
+> [!CAUTION]
+> `DynamicStyle` components are _removed_ by the theming system for any entity marked in the `UiContext`'s
+> `cleared_contexts`. By default, this is the whole list of its `contexts`.
+
 
 ### Evaluation order
 
@@ -942,6 +946,11 @@ themes to be processed for the managed component `C`:
 > In case the `ComponentThemePlugin` was not used, theme processing can be manually triggered by calling
 > `commands.entity(entity).refresh_theme::<C>();`.
 
+> [!TIP]
+> `ComponentThemePlugin` can be set to be a "custom" theme. This simply means that the processing will
+> take place in a system set called `CustomThemeUpdate`. This set is scheduled between `ThemeUpdate` and
+> `DynamicStyleUpdate` and lets developers alter or use the outcome of regular theming steps.
+
 
 ### Can I use CSS?
 
@@ -984,7 +993,7 @@ No.
 
 ### Theme
 
-`Theme<C + DefaultTheme>` is a standard `bevy` component used to hold [PseudoTheme](#pseudo-theme)s. Inserting
+`Theme<C + DefaultTheme>` is a `bevy` component used to hold [PseudoTheme](#pseudo-theme)s. Inserting
 a `Theme::<C>` component in the widget tree will override styling for `C` components below (or on) it.
 
 
@@ -1056,8 +1065,10 @@ from their list of `PseudoStates`. This update considers actual visibility based
 Most build-in widgets will also set `PseudoState`s based on user interaction, such as a `Dropdown` will set
 `PseudoState::Open` when the list of options should be visible, etc.. These are documented on the `UiBuilder` extensions themselves.
 
-> [!TIP] Oh no! I don't have a pseudo state I can abuse!
-> Don't you worry, there is a `PseudoState::Custom(String)` specfifically for such use cases.
+
+#### Oh no! I don't have a pseudo state I can abuse!
+
+Don't you worry, there is a `PseudoState::Custom(String)` specfifically for such use cases.
 
 
 ### Style builder
@@ -1213,17 +1224,56 @@ cause unwanted styling. Call `reset_context` on the style builder to remove both
 
 Don't worry, `sickle_ui` got you covered!
 
-All attribute types support a `custom` variant, that can be provided as a callback.
+All attribute types (static, interactive, animated) support a `custom` variant, that can be provided as
+a callback. `static` attributes receive the `Entity` and `&mut World` as arguments. `interactive` callbacks
+will receive the `Entity`, `FluxInteraction`, and `&mut World`, while `animated` callbacks will receive
+`Entity`, `AnimationState`, `&mut World`.
+
+You are free to mess up the whole wide world in these callbacks, no guarantees it won't blow up in your face :D
 
 
 ### Dynamic style
 
+`DynamicStyle` is a `bevy` component used to store the list of attributes that should be applied to the
+entity during its `PostUpdate` execution. The system set `DynamicStylePostUpdate` is available for
+scheduling purposes and it will always run after theming, but before `UiSystem::Layout`.
+
+Systems acting on this component apply the static styling immediately when the `DynamicStyle` changes, and
+will keep track and execute `interactive` and `animated` attribute application.
+
+> [!NOTE]
+> `DynamicStyle` will clean itself up as best it can. This means that a stylesheet with only staticly
+> styled attributes will be removed after the style has been applied. `interactive` and `animated`
+> styles will force the component to be kept.
+
+> [!WARNING]
+> `animated` styles can have a controller that is set to delete the attribute after the enter animation
+> has been executed. This is useful if the enter animation targets a property later controlled by the
+> component's own systems (i.e. FloatingPanel size).
+
+
 ### Theme data
+
+Theme data is an opinionated struct containing values useful for general purpose UI styling. Currently,
+it has colors loosely matching a Material3 theme, a set of gap sizes, area sizes, input sizes, font
+configuration, etc.
+
+Any `sickle_ui` widget that has variable values will depend on the default theme data.
+
+> [!CAUTION]
+> Updating the `ThemeData` resource will trigger all themes to be re-evaluated!
+
+> [!NOTE]
+> It is gently recommended that any widgets you create for editor purposes (or even games!) to use the
+> provided theme data resource. It is a great way to keep the UI widgets consistent across the application.
+
+> [!TIP]
+> Custom values are supported as deemed useful in the `ThemeData` struct to store app-specific exceptions.
 
 
 ## Utilities
 
-### FluxInteraction
+### FluxInteraction & FluxInteractionStopwatch
 
 ### ScrollInteraction
 
