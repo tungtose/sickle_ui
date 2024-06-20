@@ -178,7 +178,8 @@ fn setup(mut commands: Commands) {
 > the frame!).
 
 > [!NOTE]
-> Styling interactions is not possible this way. These are only static styles.
+> Styling interactions is not possible this way. These are only static styles. See 
+> [StyleBuilder](#style-builder) on how to apply interactive styling.
 
 This means that in _some_ cases, this also works as expected:
 
@@ -792,6 +793,8 @@ impl UiMyWidgetExt for UiBuilder<'_, Entity> {
 We need to implement `Default` for it manually, since `Entity` has no default. Using `Entity::PLACEHOLDER` is
 alright as long as we make sure we always assign an actual entity to it (otherwise it will panic!).
 
+#### The UiContext
+
 But this isnt't the only addition. Now our sippet defined an implementation for `UiContext` we previously
 got from a simple `derive`:
 
@@ -876,8 +879,14 @@ the style for an entity when it has the relevant `PseudoState`s in its [PseudoSt
 collection component.
 
 Styling is done per-attribute, meaning each stylable attribute has its own entry in the final
-[DynamicStyle](#dynamic-style). Each [Theme](#theme) and their [PseudoTheme](#pseudo-theme)s are evaluated in
-a strict order to calculate the final style for each attribute.
+[DynamicStyle](#dynamic-style) component attached to the entity. Each [Theme](#theme) and their
+[PseudoTheme](#pseudo-theme)s are evaluated in a strict order to calculate the final style for each attribute.
+
+> [!IMPORTANT]
+> [DynamicStyle](#dynamic-style) components can be generated and attached to entities manually as well.
+> This is useful if the developer would like to have the _power_ of the interactive / animated styling,
+> but do not wish to pay the cost of the theming lookup in general. It is also useful for one-off widgets.
+
 
 ### Evaluation order
 
@@ -994,7 +1003,7 @@ exposed function:
 #### `build`
 
 `build` requires a simple callback that accepts a `StyleBuilder` instance to setup the entity style.
-This style builder is immediatelly evaluated to generate the `DynamicStyle` that will be copied to
+This style builder is immediatelly evaluated to generate the `DynamicStyle` that will be cloned to
 entities. Switching context on the style builder emits a warning. This is because the target context
 cannot be known at compile time.
 
@@ -1004,7 +1013,7 @@ cannot be known at compile time.
 Deferred builders are stored as callbacks and evaluated when the theming system is applying styling.
 Depending on the variant you use, the callback will receive a different set of parameters:
 
-- `deferred` will receive the style builder and the theme data resource
+- `deferred` will receive the style builder and the [theme data](#theme-data) resource
 - `deferred_context` will additionally receive `&C`, which is a reference to the styled component instance.
 - `deferred_world` will receive the entity (ID), `&C`, and a readonly reference to the `World`.
 - `deferred_info_world` will additionally receive the ID of the theme that is being applied and the set of
@@ -1014,13 +1023,13 @@ to an external stylesheet implementation.
 
 > [!IMPORTANT]
 > Callbacks may be evaluated even if the final style they generate will be discarded entirely. This is because
-> The overrides are calculated per-attribute and not per-pseudo theme!
+> The overrides are calculated per-attribute and not per pseudo theme!
 
 
 ### Pseudo states
 
 `PseudoStates` is a `bevy` component with the sole purpose of holding `PseudoState` variants. This component
-is monitored by the [ComponentThemePlugin::<C>](#the-componentthemeplugin), see 
+is monitored by the [ComponentThemePlugin](#the-componentthemeplugin), see 
 [What triggers theming?](#what-triggers-theming) for how it ties into it.
 
 `EntityCommands` extensions are provided with the trait 
@@ -1042,15 +1051,134 @@ from their list of `PseudoStates`. This update considers actual visibility based
 - An entity's position among its siblings with component `C` can be tracked with the
 `HierarchyToPseudoState::<C>` plugin. This plugin will set `PseudoState::FirstChild`, `PseudoState::LastChild`,
 `PseudoState::NthChild(i)`, `PseudoState::SingleChild`, `PseudoState::EvenChild`, and
-`PseudoState::OddChild` as appropriate.
+`PseudoState::OddChild` as appropriate. This is also done in `PostUpdate` before `ThemeUpdate`.
 
 Most build-in widgets will also set `PseudoState`s based on user interaction, such as a `Dropdown` will set
-`PseudoState::Open` when the list of options should be visible. These are annotated on the `UiBuilder` extensions.
+`PseudoState::Open` when the list of options should be visible, etc.. These are documented on the `UiBuilder` extensions themselves.
 
 
 ### Style builder
 
+The style builder is the recommended way of generating [DynamicStyle](#dynamic-style) components as it lets
+developers chain together style attributes in a consistent fashion. On top of what `UiStyle` extensions allow,
+the style builder also adds `interactive` and `animated` properties. These properties tie into interactions
+from the user, such as hover, press, etc. to change styled attributes.
 
+The distinction between `interactive` and `animated` is that `interactive` styles apply immediately when an
+interaction occures. `animated` attributes perform some eased interpolation between start and end values to
+apply the final style.
+
+> [!NOTE]
+> `animated` properties break chaining of attributes. This is because animation properties are controlled in
+> the chain instead.
+
+In case you want to use the `StyleBuilder` without the [PseudoTheme](#pseudo-theme) fluff, you can simply
+create an instance:
+
+```rust
+let mut style_builder = StyleBuilder::new();
+style_builder
+    .width(Val::Percent(100.))
+    .height(Val::Percent(100.));
+
+let dynamic_style: DynamicStyle = style_builder.into();
+// Insert the dynamic stlye to your entity as any other `bevy` component.
+```
+
+> [!WARNING]
+> Switching context on the style builder emits a warning when directly converted to a `DynamicStyle`
+> This is because the target context cannot be known at compile time.
+
+> [!NOTE]
+> You can use `style_builder.convert_with(&context)` and pass in the relevant component instance reference.
+> This will proceed to build the style just like [Theming](#theming) would and will return with a
+> `Vec<(Option<Entity>, DynamicStyle)>`. Each `DynamicStyle` in the list is accompanied by an optional
+> [placement](#switching-placements) entity. When it is `None`, the `DynamicStyle` should be placed on the
+> entity the `&context` component was placed on.
+
+
+#### Example for interactive styling
+
+```rust
+fn interactive_style(style_builder: &mut StyleBuilder, theme_data: &ThemeData) {
+    style_builder
+        .interactive()
+        .width(InteractiveVals {
+            idle: Val::Px(100.),
+            hover: Val::Px(120.).into(),
+            ..default()
+        })
+        .height(InteractiveVals {
+            idle: Val::Px(100.),
+            press: Val::Px(120.).into(),
+            ..default()
+        });
+}
+```
+
+
+#### Example for animated styling
+
+```rust
+fn animated_style(style_builder: &mut StyleBuilder, theme_data: &ThemeData) {
+    let theme_spacing = theme_data.spacing;
+
+    style_builder
+        .animated()
+        .margin(AnimatedVals {
+            idle: UiRect::all(Val::Px(theme_spacing.gaps.medium)),
+            hover: UiRect::all(Val::Px(0.)).into(),
+            ..default()
+        })
+        .copy_from(theme_data.interaction_animation);
+
+    style_builder
+        .animated()
+        .scale(AnimatedVals {
+            idle: 1.,
+            enter_from: Some(0.),
+            ..default()
+        })
+        .copy_from(theme_data.enter_animation);
+}
+```
+
+> [!CAUTION]
+> `interactive` styles can switch between any variant of enum attributes, such as `Val`, as this is 
+> an immediate effect.
+> HOWEVER, `animated` attributes need compatible variants for `Lerp` calculations. It is not possible
+> to interpolate between `Val::Px(50.)` and `Val::Percent(100.)` without expensive calculations, so
+> `sickle_ui` simply doesn't do it out of the box. It doesn't mean the developer cannot do it, but they
+> need to use `deferred` callbacks that give access to the `world` and use provided utilities available
+> in [UiUtils](#uiutils) to convert one variant to the other during creation of the style (so that the
+> variants match). They can also convert it according to their chosen implementation, we don't judge.
+
+
+#### Switching targets ![checkbox retargeting](/assets/gifs/sickle_ui_checkbox_interaction.gif)
+
+As described in [Contextually themed widgets](#contextually-themed-widgets), widget components can
+manually implement [The UiContext](#the-uicontext) to provide additional styling targets / placements.
+
+Switching target on the style builder configures subsequent calls to target an entity other than the main one.
+The string labels used to identify targets are mapped to entities during the theme building process. The
+targets can only be entity properties of the widget component.
+
+> [!CAUTION]
+> Manually building `DynamicStyle` components allow setting target entities directly, but this is not recommended.
+
+> [!IMPORTANT]
+> Switching targets allows proxying interactions from the main component! Both `animated` and `interactive`
+> styles consider the interaction of their [placement](#switching-placements), i.e. the entity that holds the
+> `DynamicStyle` component. However, if the target of the styling is not the main entity, the interaction will
+> show up on the target instead.
+
+An example would be the checkbox, that applies styling to both the box and the label when the whole container is
+interacted.
+
+
+#### Switching placements
+
+#### I am missing an attribute I want to style!
 
 ### Dynamic style
 
@@ -1076,3 +1204,7 @@ Most build-in widgets will also set `PseudoState`s based on user interaction, su
 ### UiCommands
 
 ### Context Menu
+
+### Locked attributes
+
+### Tracked style state

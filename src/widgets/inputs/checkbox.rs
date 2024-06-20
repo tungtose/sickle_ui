@@ -256,7 +256,7 @@ pub trait UiCheckboxExt {
 
 impl UiCheckboxExt for UiBuilder<'_, Entity> {
     /// A simple checkbox with an optional label.
-    /// 
+    ///
     /// ### PseudoState usage
     /// - `PseudoState::Checked`, when the checkbox is in a checked state
     fn checkbox(&mut self, label: impl Into<Option<String>>, checked: bool) -> UiBuilder<Entity> {
