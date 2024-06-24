@@ -6,7 +6,7 @@
 mod fonts;
 mod icons;
 
-use bevy::prelude::*;
+use bevy::{asset::io::embedded::EmbeddedAssetRegistry, prelude::*};
 
 use fonts::BuiltInFontsPlugin;
 use icons::BuiltInIconsPlugin;
@@ -15,6 +15,7 @@ pub(crate) struct BuiltInAssetsPlugin;
 
 impl Plugin for BuiltInAssetsPlugin {
     fn build(&self, app: &mut App) {
+        app.init_resource::<EmbeddedAssetRegistry>();
         app.add_plugins((BuiltInFontsPlugin, BuiltInIconsPlugin));
     }
 }
